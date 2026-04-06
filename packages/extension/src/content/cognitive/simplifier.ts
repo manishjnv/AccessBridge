@@ -40,15 +40,34 @@ function removeElement(id: string): void {
 const FOCUS_STYLE_ID = `${STYLE_ID_PREFIX}focus-style`;
 const SPOTLIGHT_ID = `${STYLE_ID_PREFIX}spotlight`;
 
+const FOCUS_BORDER_ID = `${STYLE_ID_PREFIX}focus-border`;
+
 function buildFocusCSS(): string {
   return `
     #${SPOTLIGHT_ID} {
-      position: absolute;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
       z-index: ${Z_BASE + 5};
       pointer-events: none;
-      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.7);
-      border-radius: 4px;
-      transition: top 0.08s ease, left 0.08s ease, width 0.08s ease, height 0.08s ease;
+      background: rgba(0, 0, 0, 0.55);
+      transition: clip-path 0.4s ease-in-out;
+      clip-path: inset(0 0 0 0);
+    }
+    #${FOCUS_BORDER_ID} {
+      position: absolute;
+      z-index: ${Z_BASE + 6};
+      pointer-events: none;
+      border: 3px solid rgba(123, 104, 238, 0.85);
+      border-radius: 12px;
+      box-shadow: 0 0 30px 6px rgba(123, 104, 238, 0.45),
+                  inset 0 0 15px 3px rgba(123, 104, 238, 0.12);
+      transition: top 0.4s ease-in-out,
+                  left 0.4s ease-in-out,
+                  width 0.4s ease-in-out,
+                  height 0.4s ease-in-out;
     }
   `;
 }
@@ -151,12 +170,17 @@ export class CognitiveSimplifier {
 
   // ---- DOM refs (created lazily) ----
   private spotlightEl: HTMLElement | null = null;
+  private focusBorderEl: HTMLElement | null = null;
   private guideBarEl: HTMLElement | null = null;
   private shieldCounterEl: HTMLElement | null = null;
 
   // ---- bound listeners (so we can remove them) ----
   private readonly handleFocusMove: (e: MouseEvent) => void;
   private readonly handleGuideMove: (e: MouseEvent) => void;
+
+  // ---- focus mode debounce ----
+  private focusRafId: number | null = null;
+  private lastFocusTarget: HTMLElement | null = null;
 
   // ---- distraction tracking ----
   private hiddenFixedEls: { el: HTMLElement; prev: string }[] = [];
@@ -173,13 +197,46 @@ export class CognitiveSimplifier {
   enableFocusMode(): void {
     if (this.focusActive) return;
     this.focusActive = true;
+    console.log('[AccessBridge] Focus Mode ENABLED');
 
     injectStyle(FOCUS_STYLE_ID, buildFocusCSS());
 
-    const spot = document.createElement('div');
-    spot.id = SPOTLIGHT_ID;
-    document.body.appendChild(spot);
-    this.spotlightEl = spot;
+    // Full-screen dim overlay — all styles inline for bulletproof rendering
+    const overlay = document.createElement('div');
+    overlay.id = SPOTLIGHT_ID;
+    overlay.style.cssText = `
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      z-index: ${Z_BASE + 5} !important;
+      pointer-events: none !important;
+      background: rgba(0, 0, 0, 0.55) !important;
+      transition: clip-path 0.4s ease-in-out !important;
+      clip-path: inset(0 0 0 0) !important;
+    `;
+    document.body.appendChild(overlay);
+    this.spotlightEl = overlay;
+
+    // Purple border element that follows the focused block
+    const border = document.createElement('div');
+    border.id = FOCUS_BORDER_ID;
+    border.style.cssText = `
+      position: absolute !important;
+      z-index: ${Z_BASE + 6} !important;
+      pointer-events: none !important;
+      border: 3px solid rgba(123, 104, 238, 0.85) !important;
+      border-radius: 12px !important;
+      box-shadow: 0 0 30px 6px rgba(123, 104, 238, 0.45), inset 0 0 15px 3px rgba(123, 104, 238, 0.12) !important;
+      transition: top 0.4s ease-in-out, left 0.4s ease-in-out, width 0.4s ease-in-out, height 0.4s ease-in-out !important;
+      top: ${window.scrollY + window.innerHeight / 2 - 50}px;
+      left: ${window.innerWidth / 2 - 100}px;
+      width: 200px;
+      height: 100px;
+    `;
+    document.body.appendChild(border);
+    this.focusBorderEl = border;
 
     document.addEventListener('mousemove', this.handleFocusMove, { passive: true });
   }
@@ -188,27 +245,96 @@ export class CognitiveSimplifier {
     if (!this.focusActive) return;
     this.focusActive = false;
 
+    if (this.focusRafId !== null) {
+      cancelAnimationFrame(this.focusRafId);
+      this.focusRafId = null;
+    }
+    this.lastFocusTarget = null;
+
     document.removeEventListener('mousemove', this.handleFocusMove);
     removeElement(SPOTLIGHT_ID);
+    removeElement(FOCUS_BORDER_ID);
     removeStyle(FOCUS_STYLE_ID);
     this.spotlightEl = null;
+    this.focusBorderEl = null;
+  }
+
+  /**
+   * Walk up the DOM to find a meaningful content block rather than
+   * spotlighting tiny inline elements like <span> or <em>.
+   */
+  private findFocusBlock(el: HTMLElement): HTMLElement {
+    const MIN_SIZE = 60; // minimum width/height to be a useful spotlight target
+    const BLOCK_TAGS = new Set([
+      'P', 'DIV', 'SECTION', 'ARTICLE', 'LI', 'BLOCKQUOTE',
+      'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'FIGURE', 'TABLE',
+      'FORM', 'UL', 'OL', 'NAV', 'HEADER', 'FOOTER', 'MAIN',
+      'PRE', 'CODE', 'TD', 'TH', 'TR', 'DETAILS', 'SUMMARY',
+    ]);
+
+    let current: HTMLElement | null = el;
+    while (current && current !== document.body) {
+      const rect = current.getBoundingClientRect();
+      if (rect.width >= MIN_SIZE && rect.height >= MIN_SIZE && BLOCK_TAGS.has(current.tagName)) {
+        return current;
+      }
+      current = current.parentElement;
+    }
+
+    // Fallback: just use the original element if nothing better found
+    return el;
   }
 
   private onFocusMouseMove(e: MouseEvent): void {
     if (!this.spotlightEl) return;
 
-    const target = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
-    if (!target || target === this.spotlightEl) return;
+    // Use rAF to throttle updates to once per frame
+    if (this.focusRafId !== null) return;
+    this.focusRafId = requestAnimationFrame(() => {
+      this.focusRafId = null;
+      if (!this.spotlightEl) return;
 
-    const rect = target.getBoundingClientRect();
-    const scrollX = window.scrollX;
-    const scrollY = window.scrollY;
-    const pad = 4;
+      let target = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
+      if (!target || target === this.spotlightEl || target === this.focusBorderEl) return;
 
-    this.spotlightEl.style.top = `${rect.top + scrollY - pad}px`;
-    this.spotlightEl.style.left = `${rect.left + scrollX - pad}px`;
-    this.spotlightEl.style.width = `${rect.width + pad * 2}px`;
-    this.spotlightEl.style.height = `${rect.height + pad * 2}px`;
+      // Walk up to a meaningful content block
+      target = this.findFocusBlock(target);
+
+      // Skip if same target — avoid redundant style updates
+      if (target === this.lastFocusTarget) return;
+      this.lastFocusTarget = target;
+
+      const rect = target.getBoundingClientRect();
+      const pad = 12;
+
+      // Use box-shadow to dim everything except the focused area.
+      // The overlay becomes a small transparent box with a massive box-shadow.
+      const top = rect.top - pad;
+      const left = rect.left - pad;
+      const w = rect.width + pad * 2;
+      const h = rect.height + pad * 2;
+      const r = 12;
+
+      this.spotlightEl.style.background = 'transparent';
+      this.spotlightEl.style.clipPath = 'none';
+      this.spotlightEl.style.top = `${top}px`;
+      this.spotlightEl.style.left = `${left}px`;
+      this.spotlightEl.style.width = `${w}px`;
+      this.spotlightEl.style.height = `${h}px`;
+      this.spotlightEl.style.borderRadius = `${r}px`;
+      this.spotlightEl.style.boxShadow = '0 0 0 9999px rgba(0, 0, 0, 0.55)';
+      this.spotlightEl.style.transition = 'top 0.35s ease, left 0.35s ease, width 0.35s ease, height 0.35s ease';
+
+      // Move the purple border to match
+      if (this.focusBorderEl) {
+        const scrollX = window.scrollX;
+        const scrollY = window.scrollY;
+        this.focusBorderEl.style.top = `${rect.top + scrollY - pad}px`;
+        this.focusBorderEl.style.left = `${rect.left + scrollX - pad}px`;
+        this.focusBorderEl.style.width = `${rect.width + pad * 2}px`;
+        this.focusBorderEl.style.height = `${rect.height + pad * 2}px`;
+      }
+    });
   }
 
   // =====================================================================

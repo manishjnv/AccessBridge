@@ -362,10 +362,28 @@ function SensoryTab({
 }
 
 function toggleFeature(feature: string, enabled: boolean): void {
+  // 1. Save to storage (survives popup close, content script listens for changes)
+  chrome.storage.local.get('activeFeatures').then((result) => {
+    const features = (result.activeFeatures as Record<string, boolean>) || {};
+    features[feature] = enabled;
+    chrome.storage.local.set({ activeFeatures: features });
+  }).catch(() => {});
+
+  // 2. Send to background (for tracking active adaptations)
   chrome.runtime.sendMessage({
     type: 'TOGGLE_FEATURE',
     payload: { feature, enabled },
   }).catch(() => {});
+
+  // 3. Send directly to active tab's content script
+  chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
+    if (tab?.id) {
+      chrome.tabs.sendMessage(tab.id, {
+        type: 'TOGGLE_FEATURE_DIRECT',
+        payload: { feature, enabled },
+      }).catch(() => {});
+    }
+  });
 }
 
 function CognitiveTab({

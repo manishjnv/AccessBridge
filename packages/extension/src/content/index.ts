@@ -432,8 +432,7 @@ function listenForCommands(adapter: BaseAdapter, sensory: SensoryAdapter): void 
             else document.body.style.zoom = '';
           }
           if (s.contrastLevel !== undefined) {
-            if (s.contrastLevel !== 1.0) sensory.applyContrast(s.contrastLevel);
-            else document.body.style.filter = '';
+            sensory.applyContrast(s.contrastLevel);
           }
           if (s.lineHeight !== undefined) {
             if (s.lineHeight !== 1.5) sensory.applyLineHeight(s.lineHeight);
@@ -445,10 +444,7 @@ function listenForCommands(adapter: BaseAdapter, sensory: SensoryAdapter): void 
           }
           if (s.colorCorrectionMode !== undefined) sensory.applyColorCorrection(s.colorCorrectionMode);
           if (s.reducedMotion !== undefined) sensory.applyReducedMotion(s.reducedMotion);
-          if (s.highContrast !== undefined) {
-            if (s.highContrast) document.body.classList.add('a11y-high-contrast');
-            else document.body.classList.remove('a11y-high-contrast');
-          }
+          if (s.highContrast !== undefined) sensory.applyHighContrast(s.highContrast);
           sendResponse({ applied: true });
           break;
         }

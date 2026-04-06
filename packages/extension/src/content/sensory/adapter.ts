@@ -61,26 +61,36 @@ export class SensoryAdapter {
 
   applyContrast(level: number): void {
     const clamped = Math.max(0.5, Math.min(3.0, level));
-    document.body.style.filter = `contrast(${clamped})`;
+    this.currentContrast = clamped;
+    this.rebuildFilter();
     console.log(`[AccessBridge] Contrast applied: ${clamped}`);
   }
 
   applyColorCorrection(mode: string): void {
-    // Remove any existing color correction
-    document.body.style.removeProperty('filter');
+    this.currentColorMode = mode;
+    this.rebuildFilter();
+    console.log(`[AccessBridge] Color correction applied: ${mode}`);
+  }
 
-    if (mode === 'none') return;
+  /** Combine contrast + color correction into a single filter string */
+  private currentContrast = 1.0;
+  private currentColorMode = 'none';
 
-    const filterMap: Record<string, string> = {
+  private rebuildFilter(): void {
+    const parts: string[] = [];
+    if (this.currentContrast !== 1.0) {
+      parts.push(`contrast(${this.currentContrast})`);
+    }
+    const colorFilterMap: Record<string, string> = {
       protanopia: 'url(#a11y-protanopia)',
       deuteranopia: 'url(#a11y-deuteranopia)',
       tritanopia: 'url(#a11y-tritanopia)',
     };
-
-    const filterUrl = filterMap[mode];
-    if (filterUrl) {
-      document.body.style.filter = filterUrl;
+    const colorFilter = colorFilterMap[this.currentColorMode];
+    if (colorFilter) {
+      parts.push(colorFilter);
     }
+    document.body.style.filter = parts.length > 0 ? parts.join(' ') : '';
   }
 
   applyLineHeight(height: number): void {
@@ -98,68 +108,78 @@ export class SensoryAdapter {
 
   applyCursorSize(size: number): void {
     if (size > 1.5) {
-      document.body.classList.add('a11y-cursor-large');
+      this.injectRule('a11y-cursor', 'body { cursor: url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'32\' height=\'32\'%3E%3Ccircle cx=\'16\' cy=\'16\' r=\'14\' fill=\'%237b68ee\' opacity=\'0.7\'/%3E%3C/svg%3E") 16 16, auto !important; }');
     } else {
-      document.body.classList.remove('a11y-cursor-large');
+      this.removeRule('a11y-cursor');
     }
+    console.log(`[AccessBridge] Cursor size applied: ${size}`);
   }
 
   applyReducedMotion(enabled: boolean): void {
     if (enabled) {
-      document.body.classList.add('a11y-reduced-motion');
+      this.injectRule('a11y-reduced-motion',
+        '*, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important; }');
     } else {
-      document.body.classList.remove('a11y-reduced-motion');
+      this.removeRule('a11y-reduced-motion');
     }
+    console.log(`[AccessBridge] Reduced motion: ${enabled}`);
+  }
+
+  applyHighContrast(enabled: boolean): void {
+    if (enabled) {
+      this.injectRule('a11y-high-contrast',
+        'body { filter: contrast(1.5) !important; } ' +
+        '* { border-color: currentColor !important; outline-color: currentColor !important; } ' +
+        'a, a * { color: #ffff00 !important; } ' +
+        'button, [role="button"] { border: 2px solid currentColor !important; }');
+    } else {
+      this.removeRule('a11y-high-contrast');
+    }
+    console.log(`[AccessBridge] High contrast: ${enabled}`);
   }
 
   applyReadingMode(enabled: boolean): void {
-    const main = this.getMainContent();
     if (enabled) {
-      main?.classList.add('a11y-reading-mode');
-      document.body.classList.add('a11y-transition');
+      const main = this.getMainContent();
+      if (main && main instanceof HTMLElement) {
+        main.style.maxWidth = '65ch';
+        main.style.marginLeft = 'auto';
+        main.style.marginRight = 'auto';
+        main.style.lineHeight = '1.8';
+        main.style.wordSpacing = '0.16em';
+      }
     } else {
-      main?.classList.remove('a11y-reading-mode');
+      const main = this.getMainContent();
+      if (main && main instanceof HTMLElement) {
+        main.style.removeProperty('max-width');
+        main.style.removeProperty('margin-left');
+        main.style.removeProperty('margin-right');
+        main.style.removeProperty('line-height');
+        main.style.removeProperty('word-spacing');
+      }
     }
+    console.log(`[AccessBridge] Reading mode: ${enabled}`);
   }
 
   revertAll(): void {
-    // Remove all CSS classes
-    const classesToRemove = [
-      'a11y-font-scaled',
-      'a11y-contrast',
-      'a11y-line-height',
-      'a11y-letter-spacing',
-      'a11y-cursor-large',
-      'a11y-reduced-motion',
-      'a11y-transition',
-      'a11y-focus-visible',
-      'a11y-smart-targets',
-      'a11y-high-contrast',
-    ];
-    classesToRemove.forEach((c) => document.body.classList.remove(c));
-
-    // Remove reading mode from main content
-    this.getMainContent()?.classList.remove('a11y-reading-mode');
-
     // Reset inline styles
     document.body.style.zoom = '';
     document.body.style.filter = '';
 
-    // Remove injected style rules
-    this.removeRule('a11y-line-height');
-    this.removeRule('a11y-letter-spacing');
+    // Reset filter state
+    this.currentContrast = 1.0;
+    this.currentColorMode = 'none';
 
-    // Reset CSS custom properties
-    const varsToReset = [
-      '--a11y-font-scale',
-      '--a11y-contrast',
-      '--a11y-line-height',
-      '--a11y-letter-spacing',
-      '--a11y-cursor-size',
-    ];
-    varsToReset.forEach((v) => document.documentElement.style.removeProperty(v));
+    // Remove all injected style rules
+    const rules = ['a11y-line-height', 'a11y-letter-spacing', 'a11y-cursor',
+      'a11y-reduced-motion', 'a11y-high-contrast'];
+    rules.forEach(r => this.removeRule(r));
+
+    // Revert reading mode
+    this.applyReadingMode(false);
 
     this.activeAdaptations.clear();
+    console.log('[AccessBridge] All sensory adaptations reverted');
   }
 
   // ---------- Private helpers ----------

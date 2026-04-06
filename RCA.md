@@ -102,6 +102,21 @@ Track every bug fix: what broke, why, how it was fixed, and how to prevent recur
 
 ---
 
+## BUG-007: Sensory sliders (font scale, contrast, etc.) have no effect on page
+
+| Field | Detail |
+|-------|--------|
+| **Date** | 2026-04-06 |
+| **Severity** | High |
+| **Symptom** | Moving Font Scale slider to 2.0x has no visible effect on Wikipedia text. Same for contrast, line height, letter spacing |
+| **Root Cause** | Two issues: (1) `PROFILE_UPDATED` message handler in content script was a no-op — acknowledged but never called SensoryAdapter methods with the new values. (2) Font scaling CSS used `font-size: inherit !important` on `*` selector which Wikipedia's deeply specific selectors override |
+| **Fix** | (1) `PROFILE_UPDATED` handler now reads `profile.sensory` and calls each `sensory.apply*()` method. (2) Replaced `font-size: inherit` with CSS `zoom` property which works universally across all sites |
+| **Files Changed** | `packages/extension/src/content/index.ts`, `packages/extension/src/content/styles.css` |
+| **Commit** | `4f0ff17` |
+| **Prevention** | Any new popup slider/toggle MUST verify the message reaches the content script AND the content script actually applies it. Test on Wikipedia (complex CSS) not just simple pages. Use `zoom` for scaling, never `font-size: inherit` |
+
+---
+
 ## Checklist: Version Bump
 
 1. `packages/extension/manifest.json` — update `version` (SINGLE SOURCE OF TRUTH)

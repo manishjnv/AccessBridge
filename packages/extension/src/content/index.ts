@@ -469,7 +469,73 @@ function listenForCommands(adapter: BaseAdapter, sensory: SensoryAdapter): void 
           break;
         }
         case 'PROFILE_UPDATED': {
+          const updatedProfile = message.payload as {
+            sensory?: { fontScale?: number; contrastLevel?: number; lineHeight?: number; letterSpacing?: number; colorCorrectionMode?: string; reducedMotion?: boolean; highContrast?: boolean };
+          };
+          if (updatedProfile?.sensory) {
+            const s = updatedProfile.sensory;
+            if (s.fontScale !== undefined && s.fontScale !== 1.0) sensory.applyFontScale(s.fontScale);
+            if (s.contrastLevel !== undefined && s.contrastLevel !== 1.0) sensory.applyContrast(s.contrastLevel);
+            if (s.lineHeight !== undefined && s.lineHeight !== 1.5) sensory.applyLineHeight(s.lineHeight);
+            if (s.letterSpacing !== undefined && s.letterSpacing !== 0) sensory.applyLetterSpacing(s.letterSpacing);
+            if (s.colorCorrectionMode !== undefined) sensory.applyColorCorrection(s.colorCorrectionMode);
+            if (s.reducedMotion !== undefined) sensory.applyReducedMotion(s.reducedMotion);
+            if (s.highContrast !== undefined && s.highContrast) document.body.classList.add('a11y-high-contrast');
+            else document.body.classList.remove('a11y-high-contrast');
+            // Reset to defaults if values are back to normal
+            if (s.fontScale === 1.0) { document.documentElement.style.removeProperty('--a11y-font-scale'); document.body.classList.remove('a11y-font-scaled'); }
+            if (s.contrastLevel === 1.0) { document.documentElement.style.removeProperty('--a11y-contrast'); document.body.classList.remove('a11y-contrast'); }
+            if (s.lineHeight === 1.5) { document.documentElement.style.removeProperty('--a11y-line-height'); document.body.classList.remove('a11y-line-height'); }
+            if (s.letterSpacing === 0) { document.documentElement.style.removeProperty('--a11y-letter-spacing'); document.body.classList.remove('a11y-letter-spacing'); }
+          }
           sendResponse({ received: true });
+          break;
+        }
+        case 'TOGGLE_FEATURE_DIRECT': {
+          const { feature, enabled } = message.payload as { feature: string; enabled: boolean };
+          switch (feature) {
+            case 'focus-mode':
+              if (enabled) getCognitive().enableFocusMode();
+              else getCognitive().disableFocusMode();
+              break;
+            case 'reading-mode':
+              if (enabled) getCognitive().enableReadingGuide();
+              else getCognitive().disableReadingGuide();
+              break;
+            case 'distraction-shield':
+              if (enabled) getCognitive().enableDistractionShield();
+              else getCognitive().disableDistractionShield();
+              break;
+            case 'auto-summarize':
+              if (enabled) getAI().summarizePage(true).catch(() => {});
+              else getAI().dismiss();
+              break;
+            case 'text-simplify':
+              if (enabled) getAI().simplifyContent('mild').catch(() => {});
+              else getAI().dismiss();
+              break;
+            case 'voice-nav':
+              if (enabled) getVoice().start();
+              else getVoice().stop();
+              break;
+            case 'eye-tracking':
+              if (enabled) getEyeTracker().start();
+              else getEyeTracker().stop();
+              break;
+            case 'smart-targets':
+              if (enabled) adapter.apply({ id: 'direct-smart-targets', type: AdaptationType.CLICK_TARGET_ENLARGE, value: true, confidence: 1, applied: true, timestamp: Date.now(), reversible: true });
+              else adapter.revert('direct-smart-targets');
+              break;
+            case 'keyboard-only':
+              if (enabled) getKeyboard().start();
+              else getKeyboard().stop();
+              break;
+            case 'predictive-input':
+              if (enabled) getPredictive().start();
+              else getPredictive().stop();
+              break;
+          }
+          sendResponse({ success: true });
           break;
         }
       }
@@ -544,6 +610,21 @@ function applyAdaptation(adaptation: Adaptation, adapter: BaseAdapter, sensory: 
 }
 
 function revertAdaptation(id: string, adapter: BaseAdapter, _sensory: SensoryAdapter): void {
+  // Check if this is a manual feature toggle (id format: "manual-{feature}-{timestamp}")
+  if (id.startsWith('manual-')) {
+    const feature = id.replace(/^manual-/, '').replace(/-\d+$/, '');
+    switch (feature) {
+      case 'focus-mode': getCognitive().disableFocusMode(); return;
+      case 'reading-mode': getCognitive().disableReadingGuide(); return;
+      case 'distraction-shield': getCognitive().disableDistractionShield(); return;
+      case 'auto-summarize': getAI().dismiss(); return;
+      case 'text-simplify': getAI().dismiss(); return;
+      case 'voice-nav': getVoice().stop(); return;
+      case 'eye-tracking': getEyeTracker().stop(); return;
+      case 'keyboard-only': getKeyboard().stop(); return;
+      case 'predictive-input': getPredictive().stop(); return;
+    }
+  }
   adapter.revert(id);
 }
 
@@ -604,14 +685,10 @@ function init(): void {
   // Detect and activate domain-specific connector (banking, insurance, etc.)
   getDomainRegistry().detectAndActivate();
 
-  // Load profile and check for pre-enabled features
+  // Load profile for language setting only — features are toggled on demand via popup
   chrome.runtime.sendMessage({ type: 'GET_PROFILE' }).then((profile) => {
     if (!profile || typeof profile !== 'object') return;
-    const p = profile as {
-      language?: string;
-      motor?: { voiceNavigationEnabled?: boolean };
-      cognitive?: { focusModeEnabled?: boolean; distractionShield?: boolean };
-    };
+    const p = profile as { language?: string };
     // Set voice command language based on profile
     const langMap: Record<string, string> = {
       'en': 'en-US', 'hi': 'hi-IN', 'es': 'es-ES',
@@ -619,7 +696,6 @@ function init(): void {
       'ja': 'ja-JP', 'ar': 'ar-SA',
     };
     if (p.language && langMap[p.language]) {
-      // Voice system will use this language for recognition
       voiceCommands = new VoiceCommandSystem({
         lang: langMap[p.language],
         onCommand: (command: string, args: string) => {
@@ -627,16 +703,61 @@ function init(): void {
         },
       });
     }
-    if (p.motor?.voiceNavigationEnabled) getVoice().start();
-    if (p.cognitive?.focusModeEnabled) getCognitive().enableFocusMode();
-    if (p.cognitive?.distractionShield) getCognitive().enableDistractionShield();
-    // Dwell click and eye tracking from profile
-    const pm = profile as { motor?: { dwellClickEnabled?: boolean; dwellClickDelay?: number; eyeTrackingEnabled?: boolean; keyboardOnlyMode?: boolean; predictiveInput?: boolean } };
-    if (pm.motor?.dwellClickEnabled) getDwell().start(pm.motor?.dwellClickDelay);
-    if (pm.motor?.eyeTrackingEnabled) getEyeTracker().start();
-    if (pm.motor?.keyboardOnlyMode) getKeyboard().start();
-    if (pm.motor?.predictiveInput) getPredictive().start();
   }).catch(() => {});
+
+  // Listen for feature toggle changes via storage (survives popup close)
+  chrome.storage.onChanged.addListener((changes) => {
+    if (!changes.activeFeatures) return;
+    const oldFeatures = (changes.activeFeatures.oldValue as Record<string, boolean>) || {};
+    const newFeatures = (changes.activeFeatures.newValue as Record<string, boolean>) || {};
+
+    for (const [feature, enabled] of Object.entries(newFeatures)) {
+      if (oldFeatures[feature] === enabled) continue; // no change
+      console.log(`[AccessBridge] Feature toggled via storage: ${feature} = ${enabled}`);
+      switch (feature) {
+        case 'focus-mode':
+          if (enabled) getCognitive().enableFocusMode();
+          else getCognitive().disableFocusMode();
+          break;
+        case 'reading-mode':
+          if (enabled) getCognitive().enableReadingGuide();
+          else getCognitive().disableReadingGuide();
+          break;
+        case 'distraction-shield':
+          if (enabled) getCognitive().enableDistractionShield();
+          else getCognitive().disableDistractionShield();
+          break;
+        case 'auto-summarize':
+          if (enabled) getAI().summarizePage(true).catch(() => {});
+          else getAI().dismiss();
+          break;
+        case 'text-simplify':
+          if (enabled) getAI().simplifyContent('mild').catch(() => {});
+          else getAI().dismiss();
+          break;
+        case 'voice-nav':
+          if (enabled) getVoice().start();
+          else getVoice().stop();
+          break;
+        case 'eye-tracking':
+          if (enabled) getEyeTracker().start();
+          else getEyeTracker().stop();
+          break;
+        case 'smart-targets':
+          if (enabled) adapter.apply({ id: 'direct-smart-targets', type: AdaptationType.CLICK_TARGET_ENLARGE, value: true, confidence: 1, applied: true, timestamp: Date.now(), reversible: true });
+          else adapter.revert('direct-smart-targets');
+          break;
+        case 'keyboard-only':
+          if (enabled) getKeyboard().start();
+          else getKeyboard().stop();
+          break;
+        case 'predictive-input':
+          if (enabled) getPredictive().start();
+          else getPredictive().stop();
+          break;
+      }
+    }
+  });
 
   console.log('[AccessBridge] Content script initialized (Day 2)');
 }

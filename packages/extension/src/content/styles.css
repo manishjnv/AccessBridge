@@ -30,11 +30,7 @@
 
 /* ---- Font scaling ---- */
 .a11y-font-scaled {
-  font-size: calc(1em * var(--a11y-font-scale)) !important;
-}
-
-.a11y-font-scaled * {
-  font-size: inherit !important;
+  zoom: var(--a11y-font-scale) !important;
 }
 
 /* ---- Line height ---- */

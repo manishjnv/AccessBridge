@@ -1,45 +1,54 @@
 # AccessBridge - Shift Handoff
 
-## Current Session: Day 1 (April 6, 2026)
+## Last Session: Day 1 — Shift 1 (April 6, 2026)
 
 ### Completed
-- [x] GitHub repo initialized at E:\code\AccessBridge
+- [x] GitHub repo initialized at E:\code\AccessBridge (commit f4d53ee)
 - [x] Monorepo scaffold (pnpm workspaces, tsconfig, .gitignore)
-- [x] @accessbridge/core package: types (profile, signals, adaptation), ProfileStore (IndexedDB + AES-GCM encryption), StruggleDetector (10 signals, weighted scoring), DecisionEngine (rules-based + confidence)
-- [x] @accessbridge/extension package: Manifest V3, Vite build, React popup with 5 tabs (Overview, Sensory, Cognitive, Motor, Settings), content scripts with app adapters (Gmail, Outlook, generic), SensoryAdapter (font, contrast, color correction, reading mode)
-- [x] VPS infrastructure at /opt/accessbridge: docker-compose (API port 8100, Observatory port 8200, Nginx port 8300), all isolated from existing ti-platform
-- [x] VPS optimized: 2.4GB images cleaned, 4GB swap added, log rotation configured
-- [x] All a11yos references renamed to AccessBridge
-- [x] TypeScript type checking passes with zero errors
+- [x] @accessbridge/core: types (profile, signals, adaptation), ProfileStore (IndexedDB + AES-GCM), StruggleDetector (10 weighted signals), DecisionEngine (11 rules + confidence)
+- [x] @accessbridge/extension: Chrome Manifest V3, Vite build, React popup (5 tabs), content scripts (Gmail/Outlook/generic adapters), SensoryAdapter (font/contrast/color/reading mode), icons
+- [x] @accessbridge/ai-engine: 3-tier AI (local→Gemini Flash→Claude), caching/dedup, normalization, cost tracking, summarizer + simplifier services
+- [x] VPS infrastructure at /opt/accessbridge (Docker: API:8100, Observatory:8200, Nginx:8300)
+- [x] VPS optimized: 2.4GB freed, 4GB swap, log rotation
+- [x] All a11yos → AccessBridge renamed
+- [x] Feature documentation (10 docs)
+- [x] TypeScript zero errors, Vite build succeeds
+- [x] Auto-execute permissions configured (.claude/settings.local.json)
 
-### In Progress
-- [ ] @accessbridge/ai-engine package: layered AI (local → Gemini Flash → Claude), caching, dedup, cost tracking
-- [ ] Extension icon generation
-- [ ] Vite build verification (extension loads in Chrome)
+### NOT Done (Carry Forward)
+- [ ] Extension NOT tested in Chrome yet (build works, not sideloaded)
+- [ ] Codex plugin NOT used — must use from Day 2
+- [ ] GitHub remote NOT created — repo is local only
+- [ ] Struggle signals not wired to auto-adaptations yet
+- [ ] Cognitive Simplifier not implemented
+- [ ] Motor Assistor not implemented
+- [ ] No tests written yet
 
-### Blocked
-- Nothing currently blocked
-
-### Next Up (for next shift)
-- [ ] Verify extension builds and loads in Chrome developer mode
-- [ ] Test sensory adapter on Gmail and Outlook Web
-- [ ] Implement Struggle Signal Detection signal collectors in content script
-- [ ] Wire up Decision Engine to auto-apply adaptations
-- [ ] Begin Cognitive Simplifier (focus mode, reading mode, email summarization)
-- [ ] Begin Motor Assistor (Web Speech API voice commands)
+### Day 2 Priority (April 7)
+1. Load extension in Chrome, test popup UI works
+2. Wire struggle detection → decision engine → auto-apply adaptations
+3. Cognitive Simplifier: focus mode, reading mode, email summarization via AI engine
+4. Motor Assistor: Web Speech API voice commands, smart click targets
+5. Fatigue-Adaptive Interface: time-of-day progressive simplification
+6. Eye tracking: MediaPipe Face Mesh integration
 
 ### Architecture Notes
 - Monorepo: packages/core, packages/extension, packages/ai-engine
-- Extension uses workspace dependency on @accessbridge/core
+- Extension depends on @accessbridge/core via workspace:*
 - VPS SSH: `ssh a11yos-vps` or `ssh accessbridge-vps`
-- AI strategy: 3-tier (local free → Gemini Flash low-cost → Claude premium) with caching and cost tracking
-- All AI requests go through dedup cache and input normalization before hitting any provider
+- AI: 3-tier (local free → Gemini Flash → Claude) with cache + cost tracking
+- All on-device, zero network for accessibility data
 
 ### Key Commands
 ```
 pnpm install          # Install all deps
-pnpm build            # Build extension
+pnpm build            # Build extension to dist/
 pnpm typecheck        # Type check all packages
 pnpm dev              # Dev mode with watch
 ssh a11yos-vps        # SSH to VPS
 ```
+
+### Load Extension in Chrome
+1. chrome://extensions/
+2. Enable Developer Mode
+3. Load unpacked → E:\code\AccessBridge\packages\extension\dist

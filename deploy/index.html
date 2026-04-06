@@ -4,74 +4,175 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AccessBridge - Ambient Accessibility Operating Layer</title>
+  <meta name="description" content="AccessBridge: Zero-disclosure, AI-powered ambient accessibility for enterprise web apps. Chrome extension that auto-adapts to user struggles in real time.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
     :root {
       --bg: #0a0a1a;
+      --bg-alt: #0d0d22;
       --surface: #1a1a2e;
+      --surface-hover: #222240;
       --primary: #7b68ee;
       --accent: #bb86fc;
       --text: #e2e8f0;
       --muted: #94a3b8;
       --success: #10b981;
       --warning: #f59e0b;
+      --glow: rgba(123, 104, 238, 0.35);
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html { scroll-behavior: smooth; overflow-x: hidden; width: 100%; }
+    html { scroll-behavior: smooth; overflow-x: hidden; }
     body {
-      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
       background: var(--bg);
       color: var(--text);
       line-height: 1.6;
       min-height: 100vh;
-      min-height: 100dvh;
       overflow-x: hidden;
       width: 100%;
     }
-    .container { max-width: 100%; margin: 0 auto; padding: 0 5vw; width: 100%; }
+    .container { max-width: 1120px; margin: 0 auto; padding: 0 24px; width: 100%; }
 
-    /* Hero */
-    .hero {
-      text-align: center;
-      padding: 60px 0 48px;
-      background: linear-gradient(180deg, rgba(123,104,238,0.12) 0%, transparent 80%);
-      width: 100%;
+    /* --- Navbar --- */
+    .navbar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      background: rgba(10, 10, 26, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(123, 104, 238, 0.12);
+      padding: 0 24px;
+      transition: box-shadow 0.3s;
     }
-    .hero-badge {
-      display: inline-block;
-      background: rgba(123,104,238,0.2);
-      border: 1px solid rgba(123,104,238,0.4);
-      border-radius: 20px;
-      padding: 4px 16px;
-      font-size: 12px;
-      color: var(--accent);
-      margin-bottom: 16px;
+    .navbar.scrolled { box-shadow: 0 4px 24px rgba(0,0,0,0.4); }
+    .navbar-inner {
+      max-width: 1120px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 56px;
     }
-    .hero h1 {
-      font-size: clamp(2rem, 6vw, 3.2rem);
+    .navbar-brand {
       font-weight: 800;
+      font-size: 1.15rem;
       background: linear-gradient(135deg, var(--primary), var(--accent));
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
-      margin-bottom: 14px;
+      text-decoration: none;
     }
-    .hero p {
-      font-size: clamp(0.95rem, 2.5vw, 1.15rem);
+    .navbar-links { display: flex; gap: 28px; align-items: center; }
+    .navbar-links a {
       color: var(--muted);
-      max-width: 600px;
-      margin: 0 auto 28px;
-      padding: 0 12px;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 500;
+      transition: color 0.2s;
     }
-    .hero-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; padding: 0 12px; }
+    .navbar-links a:hover { color: var(--text); }
+    .navbar-cta {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 18px;
+      border-radius: 7px;
+      font-size: 13px;
+      font-weight: 600;
+      text-decoration: none;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      color: white !important;
+      -webkit-text-fill-color: white !important;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .navbar-cta:hover { transform: translateY(-1px); box-shadow: 0 4px 16px var(--glow); }
+    .navbar-toggle {
+      display: none;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 4px;
+    }
+    .navbar-toggle span {
+      display: block;
+      width: 22px;
+      height: 2px;
+      background: var(--text);
+      margin: 5px 0;
+      border-radius: 2px;
+      transition: all 0.3s;
+    }
+
+    /* --- Hero --- */
+    .hero {
+      text-align: center;
+      padding: 120px 0 64px;
+      background:
+        radial-gradient(ellipse 80% 60% at 50% 0%, rgba(123,104,238,0.18) 0%, transparent 70%),
+        radial-gradient(ellipse 40% 40% at 80% 20%, rgba(187,134,252,0.08) 0%, transparent 60%);
+      position: relative;
+    }
+    .hero::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(123,104,238,0.3), transparent);
+    }
+    .hero-badge {
+      display: inline-block;
+      background: rgba(123,104,238,0.15);
+      border: 1px solid rgba(123,104,238,0.35);
+      border-radius: 24px;
+      padding: 6px 20px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--accent);
+      margin-bottom: 20px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    .hero h1 {
+      font-size: clamp(2.4rem, 7vw, 4rem);
+      font-weight: 900;
+      background: linear-gradient(135deg, #fff 0%, var(--primary) 40%, var(--accent) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 8px;
+      letter-spacing: -1px;
+    }
+    .hero-tagline {
+      font-size: clamp(1rem, 2.5vw, 1.25rem);
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 12px;
+      opacity: 0.9;
+    }
+    .hero-desc {
+      font-size: clamp(0.9rem, 2vw, 1.05rem);
+      color: var(--muted);
+      max-width: 620px;
+      margin: 0 auto 32px;
+      padding: 0 16px;
+    }
+    .hero-actions { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; padding: 0 16px; }
     .btn {
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      padding: 11px 24px;
-      border-radius: 8px;
-      font-size: 14px;
+      padding: 13px 28px;
+      border-radius: 10px;
+      font-size: 15px;
       font-weight: 600;
       text-decoration: none;
-      transition: all 0.2s;
+      transition: all 0.25s;
       cursor: pointer;
       border: none;
       white-space: nowrap;
@@ -79,343 +180,855 @@
     .btn-primary {
       background: linear-gradient(135deg, var(--primary), var(--accent));
       color: white;
+      box-shadow: 0 4px 20px rgba(123,104,238,0.25);
     }
-    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(123,104,238,0.4); }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(123,104,238,0.45); }
     .btn-secondary {
       background: var(--surface);
       color: var(--text);
       border: 1px solid rgba(123,104,238,0.3);
     }
-    .btn-secondary:hover { border-color: var(--primary); }
+    .btn-secondary:hover { border-color: var(--primary); background: var(--surface-hover); }
 
-    /* Stats */
+    /* --- Stats --- */
+    .stats-section { padding: 48px 0 16px; }
     .stats {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-      gap: 12px;
-      padding: 32px 0;
-      width: 100%;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
     }
     .stat {
       text-align: center;
       background: var(--surface);
-      border-radius: 12px;
-      padding: 20px 12px;
-      border: 1px solid rgba(123,104,238,0.15);
+      border-radius: 14px;
+      padding: 24px 16px;
+      border: 1px solid rgba(123,104,238,0.12);
+      transition: border-color 0.2s, transform 0.2s;
     }
-    .stat-value { font-size: clamp(1.4rem, 4vw, 2rem); font-weight: 700; color: var(--accent); }
-    .stat-label { font-size: 12px; color: var(--muted); margin-top: 4px; }
+    .stat:hover { border-color: rgba(123,104,238,0.3); transform: translateY(-2px); }
+    .stat-value {
+      font-size: clamp(1.5rem, 4vw, 2.2rem);
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .stat-label { font-size: 12px; color: var(--muted); margin-top: 4px; font-weight: 500; }
 
-    /* Features */
+    /* --- How It Works --- */
+    .how-section {
+      padding: 72px 0;
+      background: var(--bg-alt);
+      position: relative;
+    }
+    .how-section::before,
+    .how-section::after {
+      content: '';
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(123,104,238,0.2), transparent);
+    }
+    .how-section::before { top: 0; }
+    .how-section::after { bottom: 0; }
     .section-title {
       text-align: center;
-      font-size: clamp(1.5rem, 4vw, 2rem);
-      font-weight: 700;
+      font-size: clamp(1.6rem, 4vw, 2.2rem);
+      font-weight: 800;
       margin-bottom: 10px;
+      letter-spacing: -0.5px;
     }
     .section-sub {
       text-align: center;
       color: var(--muted);
-      margin-bottom: 32px;
+      margin-bottom: 40px;
       font-size: clamp(0.9rem, 2vw, 1.05rem);
-      padding: 0 12px;
+      padding: 0 16px;
     }
-    .features {
+    .how-steps {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 16px;
-      padding-bottom: 48px;
-      width: 100%;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
     }
-    .feature {
+    .how-step {
+      text-align: center;
+      padding: 36px 24px;
       background: var(--surface);
-      border-radius: 12px;
-      padding: 24px;
-      border: 1px solid rgba(123,104,238,0.15);
-      transition: border-color 0.2s;
+      border-radius: 16px;
+      border: 1px solid rgba(123,104,238,0.12);
+      transition: border-color 0.2s, transform 0.2s;
+      position: relative;
     }
-    .feature:hover { border-color: var(--primary); }
-    .feature-icon {
-      width: 40px;
-      height: 40px;
-      background: rgba(123,104,238,0.15);
-      border-radius: 10px;
+    .how-step:hover { border-color: rgba(123,104,238,0.35); transform: translateY(-4px); }
+    .how-step-icon {
+      width: 64px;
+      height: 64px;
+      margin: 0 auto 16px;
+      background: linear-gradient(135deg, rgba(123,104,238,0.2), rgba(187,134,252,0.1));
+      border-radius: 16px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 20px;
-      margin-bottom: 12px;
     }
-    .feature h3 { font-size: 1rem; margin-bottom: 6px; }
-    .feature p { color: var(--muted); font-size: 13px; }
+    .how-step-num {
+      position: absolute;
+      top: -12px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 28px;
+      height: 28px;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      border-radius: 50%;
+      color: white;
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 28px;
+      text-align: center;
+    }
+    .how-step h3 { font-size: 1.1rem; margin-bottom: 8px; font-weight: 700; }
+    .how-step p { color: var(--muted); font-size: 14px; line-height: 1.6; }
 
-    /* Architecture */
+    /* --- Demo Section --- */
+    .demo-section { padding: 72px 0; }
+    .demo-card {
+      background: var(--surface);
+      border-radius: 20px;
+      border: 1px solid rgba(123,104,238,0.15);
+      overflow: hidden;
+    }
+    .demo-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 20px;
+      background: rgba(123,104,238,0.06);
+      border-bottom: 1px solid rgba(123,104,238,0.1);
+    }
+    .demo-dot { width: 10px; height: 10px; border-radius: 50%; }
+    .demo-dot-red { background: #ff5f56; }
+    .demo-dot-yellow { background: #ffbd2e; }
+    .demo-dot-green { background: #27c93f; }
+    .demo-header span {
+      margin-left: 8px;
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 500;
+    }
+    .demo-body {
+      padding: 40px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 32px;
+      align-items: center;
+    }
+    .demo-visual {
+      background: linear-gradient(135deg, rgba(123,104,238,0.12), rgba(187,134,252,0.06));
+      border-radius: 14px;
+      padding: 32px;
+      text-align: center;
+      border: 1px solid rgba(123,104,238,0.1);
+      min-height: 240px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+    }
+    .demo-visual p { color: var(--muted); font-size: 13px; }
+    .demo-signals {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .demo-signal {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 10px;
+      background: rgba(123,104,238,0.1);
+      border-radius: 6px;
+      font-size: 11px;
+      color: var(--accent);
+      font-weight: 500;
+    }
+    .demo-signal-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--success);
+      animation: pulse-dot 2s infinite;
+    }
+    .demo-info h3 { font-size: 1.4rem; font-weight: 700; margin-bottom: 12px; }
+    .demo-info p { color: var(--muted); font-size: 14px; margin-bottom: 16px; line-height: 1.7; }
+    .demo-feature-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .demo-feature-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 14px;
+      color: var(--text);
+    }
+    .demo-check {
+      flex-shrink: 0;
+      width: 20px;
+      height: 20px;
+      background: rgba(16, 185, 129, 0.15);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 2px;
+    }
+    .demo-check svg { width: 12px; height: 12px; }
+
+    /* --- Features --- */
+    .features-section { padding: 72px 0; background: var(--bg-alt); position: relative; }
+    .features-section::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(123,104,238,0.2), transparent);
+    }
+    .features {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+    }
+    .feature {
+      background: var(--surface);
+      border-radius: 14px;
+      padding: 28px;
+      border: 1px solid rgba(123,104,238,0.1);
+      transition: border-color 0.25s, transform 0.25s, box-shadow 0.25s;
+    }
+    .feature:hover {
+      border-color: rgba(123,104,238,0.35);
+      transform: translateY(-3px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+    }
+    .feature-icon {
+      width: 44px;
+      height: 44px;
+      background: linear-gradient(135deg, rgba(123,104,238,0.15), rgba(187,134,252,0.08));
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      margin-bottom: 14px;
+    }
+    .feature h3 { font-size: 1rem; margin-bottom: 8px; font-weight: 700; }
+    .feature p { color: var(--muted); font-size: 13px; line-height: 1.6; }
+
+    /* --- Architecture --- */
+    .arch-section { padding: 72px 0; }
     .arch {
       background: var(--surface);
-      border-radius: 16px;
-      padding: clamp(16px, 4vw, 32px);
-      margin-bottom: 48px;
-      border: 1px solid rgba(123,104,238,0.15);
-      width: 100%;
+      border-radius: 18px;
+      padding: 36px;
+      border: 1px solid rgba(123,104,238,0.12);
     }
-    .arch h2 { margin-bottom: 20px; }
+    .arch h2 { margin-bottom: 24px; }
     .arch-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 12px;
-      width: 100%;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px;
     }
     .arch-item {
-      background: rgba(123,104,238,0.08);
-      border-radius: 8px;
-      padding: 14px;
+      background: rgba(123,104,238,0.06);
+      border-radius: 10px;
+      padding: 18px;
       border-left: 3px solid var(--primary);
+      transition: background 0.2s;
     }
-    .arch-item h4 { color: var(--accent); margin-bottom: 4px; font-size: 13px; }
-    .arch-item p { color: var(--muted); font-size: 12px; }
+    .arch-item:hover { background: rgba(123,104,238,0.1); }
+    .arch-item h4 { color: var(--accent); margin-bottom: 6px; font-size: 13px; font-weight: 700; }
+    .arch-item p { color: var(--muted); font-size: 12px; line-height: 1.6; }
 
-    /* Install */
+    /* --- Install CTA --- */
+    .install-section { padding: 0 0 72px; }
     .install {
-      background: linear-gradient(135deg, rgba(123,104,238,0.15), rgba(187,134,252,0.1));
-      border-radius: 16px;
-      padding: clamp(20px, 4vw, 36px) clamp(16px, 3vw, 24px);
+      background:
+        linear-gradient(135deg, rgba(123,104,238,0.18), rgba(187,134,252,0.08)),
+        var(--surface);
+      border-radius: 20px;
+      padding: 48px 32px;
       text-align: center;
-      margin-bottom: 48px;
-      border: 1px solid rgba(123,104,238,0.3);
-      width: 100%;
+      border: 1px solid rgba(123,104,238,0.25);
+      position: relative;
+      overflow: hidden;
     }
-    .install h2 { margin-bottom: 10px; }
-    .install p { color: var(--muted); margin-bottom: 20px; font-size: 14px; }
+    .install::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle at 30% 30%, rgba(123,104,238,0.08) 0%, transparent 50%);
+      pointer-events: none;
+    }
+    .install h2 {
+      font-size: clamp(1.5rem, 4vw, 2rem);
+      margin-bottom: 10px;
+      position: relative;
+    }
+    .install > p {
+      color: var(--muted);
+      margin-bottom: 24px;
+      font-size: 15px;
+      position: relative;
+    }
+    .install .btn { position: relative; font-size: 16px; padding: 14px 32px; }
     .install-steps {
       display: flex;
-      gap: 16px;
+      gap: 18px;
       justify-content: center;
       flex-wrap: wrap;
-      margin-top: 20px;
+      margin-top: 28px;
+      position: relative;
     }
     .step {
-      background: var(--surface);
-      border-radius: 10px;
-      padding: 16px 20px;
+      background: rgba(10, 10, 26, 0.6);
+      border-radius: 12px;
+      padding: 18px 22px;
       text-align: left;
       flex: 1;
-      min-width: 180px;
-      max-width: 240px;
+      min-width: 190px;
+      max-width: 260px;
+      border: 1px solid rgba(123,104,238,0.1);
     }
     .step-num {
       display: inline-block;
-      width: 26px;
-      height: 26px;
-      background: var(--primary);
+      width: 28px;
+      height: 28px;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
       color: white;
       border-radius: 50%;
       text-align: center;
-      line-height: 26px;
+      line-height: 28px;
       font-weight: 700;
       font-size: 13px;
-      margin-bottom: 8px;
+      margin-bottom: 10px;
     }
-    .step p { font-size: 13px; color: var(--muted); }
-
-    /* Footer */
-    footer {
-      border-top: 1px solid rgba(123,104,238,0.15);
-      padding: 28px 0;
-      text-align: center;
-      color: var(--muted);
+    .step h4 { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+    .step p { font-size: 13px; color: var(--muted); line-height: 1.5; }
+    .step code {
+      background: rgba(123,104,238,0.15);
+      padding: 1px 6px;
+      border-radius: 4px;
       font-size: 12px;
+      color: var(--accent);
     }
-    footer a { color: var(--accent); text-decoration: none; }
 
-    /* API Health indicator */
+    /* --- Footer --- */
+    footer {
+      border-top: 1px solid rgba(123,104,238,0.12);
+      padding: 40px 0 32px;
+      background: var(--bg-alt);
+    }
+    .footer-inner {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+    .footer-brand h3 {
+      font-size: 1.1rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 6px;
+    }
+    .footer-brand p {
+      color: var(--muted);
+      font-size: 13px;
+      max-width: 320px;
+      line-height: 1.6;
+    }
+    .footer-links { display: flex; gap: 40px; }
+    .footer-col h4 {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text);
+      margin-bottom: 12px;
+      font-weight: 700;
+    }
+    .footer-col a {
+      display: block;
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 13px;
+      margin-bottom: 8px;
+      transition: color 0.2s;
+    }
+    .footer-col a:hover { color: var(--accent); }
+    .footer-bottom {
+      margin-top: 28px;
+      padding-top: 20px;
+      border-top: 1px solid rgba(123,104,238,0.08);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .footer-bottom p { color: var(--muted); font-size: 12px; }
+    .footer-bottom a { color: var(--accent); text-decoration: none; }
+    .footer-bottom a:hover { text-decoration: underline; }
+    .footer-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    /* API Health */
     .health-dot {
       display: inline-block;
       width: 8px; height: 8px;
       border-radius: 50%;
-      margin-right: 6px;
       background: var(--success);
       animation: pulse-dot 2s infinite;
     }
     @keyframes pulse-dot {
       0%, 100% { opacity: 1; }
-      50% { opacity: 0.5; }
+      50% { opacity: 0.4; }
     }
 
-    /* ---- Mobile responsive ---- */
+    /* --- Fade-in animation --- */
+    .fade-in {
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity 0.6s ease, transform 0.6s ease;
+    }
+    .fade-in.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* ---- Responsive: Tablet ---- */
+    @media (max-width: 1024px) {
+      .features { grid-template-columns: repeat(2, 1fr); }
+      .demo-body { grid-template-columns: 1fr; }
+      .demo-visual { min-height: 200px; }
+    }
+
+    /* ---- Responsive: Mobile ---- */
     @media (max-width: 768px) {
-      .container { padding: 0 4vw; }
-      .hero { padding: 40px 0 32px; }
-      .stats { grid-template-columns: repeat(2, 1fr); gap: 10px; }
-      .features { grid-template-columns: 1fr; gap: 12px; }
-      .feature { padding: 20px; }
+      .navbar-links { display: none; }
+      .navbar-toggle { display: block; }
+      .navbar-links.open {
+        display: flex;
+        flex-direction: column;
+        position: absolute;
+        top: 56px;
+        left: 0;
+        right: 0;
+        background: rgba(10, 10, 26, 0.98);
+        backdrop-filter: blur(12px);
+        padding: 20px 24px;
+        gap: 16px;
+        border-bottom: 1px solid rgba(123,104,238,0.15);
+      }
+      .hero { padding: 100px 0 48px; }
+      .stats { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+      .how-steps { grid-template-columns: 1fr; gap: 20px; }
+      .features { grid-template-columns: 1fr; gap: 14px; }
+      .feature { padding: 22px; }
+      .arch { padding: 24px; }
       .arch-grid { grid-template-columns: 1fr; }
-      .install-steps { flex-direction: column; align-items: stretch; }
+      .install { padding: 36px 20px; }
+      .install-steps { flex-direction: column; align-items: center; }
       .step { max-width: 100%; min-width: auto; width: 100%; }
+      .footer-inner { flex-direction: column; }
+      .footer-links { gap: 28px; }
+      .footer-bottom { flex-direction: column; text-align: center; }
+      .demo-body { padding: 24px; gap: 24px; }
     }
 
     @media (max-width: 480px) {
-      .container { padding: 0 3.5vw; }
-      .hero { padding: 32px 0 24px; }
-      .hero-actions { flex-direction: column; align-items: stretch; }
-      .btn { width: 100%; justify-content: center; }
+      .container { padding: 0 16px; }
+      .hero { padding: 88px 0 36px; }
+      .hero-actions { flex-direction: column; align-items: center; }
+      .btn { width: 100%; justify-content: center; max-width: 300px; }
       .stats { grid-template-columns: repeat(2, 1fr); gap: 8px; }
-      .stat { padding: 16px 8px; }
-      .stat-value { font-size: 1.3rem; }
+      .stat { padding: 18px 10px; }
+      .stat-value { font-size: 1.4rem; }
       .stat-label { font-size: 11px; }
-      .feature { padding: 16px; }
-      .feature h3 { font-size: 0.95rem; }
-      .feature p { font-size: 12px; }
+      .how-step { padding: 28px 20px; }
+      .demo-body { padding: 20px; }
+      .demo-visual { padding: 24px; min-height: 180px; }
     }
   </style>
 </head>
 <body>
 
-  <section class="hero">
+  <!-- Navbar -->
+  <nav class="navbar" id="navbar">
+    <div class="navbar-inner">
+      <a href="#top" class="navbar-brand">AccessBridge</a>
+      <div class="navbar-links" id="nav-links">
+        <a href="#how-it-works">How It Works</a>
+        <a href="#features">Features</a>
+        <a href="#architecture">Architecture</a>
+        <a href="https://github.com/manishjnv/AccessBridge" target="_blank">GitHub</a>
+        <a href="#install" class="navbar-cta">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+          Install
+        </a>
+      </div>
+      <button class="navbar-toggle" id="nav-toggle" aria-label="Toggle navigation menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <section class="hero" id="top">
     <div class="container">
       <div class="hero-badge">Wipro TopGear Ideathon 2026</div>
       <h1>AccessBridge</h1>
-      <p>The Ambient Accessibility Operating Layer. Zero disclosure, AI-powered, cross-application accessibility for enterprise web apps.</p>
+      <p class="hero-tagline">The Ambient Accessibility Operating Layer</p>
+      <p class="hero-desc">A Chrome extension that silently detects user struggles and auto-adapts any web app in real time. Zero disclosure. Zero configuration. Powered by on-device AI.</p>
       <div class="hero-actions">
-        <a href="/downloads/accessbridge-extension.zip" class="btn btn-primary">
+        <a href="#install" class="btn btn-primary">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-          Download Extension
+          Install Extension
         </a>
         <a href="https://github.com/manishjnv/AccessBridge" target="_blank" class="btn btn-secondary">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
-          GitHub
+          View on GitHub
         </a>
       </div>
     </div>
   </section>
 
-  <section class="container">
-    <div class="stats">
-      <div class="stat">
-        <div class="stat-value">10+</div>
-        <div class="stat-label">Accessibility Features</div>
-      </div>
-      <div class="stat">
-        <div class="stat-value">25+</div>
-        <div class="stat-label">Voice Commands</div>
-      </div>
-      <div class="stat">
-        <div class="stat-value">8</div>
-        <div class="stat-label">Languages Supported</div>
-      </div>
-      <div class="stat">
-        <div class="stat-value">0</div>
-        <div class="stat-label">Network Dependency</div>
-      </div>
-    </div>
-  </section>
-
-  <section class="container">
-    <h2 class="section-title">Core Features</h2>
-    <p class="section-sub">Ambient, invisible accessibility that adapts in real-time to user struggles</p>
-    <div class="features">
-      <div class="feature">
-        <div class="feature-icon">&#x1f9e0;</div>
-        <h3>Struggle Detection</h3>
-        <p>Real-time behavioral signal analysis: scroll velocity, click accuracy, typing rhythm, cursor path, dwell time, hesitation patterns.</p>
-      </div>
-      <div class="feature">
-        <div class="feature-icon">&#x2699;&#xfe0f;</div>
-        <h3>Auto Adaptations</h3>
-        <p>Decision engine evaluates struggle scores and automatically applies font scaling, contrast, layout simplification, and more.</p>
-      </div>
-      <div class="feature">
-        <div class="feature-icon">&#x1f3af;</div>
-        <h3>Focus &amp; Reading Mode</h3>
-        <p>Cognitive simplifier with spotlight focus, distraction shield, and reading guide for users with attention difficulties.</p>
-      </div>
-      <div class="feature">
-        <div class="feature-icon">&#x1f3a4;</div>
-        <h3>Voice Commands</h3>
-        <p>20+ hands-free commands via Web Speech API: scroll, click, type, navigate tabs, zoom, find text, and more. Hindi supported.</p>
-      </div>
-      <div class="feature">
-        <div class="feature-icon">&#x1f441;&#xfe0f;</div>
-        <h3>Eye Tracking</h3>
-        <p>Webcam-based gaze cursor for motor-impaired users. Face-position tracking with 5-point calibration and smooth interpolation.</p>
-      </div>
-      <div class="feature">
-        <div class="feature-icon">&#x1f5b1;&#xfe0f;</div>
-        <h3>Dwell Click</h3>
-        <p>Auto-click after configurable hover delay. Radial SVG progress indicator, 15px movement threshold, visual pulse feedback.</p>
-      </div>
-      <div class="feature">
-        <div class="feature-icon">&#x1f4a4;</div>
-        <h3>Fatigue-Adaptive UI</h3>
-        <p>4-level progressive interface simplification based on time-of-day, session duration, and declining interaction rates.</p>
-      </div>
-      <div class="feature">
-        <div class="feature-icon">&#x1f916;</div>
-        <h3>AI-Powered Insights</h3>
-        <p>3-tier AI engine (local free, Gemini Flash, Claude) for page summarization, text simplification, and readability scoring.</p>
-      </div>
-      <div class="feature">
-        <div class="feature-icon">&#x1f30d;</div>
-        <h3>Multi-Language</h3>
-        <p>Voice commands in Hindi, English, Spanish, French, German, Chinese, Japanese, Arabic. Profile-based language selection.</p>
-      </div>
-    </div>
-  </section>
-
-  <section class="container">
-    <div class="arch">
-      <h2 class="section-title" style="text-align:left">Architecture</h2>
-      <div class="arch-grid">
-        <div class="arch-item">
-          <h4>@accessbridge/core</h4>
-          <p>Types, ProfileStore, StruggleDetector, DecisionEngine. Zero dependencies.</p>
+  <!-- Stats -->
+  <section class="stats-section">
+    <div class="container">
+      <div class="stats">
+        <div class="stat fade-in">
+          <div class="stat-value">10+</div>
+          <div class="stat-label">Accessibility Features</div>
         </div>
-        <div class="arch-item">
-          <h4>@accessbridge/extension</h4>
-          <p>Manifest V3 Chrome extension. React popup, side panel, content scripts, sensory adapter.</p>
+        <div class="stat fade-in">
+          <div class="stat-value">25+</div>
+          <div class="stat-label">Voice Commands</div>
         </div>
-        <div class="arch-item">
-          <h4>@accessbridge/ai-engine</h4>
-          <p>3-tier AI with caching and cost tracking. Summarizer, simplifier, classifier, translator.</p>
+        <div class="stat fade-in">
+          <div class="stat-value">8</div>
+          <div class="stat-label">Languages Supported</div>
         </div>
-        <div class="arch-item">
-          <h4>Content Modules</h4>
-          <p>Cognitive Simplifier, Voice Commands, Fatigue Adaptive UI, Dwell Click, Eye Tracker, AI Bridge.</p>
+        <div class="stat fade-in">
+          <div class="stat-value">0</div>
+          <div class="stat-label">Server Dependency</div>
         </div>
       </div>
     </div>
   </section>
 
-  <section class="container">
-    <div class="install">
-      <h2>Install in Chrome</h2>
-      <p>AccessBridge runs entirely on-device. No server required for core accessibility features.</p>
-      <a href="/downloads/accessbridge-extension.zip" class="btn btn-primary">Download Extension (.zip)</a>
-      <div class="install-steps">
-        <div class="step">
-          <div class="step-num">1</div>
-          <p>Download and unzip the extension package</p>
+  <!-- How It Works -->
+  <section class="how-section" id="how-it-works">
+    <div class="container">
+      <h2 class="section-title fade-in">How It Works</h2>
+      <p class="section-sub fade-in">Three steps to ambient, invisible accessibility</p>
+      <div class="how-steps">
+        <div class="how-step fade-in">
+          <div class="how-step-num">1</div>
+          <div class="how-step-icon">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+          </div>
+          <h3>Install Extension</h3>
+          <p>Download the AccessBridge Chrome extension and load it in developer mode. One-time setup, under a minute.</p>
         </div>
-        <div class="step">
-          <div class="step-num">2</div>
-          <p>Open <code>chrome://extensions</code> and enable Developer Mode</p>
+        <div class="how-step fade-in">
+          <div class="how-step-num">2</div>
+          <div class="how-step-icon">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
+          </div>
+          <h3>Browse Normally</h3>
+          <p>Use any website as usual. AccessBridge runs silently in the background, analyzing behavioral signals without interrupting your workflow.</p>
         </div>
-        <div class="step">
-          <div class="step-num">3</div>
-          <p>Click "Load unpacked" and select the unzipped folder</p>
+        <div class="how-step fade-in">
+          <div class="how-step-num">3</div>
+          <div class="how-step-icon">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5"><path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/></svg>
+          </div>
+          <h3>Auto-Adapts</h3>
+          <p>When struggle is detected, the page automatically adapts: font size, contrast, layout, focus mode, and more adjust in real time.</p>
         </div>
       </div>
     </div>
   </section>
 
+  <!-- Demo / Showcase -->
+  <section class="demo-section" id="demo">
+    <div class="container">
+      <h2 class="section-title fade-in">See It In Action</h2>
+      <p class="section-sub fade-in">AccessBridge detects struggles and responds instantly, without any user configuration</p>
+      <div class="demo-card fade-in">
+        <div class="demo-header">
+          <div class="demo-dot demo-dot-red"></div>
+          <div class="demo-dot demo-dot-yellow"></div>
+          <div class="demo-dot demo-dot-green"></div>
+          <span>accessbridge -- live detection</span>
+        </div>
+        <div class="demo-body">
+          <div class="demo-visual">
+            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.2">
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+              <path d="M8 21h8M12 17v4"/>
+              <path d="M7 8h2m2 0h2m2 0h2" stroke-dasharray="2 2" opacity="0.5"/>
+              <circle cx="12" cy="10" r="2" fill="rgba(123,104,238,0.3)" stroke="var(--primary)"/>
+            </svg>
+            <div class="demo-signals">
+              <span class="demo-signal"><span class="demo-signal-dot"></span> Scroll velocity</span>
+              <span class="demo-signal"><span class="demo-signal-dot"></span> Click accuracy</span>
+              <span class="demo-signal"><span class="demo-signal-dot"></span> Typing rhythm</span>
+              <span class="demo-signal"><span class="demo-signal-dot"></span> Dwell time</span>
+              <span class="demo-signal"><span class="demo-signal-dot"></span> Cursor path</span>
+            </div>
+            <p>Real-time behavioral signal monitoring</p>
+          </div>
+          <div class="demo-info">
+            <h3>Ambient Intelligence at Work</h3>
+            <p>AccessBridge continuously monitors subtle behavioral signals to understand user needs. When struggle patterns emerge, the AI decision engine triggers targeted adaptations without requiring any explicit action.</p>
+            <ul class="demo-feature-list">
+              <li>
+                <span class="demo-check"><svg viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></span>
+                Detects motor impairment via click accuracy and cursor tremor
+              </li>
+              <li>
+                <span class="demo-check"><svg viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></span>
+                Identifies vision struggles from scroll and zoom behavior
+              </li>
+              <li>
+                <span class="demo-check"><svg viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></span>
+                Adapts layout complexity based on cognitive load signals
+              </li>
+              <li>
+                <span class="demo-check"><svg viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></span>
+                All processing runs locally -- no data leaves the browser
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section class="features-section" id="features">
+    <div class="container">
+      <h2 class="section-title fade-in">Core Features</h2>
+      <p class="section-sub fade-in">Ambient, invisible accessibility that adapts in real time to user struggles</p>
+      <div class="features">
+        <div class="feature fade-in">
+          <div class="feature-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M12 2a10 10 0 110 20 10 10 0 010-20z"/><path d="M12 6v6l4 2"/></svg>
+          </div>
+          <h3>Struggle Detection</h3>
+          <p>Real-time behavioral signal analysis: scroll velocity, click accuracy, typing rhythm, cursor path, dwell time, and hesitation patterns.</p>
+        </div>
+        <div class="feature fade-in">
+          <div class="feature-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+          </div>
+          <h3>Auto Adaptations</h3>
+          <p>AI decision engine evaluates struggle scores and automatically applies font scaling, contrast boost, layout simplification, and more.</p>
+        </div>
+        <div class="feature fade-in">
+          <div class="feature-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+          </div>
+          <h3>Focus &amp; Reading Mode</h3>
+          <p>Cognitive simplifier with spotlight focus, distraction shield, and reading guide for users with attention difficulties.</p>
+        </div>
+        <div class="feature fade-in">
+          <div class="feature-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8"/></svg>
+          </div>
+          <h3>Voice Commands</h3>
+          <p>25+ hands-free commands via Web Speech API: scroll, click, type, navigate tabs, zoom, find text, and more. Hindi and 7 other languages supported.</p>
+        </div>
+        <div class="feature fade-in">
+          <div class="feature-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </div>
+          <h3>Eye Tracking</h3>
+          <p>Webcam-based gaze cursor for motor-impaired users. Face-position tracking with 5-point calibration and smooth interpolation.</p>
+        </div>
+        <div class="feature fade-in">
+          <div class="feature-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3zM13 13l6 6"/></svg>
+          </div>
+          <h3>Dwell Click</h3>
+          <p>Auto-click after configurable hover delay. Radial SVG progress indicator, movement threshold detection, visual pulse feedback.</p>
+        </div>
+        <div class="feature fade-in">
+          <div class="feature-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+          </div>
+          <h3>Fatigue-Adaptive UI</h3>
+          <p>4-level progressive interface simplification based on time-of-day, session duration, and declining interaction rates.</p>
+        </div>
+        <div class="feature fade-in">
+          <div class="feature-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+          </div>
+          <h3>AI-Powered Insights</h3>
+          <p>3-tier AI engine (local heuristic, Gemini Flash, Claude) for page summarization, text simplification, and readability scoring.</p>
+        </div>
+        <div class="feature fade-in">
+          <div class="feature-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
+          </div>
+          <h3>Multi-Language</h3>
+          <p>Voice commands in Hindi, English, Spanish, French, German, Chinese, Japanese, and Arabic. Profile-based language selection.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Architecture -->
+  <section class="arch-section" id="architecture">
+    <div class="container">
+      <div class="arch fade-in">
+        <h2 class="section-title" style="text-align:left">Architecture</h2>
+        <div class="arch-grid">
+          <div class="arch-item">
+            <h4>@accessbridge/core</h4>
+            <p>Types, ProfileStore, StruggleDetector, DecisionEngine. Zero external dependencies.</p>
+          </div>
+          <div class="arch-item">
+            <h4>@accessbridge/extension</h4>
+            <p>Manifest V3 Chrome extension. React popup, side panel, content scripts, sensory adapter.</p>
+          </div>
+          <div class="arch-item">
+            <h4>@accessbridge/ai-engine</h4>
+            <p>3-tier AI with caching and cost tracking. Summarizer, simplifier, classifier, translator.</p>
+          </div>
+          <div class="arch-item">
+            <h4>Content Modules</h4>
+            <p>Cognitive Simplifier, Voice Commands, Fatigue Adaptive UI, Dwell Click, Eye Tracker, AI Bridge.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Install CTA -->
+  <section class="install-section" id="install">
+    <div class="container">
+      <div class="install fade-in">
+        <h2>Get AccessBridge for Chrome</h2>
+        <p>Runs entirely on-device. No server required. No data leaves your browser.</p>
+        <a href="/downloads/accessbridge-extension.zip" class="btn btn-primary">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+          Download Extension (.zip)
+        </a>
+        <div class="install-steps">
+          <div class="step">
+            <div class="step-num">1</div>
+            <h4>Download &amp; Unzip</h4>
+            <p>Download the extension package and extract to any folder</p>
+          </div>
+          <div class="step">
+            <div class="step-num">2</div>
+            <h4>Enable Developer Mode</h4>
+            <p>Open <code>chrome://extensions</code> and toggle Developer Mode on</p>
+          </div>
+          <div class="step">
+            <div class="step-num">3</div>
+            <h4>Load Extension</h4>
+            <p>Click "Load unpacked" and select the unzipped folder</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
   <footer>
     <div class="container">
-      <p><span class="health-dot" id="health-dot"></span>AccessBridge v0.1.0 &mdash; Built for <a href="#">Wipro TopGear Ideathon 2026</a></p>
-      <p style="margin-top:8px">Team: Manish Kumar | <a href="https://github.com/manishjnv/AccessBridge">GitHub</a></p>
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <h3>AccessBridge</h3>
+          <p>Ambient accessibility middleware that detects user struggles and adapts web experiences in real time. No disclosure required.</p>
+        </div>
+        <div class="footer-links">
+          <div class="footer-col">
+            <h4>Project</h4>
+            <a href="#features">Features</a>
+            <a href="#how-it-works">How It Works</a>
+            <a href="#architecture">Architecture</a>
+            <a href="#install">Install</a>
+          </div>
+          <div class="footer-col">
+            <h4>Links</h4>
+            <a href="https://github.com/manishjnv/AccessBridge" target="_blank">GitHub Repository</a>
+            <a href="https://github.com/manishjnv/AccessBridge/issues" target="_blank">Report Issues</a>
+            <a href="https://github.com/manishjnv/AccessBridge/blob/main/HANDOFF.md" target="_blank">Dev Handoff</a>
+          </div>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>
+          <span class="footer-status"><span class="health-dot" id="health-dot"></span> AccessBridge v0.1.0</span>
+          &nbsp;&mdash;&nbsp; Built for <a href="https://topgear.wipro.com" target="_blank">Wipro TopGear Ideathon 2026</a>
+        </p>
+        <p>Team: Manish Kumar &amp; Team &nbsp;|&nbsp; <a href="https://github.com/manishjnv/AccessBridge" target="_blank">github.com/manishjnv/AccessBridge</a></p>
+      </div>
     </div>
   </footer>
 
   <script>
-    // Check API health
+    // Navbar scroll effect
+    const navbar = document.getElementById('navbar');
+    window.addEventListener('scroll', () => {
+      navbar.classList.toggle('scrolled', window.scrollY > 20);
+    }, { passive: true });
+
+    // Mobile nav toggle
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+    navToggle.addEventListener('click', () => {
+      navLinks.classList.toggle('open');
+    });
+    // Close mobile nav on link click
+    navLinks.querySelectorAll('a').forEach(link => {
+      link.addEventListener('click', () => {
+        navLinks.classList.remove('open');
+      });
+    });
+
+    // Intersection Observer for fade-in animations
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+
+    // API health check
     fetch('/api/health').then(r => r.json()).then(d => {
       if (d.status === 'ok') document.getElementById('health-dot').style.background = '#10b981';
     }).catch(() => {

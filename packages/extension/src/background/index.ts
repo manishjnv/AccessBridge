@@ -141,7 +141,7 @@ chrome.runtime.onStartup.addListener(() => {
 
 // ---------- Update server ----------
 
-const UPDATE_SERVER = 'http://72.61.227.64:8100';
+const UPDATE_SERVER = 'http://72.61.227.64:8300/api';
 
 type MessageType =
   | 'GET_PROFILE'
@@ -333,7 +333,7 @@ async function handleMessage(message: Message): Promise<unknown> {
           hasUpdate,
           currentVersion,
           latestVersion: data.version,
-          downloadUrl: `${UPDATE_SERVER}${data.download_url}`,
+          downloadUrl: `http://72.61.227.64:8300${data.download_url}`,
           changelog: data.changelog,
         };
       } catch {

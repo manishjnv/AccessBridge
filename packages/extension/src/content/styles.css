@@ -1,0 +1,147 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================
+   AccessBridge – Content Script Styles
+   ============================================ */
+
+:root {
+  /* Adaptation CSS custom properties */
+  --a11y-font-scale: 1;
+  --a11y-contrast: 1;
+  --a11y-line-height: 1.5;
+  --a11y-letter-spacing: 0px;
+  --a11y-cursor-size: 1;
+  --a11y-transition-duration: 300ms;
+}
+
+/* ---- Smooth adaptation transitions ---- */
+.a11y-transition,
+.a11y-transition * {
+  transition:
+    font-size var(--a11y-transition-duration) ease-in-out,
+    line-height var(--a11y-transition-duration) ease-in-out,
+    letter-spacing var(--a11y-transition-duration) ease-in-out,
+    filter var(--a11y-transition-duration) ease-in-out,
+    color var(--a11y-transition-duration) ease-in-out,
+    background-color var(--a11y-transition-duration) ease-in-out;
+}
+
+/* ---- Font scaling ---- */
+.a11y-font-scaled {
+  font-size: calc(1em * var(--a11y-font-scale)) !important;
+}
+
+.a11y-font-scaled * {
+  font-size: inherit !important;
+}
+
+/* ---- Line height ---- */
+.a11y-line-height * {
+  line-height: var(--a11y-line-height) !important;
+}
+
+/* ---- Letter spacing ---- */
+.a11y-letter-spacing * {
+  letter-spacing: var(--a11y-letter-spacing) !important;
+}
+
+/* ---- Contrast ---- */
+.a11y-contrast {
+  filter: contrast(var(--a11y-contrast));
+}
+
+/* ---- Reduced motion ---- */
+.a11y-reduced-motion,
+.a11y-reduced-motion * {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* ---- Reading mode ---- */
+.a11y-reading-mode {
+  max-width: 65ch !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  padding: 2rem !important;
+  font-family: 'OpenDyslexic', 'Comic Sans MS', 'Atkinson Hyperlegible', sans-serif !important;
+  font-size: calc(1.1em * var(--a11y-font-scale)) !important;
+  line-height: 1.8 !important;
+  word-spacing: 0.16em !important;
+}
+
+.a11y-reading-mode img:not([alt]),
+.a11y-reading-mode [role='banner'],
+.a11y-reading-mode [role='complementary'],
+.a11y-reading-mode aside,
+.a11y-reading-mode nav:not([aria-label]) {
+  display: none !important;
+}
+
+/* ---- Focus indicators ---- */
+.a11y-focus-visible :focus-visible {
+  outline: 3px solid #e94560 !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 6px rgba(233, 69, 96, 0.25) !important;
+}
+
+.a11y-focus-visible :focus:not(:focus-visible) {
+  outline: none !important;
+}
+
+/* ---- Cursor size ---- */
+.a11y-cursor-large {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Cpath d='M5 2l18 14H13l6 13-4 2-6-13-4 11z' fill='%23000' stroke='%23fff' stroke-width='1.5'/%3E%3C/svg%3E")
+      0 0,
+    auto !important;
+}
+
+/* ---- Smart click targets ---- */
+.a11y-smart-targets a,
+.a11y-smart-targets button,
+.a11y-smart-targets [role='button'],
+.a11y-smart-targets input,
+.a11y-smart-targets select,
+.a11y-smart-targets textarea,
+.a11y-smart-targets [tabindex] {
+  min-width: 44px !important;
+  min-height: 44px !important;
+  padding: 8px !important;
+}
+
+/* ---- Focus mode overlay ---- */
+.a11y-focus-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 999998;
+  pointer-events: none;
+}
+
+.a11y-focus-spotlight {
+  position: fixed;
+  z-index: 999999;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.7);
+  border-radius: 8px;
+  pointer-events: none;
+}
+
+/* ---- High contrast ---- */
+.a11y-high-contrast {
+  filter: contrast(1.5) !important;
+}
+
+.a11y-high-contrast img {
+  filter: contrast(1) !important;
+}
+
+/* ---- SVG filters container ---- */
+.a11y-svg-filters {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}

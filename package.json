@@ -1,0 +1,20 @@
+{
+  "name": "accessbridge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A11yOS - The Ambient Accessibility Operating Layer",
+  "scripts": {
+    "dev": "pnpm --filter @accessbridge/extension dev",
+    "build": "pnpm --filter @accessbridge/extension build",
+    "build:all": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "author": "Manish",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  }
+}

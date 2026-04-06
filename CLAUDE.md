@@ -9,8 +9,9 @@ Every bug fix must follow this sequence:
 3. **Dispatch Codex in parallel** — for independent investigation, fix, or regression check
 4. **Claude reviews Codex output** — verify fix doesn't reintroduce any past bug
 5. **Build + test** — `pnpm build && npx vitest run` must both pass
-6. **Verify in Chrome** — reload extension, test the fix AND related features
-7. **Update `RCA.md`** — add new BUG-XXX entry with root cause and prevention
+6. **Stale data scan** — grep for old values (versions, names, URLs) across the repo. Fix any stale matches before committing
+7. **Verify in Chrome** — reload extension, test the fix AND related features
+8. **Update `RCA.md`** — add new BUG-XXX entry with root cause and prevention
 
 ## Key Rules
 

@@ -87,12 +87,32 @@ Track every bug fix: what broke, why, how it was fixed, and how to prevent recur
 4. **Verify in Chrome** — reload extension, test the specific fix AND related features
 5. **Update this log** — add new entry with root cause and prevention
 
+## BUG-006: Stale hardcoded versions cause false positives in update check
+
+| Field | Detail |
+|-------|--------|
+| **Date** | 2026-04-06 |
+| **Severity** | Medium |
+| **Symptom** | Side panel shows "v0.1.0" after version bump. Package.json files out of sync with manifest. Potential false positive update banners |
+| **Root Cause** | Version was hardcoded in 4 places: `manifest.json`, 3x `package.json`, sidepanel `const VERSION`. Only manifest was bumped to 0.1.1, the rest stayed at 0.1.0 |
+| **Fix** | (1) Bumped all package.json to 0.1.1, (2) Sidepanel now reads `chrome.runtime.getManifest().version` dynamically, (3) Popup already used `chrome.runtime.getManifest().version` |
+| **Files Changed** | `packages/core/package.json`, `packages/ai-engine/package.json`, `packages/extension/package.json`, `packages/extension/src/sidepanel/index.tsx` |
+| **Commit** | (pending) |
+| **Prevention** | NEVER hardcode version strings in code. Always use `chrome.runtime.getManifest().version` in extension code. `manifest.json` is the single source of truth. Use version bump checklist below |
+
+---
+
 ## Checklist: Version Bump
 
-1. `packages/extension/manifest.json` — update `version`
-2. VPS API `/opt/accessbridge/api/main.py` — update `CURRENT_VERSION`
-3. `pnpm build`
-4. Create zip: `powershell Compress-Archive -Path dist/* -DestinationPath accessbridge-extension.zip -Force`
-5. Upload: `scp accessbridge-extension.zip a11yos-vps:/opt/accessbridge/docs/downloads/`
-6. Restart API: `ssh a11yos-vps "cd /opt/accessbridge && docker compose restart accessbridge-api"`
-7. Landing page version updates automatically (fetches from API)
+1. `packages/extension/manifest.json` — update `version` (SINGLE SOURCE OF TRUTH)
+2. `packages/core/package.json` — update `version` to match
+3. `packages/ai-engine/package.json` — update `version` to match
+4. `packages/extension/package.json` — update `version` to match
+5. VPS API `/opt/accessbridge/api/main.py` — update `CURRENT_VERSION` to match
+6. `pnpm build`
+7. `npx vitest run` — verify tests pass
+8. Verify: `grep -r "0\.OLD\.VERSION" packages/` — must return zero results
+9. Create zip: `powershell Compress-Archive -Path dist/* -DestinationPath accessbridge-extension.zip -Force`
+10. Upload: `scp accessbridge-extension.zip a11yos-vps:/opt/accessbridge/docs/downloads/`
+11. Restart API: `ssh a11yos-vps "cd /opt/accessbridge && docker compose restart accessbridge-api"`
+12. Landing page + popup + sidepanel version update automatically (all read dynamically)

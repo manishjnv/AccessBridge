@@ -47,7 +47,7 @@ interface QuickFeature {
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const VERSION = '0.1.0';
+const VERSION = chrome.runtime.getManifest().version;
 
 const QUICK_FEATURES: QuickFeature[] = [
   {

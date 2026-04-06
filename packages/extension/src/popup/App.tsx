@@ -80,6 +80,15 @@ export default function App() {
     (patch: Partial<SensoryProfile>) => {
       const updated = { ...profile, sensory: { ...profile.sensory, ...patch }, updatedAt: Date.now() };
       saveProfile(updated);
+      // Apply immediately to active tab
+      chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
+        if (tab?.id) {
+          chrome.tabs.sendMessage(tab.id, {
+            type: 'APPLY_SENSORY',
+            payload: { ...profile.sensory, ...patch },
+          }).catch(() => {});
+        }
+      });
     },
     [profile, saveProfile],
   );

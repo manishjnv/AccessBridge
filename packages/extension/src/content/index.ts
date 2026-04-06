@@ -421,6 +421,37 @@ function listenForCommands(adapter: BaseAdapter, sensory: SensoryAdapter): void 
   chrome.runtime.onMessage.addListener(
     (message: { type: string; payload?: unknown }, _sender, sendResponse) => {
       switch (message.type) {
+        case 'APPLY_SENSORY': {
+          const s = message.payload as {
+            fontScale?: number; contrastLevel?: number; lineHeight?: number;
+            letterSpacing?: number; colorCorrectionMode?: string;
+            reducedMotion?: boolean; highContrast?: boolean;
+          };
+          if (s.fontScale !== undefined) {
+            if (s.fontScale !== 1.0) sensory.applyFontScale(s.fontScale);
+            else { document.documentElement.style.removeProperty('--a11y-font-scale'); document.body.classList.remove('a11y-font-scaled'); }
+          }
+          if (s.contrastLevel !== undefined) {
+            if (s.contrastLevel !== 1.0) sensory.applyContrast(s.contrastLevel);
+            else { document.documentElement.style.removeProperty('--a11y-contrast'); document.body.classList.remove('a11y-contrast'); }
+          }
+          if (s.lineHeight !== undefined) {
+            if (s.lineHeight !== 1.5) sensory.applyLineHeight(s.lineHeight);
+            else { document.documentElement.style.removeProperty('--a11y-line-height'); document.body.classList.remove('a11y-line-height'); }
+          }
+          if (s.letterSpacing !== undefined) {
+            if (s.letterSpacing !== 0) sensory.applyLetterSpacing(s.letterSpacing);
+            else { document.documentElement.style.removeProperty('--a11y-letter-spacing'); document.body.classList.remove('a11y-letter-spacing'); }
+          }
+          if (s.colorCorrectionMode !== undefined) sensory.applyColorCorrection(s.colorCorrectionMode);
+          if (s.reducedMotion !== undefined) sensory.applyReducedMotion(s.reducedMotion);
+          if (s.highContrast !== undefined) {
+            if (s.highContrast) document.body.classList.add('a11y-high-contrast');
+            else document.body.classList.remove('a11y-high-contrast');
+          }
+          sendResponse({ applied: true });
+          break;
+        }
         case 'APPLY_ADAPTATION': {
           const adaptation = message.payload as Adaptation;
           applyAdaptation(adaptation, adapter, sensory);

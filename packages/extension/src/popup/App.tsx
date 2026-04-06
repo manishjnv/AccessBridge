@@ -38,6 +38,7 @@ export default function App() {
   const [enabled, setEnabled] = useState(true);
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [updateStep, setUpdateStep] = useState<'idle' | 'downloading' | 'downloaded' | 'reloading'>('idle');
 
   // Load profile and poll struggle score
   useEffect(() => {
@@ -143,6 +144,7 @@ export default function App() {
   const handleCheckUpdate = useCallback(() => {
     setCheckingUpdate(true);
     setUpdateInfo(null);
+    setUpdateStep('idle');
     chrome.runtime.sendMessage({ type: 'CHECK_UPDATE' }).then((res) => {
       setCheckingUpdate(false);
       if (res && typeof res === 'object' && 'hasUpdate' in res) {
@@ -154,45 +156,99 @@ export default function App() {
     });
   }, []);
 
-  const handleInstallUpdate = useCallback(() => {
-    if (updateInfo?.downloadUrl) {
-      chrome.tabs.create({ url: updateInfo.downloadUrl });
-    }
+  const handleDownloadUpdate = useCallback(() => {
+    if (!updateInfo?.downloadUrl) return;
+    setUpdateStep('downloading');
+    // Use chrome.downloads API to auto-download the zip
+    chrome.downloads.download({
+      url: updateInfo.downloadUrl,
+      filename: 'accessbridge-extension.zip',
+      saveAs: false,
+    }, (downloadId) => {
+      if (downloadId) {
+        // Monitor download completion
+        const listener = (delta: chrome.downloads.DownloadDelta) => {
+          if (delta.id === downloadId && delta.state?.current === 'complete') {
+            chrome.downloads.onChanged.removeListener(listener);
+            setUpdateStep('downloaded');
+          }
+        };
+        chrome.downloads.onChanged.addListener(listener);
+      } else {
+        // Fallback: open in tab if downloads API fails
+        chrome.tabs.create({ url: updateInfo.downloadUrl });
+        setUpdateStep('downloaded');
+      }
+    });
   }, [updateInfo]);
+
+  const handleReloadExtension = useCallback(() => {
+    setUpdateStep('reloading');
+    // Short delay so user sees the state change
+    setTimeout(() => {
+      chrome.runtime.reload();
+    }, 500);
+  }, []);
 
   return (
     <div className="bg-a11y-bg text-a11y-text min-h-[300px] flex flex-col">
-      {/* Update banner — only shows after user clicks Check for Update */}
+      {/* Update banner — 2-step: Download then Reload */}
       {updateInfo?.hasUpdate && (
         <div style={{
-          background: 'linear-gradient(135deg, rgba(16,185,129,0.2), rgba(123,104,238,0.15))',
-          borderBottom: '1px solid rgba(16,185,129,0.4)',
+          background: 'linear-gradient(135deg, rgba(16,185,129,0.15), rgba(123,104,238,0.1))',
+          borderBottom: '1px solid rgba(16,185,129,0.3)',
           padding: '10px 16px',
           fontSize: '12px',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-            <span style={{ color: '#10b981', fontWeight: 700 }}>Update available: v{updateInfo.latestVersion}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+            <span style={{ color: '#10b981', fontWeight: 700, fontSize: '13px' }}>v{updateInfo.latestVersion} available</span>
           </div>
-          <div style={{ color: '#94a3b8', fontSize: '11px', marginBottom: '8px' }}>{updateInfo.changelog}</div>
-          <button
-            onClick={handleInstallUpdate}
-            style={{
-              background: 'linear-gradient(135deg, #7b68ee, #bb86fc)',
-              border: 'none',
-              color: 'white',
-              borderRadius: '6px',
-              padding: '6px 16px',
-              fontSize: '12px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              width: '100%',
-            }}
-          >
-            Download & Install v{updateInfo.latestVersion}
-          </button>
-          <div style={{ color: '#64748b', fontSize: '10px', marginTop: '6px', textAlign: 'center' }}>
-            Download zip, unzip, then load unpacked in chrome://extensions
-          </div>
+          <div style={{ color: '#94a3b8', fontSize: '11px', marginBottom: '10px' }}>{updateInfo.changelog}</div>
+
+          {updateStep === 'idle' && (
+            <button
+              onClick={handleDownloadUpdate}
+              style={{
+                background: 'linear-gradient(135deg, #7b68ee, #bb86fc)',
+                border: 'none', color: 'white', borderRadius: '6px',
+                padding: '8px 16px', fontSize: '12px', fontWeight: 600,
+                cursor: 'pointer', width: '100%',
+              }}
+            >
+              Step 1: Download Update
+            </button>
+          )}
+
+          {updateStep === 'downloading' && (
+            <div style={{ textAlign: 'center', color: '#bb86fc', padding: '8px 0' }}>
+              Downloading...
+            </div>
+          )}
+
+          {updateStep === 'downloaded' && (
+            <>
+              <div style={{ color: '#10b981', fontSize: '11px', marginBottom: '8px', textAlign: 'center' }}>
+                Downloaded! Extract zip to the same folder, then:
+              </div>
+              <button
+                onClick={handleReloadExtension}
+                style={{
+                  background: 'linear-gradient(135deg, #10b981, #059669)',
+                  border: 'none', color: 'white', borderRadius: '6px',
+                  padding: '8px 16px', fontSize: '12px', fontWeight: 600,
+                  cursor: 'pointer', width: '100%',
+                }}
+              >
+                Step 2: Reload Extension
+              </button>
+            </>
+          )}
+
+          {updateStep === 'reloading' && (
+            <div style={{ textAlign: 'center', color: '#10b981', padding: '8px 0' }}>
+              Reloading...
+            </div>
+          )}
         </div>
       )}
 

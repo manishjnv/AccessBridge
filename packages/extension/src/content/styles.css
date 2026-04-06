@@ -1114,3 +1114,294 @@
   margin-left: 6px;
   vertical-align: middle;
 }
+
+/* ============================================
+   Domain Connector — Shared Styles
+   ============================================ */
+
+/* ---- Jargon tooltips ---- */
+
+.ab-domain-jargon {
+  position: relative;
+  border-bottom: 1.5px dashed rgba(123, 104, 238, 0.6);
+  cursor: help;
+  color: inherit;
+}
+
+.ab-domain-jargon:hover,
+.ab-domain-jargon:focus {
+  background: rgba(123, 104, 238, 0.12);
+  border-radius: 2px;
+}
+
+.ab-domain-tooltip {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 320px;
+  padding: 10px 14px;
+  background: #1a1a2e;
+  color: #e2e8f0;
+  font-size: 13px;
+  line-height: 1.5;
+  border-radius: 8px;
+  border: 1px solid rgba(123, 104, 238, 0.4);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+  z-index: 2147483640;
+  pointer-events: none;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-weight: 400;
+  white-space: normal;
+}
+
+.ab-domain-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: #1a1a2e;
+}
+
+.ab-domain-jargon:hover .ab-domain-tooltip,
+.ab-domain-jargon:focus .ab-domain-tooltip {
+  display: block;
+  animation: ab-domain-tooltip-in 0.15s ease-out;
+}
+
+@keyframes ab-domain-tooltip-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(4px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* ---- Amount tag (currency in words) ---- */
+
+.ab-domain-amount-tag {
+  position: relative;
+  border-bottom: 1.5px dotted rgba(233, 69, 96, 0.5);
+  cursor: help;
+  color: inherit;
+}
+
+.ab-domain-amount-tag:hover .ab-domain-tooltip,
+.ab-domain-amount-tag:focus .ab-domain-tooltip {
+  display: block;
+  animation: ab-domain-tooltip-in 0.15s ease-out;
+}
+
+.ab-domain-amount-words {
+  font-size: 12px;
+  color: #7b68ee;
+  margin-top: 2px;
+  font-style: italic;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+/* ---- Transaction summary badge ---- */
+
+.ab-domain-txn-summary {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 4px 10px;
+  background: rgba(123, 104, 238, 0.1);
+  color: #bb86fc;
+  font-size: 12px;
+  line-height: 1.4;
+  border-radius: 6px;
+  border-left: 3px solid #7b68ee;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+/* ---- Form field hints ---- */
+
+.ab-domain-field-hint {
+  font-size: 12px;
+  color: #8b8fa3;
+  margin-top: 4px;
+  padding: 4px 8px;
+  background: rgba(123, 104, 238, 0.06);
+  border-radius: 4px;
+  border-left: 2px solid rgba(123, 104, 238, 0.4);
+  font-family: system-ui, -apple-system, sans-serif;
+  line-height: 1.4;
+}
+
+.ab-domain-field-error {
+  font-size: 12px;
+  color: #e94560;
+  margin-top: 4px;
+  padding: 4px 8px;
+  background: rgba(233, 69, 96, 0.08);
+  border-radius: 4px;
+  border-left: 2px solid #e94560;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+.ab-domain-field-invalid {
+  outline: 2px solid rgba(233, 69, 96, 0.6) !important;
+  outline-offset: 1px !important;
+}
+
+.ab-domain-field-valid {
+  outline: 2px solid rgba(34, 197, 94, 0.5) !important;
+  outline-offset: 1px !important;
+}
+
+/* ---- Step guide (form progress) ---- */
+
+.ab-domain-step-guide {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  background: rgba(123, 104, 238, 0.06);
+  border-radius: 8px;
+  border: 1px solid rgba(123, 104, 238, 0.15);
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+.ab-domain-step-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(123, 104, 238, 0.15);
+  color: #8b8fa3;
+  font-size: 12px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.ab-domain-step-dot.ab-domain-step-active {
+  background: #7b68ee;
+  color: #fff;
+  box-shadow: 0 0 0 3px rgba(123, 104, 238, 0.25);
+}
+
+.ab-domain-step-dot.ab-domain-step-done {
+  background: rgba(34, 197, 94, 0.2);
+  color: #22c55e;
+}
+
+/* ---- Policy summary banner (insurance) ---- */
+
+.ab-domain-policy-banner {
+  margin-bottom: 12px;
+  background: rgba(123, 104, 238, 0.06);
+  border: 1px solid rgba(123, 104, 238, 0.25);
+  border-radius: 8px;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  overflow: hidden;
+}
+
+.ab-domain-policy-banner-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: rgba(123, 104, 238, 0.1);
+  cursor: pointer;
+  user-select: none;
+}
+
+.ab-domain-policy-banner-icon {
+  font-size: 18px;
+  color: #7b68ee;
+}
+
+.ab-domain-policy-banner-header strong {
+  flex: 1;
+  color: #bb86fc;
+}
+
+.ab-domain-policy-banner-toggle {
+  background: none;
+  border: none;
+  color: #8b8fa3;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+.ab-domain-policy-banner-body {
+  padding: 10px 14px;
+  color: #cbd5e1;
+  line-height: 1.6;
+}
+
+.ab-domain-policy-banner-body ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.ab-domain-policy-banner-body li {
+  margin-bottom: 6px;
+}
+
+/* ---- Comparison helper (insurance) ---- */
+
+.ab-domain-comparison-summary,
+.ab-domain-comparison-table {
+  margin-bottom: 16px;
+  background: rgba(123, 104, 238, 0.06);
+  border: 1px solid rgba(123, 104, 238, 0.25);
+  border-radius: 8px;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  overflow: hidden;
+}
+
+.ab-domain-comparison-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: rgba(123, 104, 238, 0.1);
+  color: #bb86fc;
+}
+
+.ab-domain-comparison-list {
+  margin: 0;
+  padding: 10px 14px 10px 34px;
+  color: #cbd5e1;
+  line-height: 1.6;
+}
+
+.ab-domain-comparison-list li {
+  margin-bottom: 4px;
+}
+
+.ab-domain-comparison-cell {
+  padding: 10px;
+  text-align: center;
+  border: 1px solid rgba(123, 104, 238, 0.15);
+  border-radius: 6px;
+  background: rgba(26, 26, 46, 0.5);
+}
+
+.ab-domain-comparison-plan-name {
+  font-weight: 600;
+  color: #bb86fc;
+  margin-bottom: 4px;
+}
+
+.ab-domain-comparison-plan-price {
+  font-size: 16px;
+  color: #e2e8f0;
+  font-weight: 700;
+}
+
+/* ---- Calculator tooltip (insurance) ---- */
+
+.ab-domain-calc-tooltip {
+  border-left-color: rgba(233, 69, 96, 0.4);
+  background: rgba(233, 69, 96, 0.06);
+}

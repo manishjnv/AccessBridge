@@ -1,8 +1,22 @@
 # AccessBridge - Shift Handoff
 
-## Last Session: Day 3 — Shift 1 (April 6, 2026)
+## Last Session: Day 3 — Shift 2 (April 6, 2026)
 
-### Completed (Day 3)
+### Completed (Day 3, Shift 2)
+- [x] Keyboard-Only Mode (`content/motor/keyboard-mode.ts`): skip links (main/nav/footer), enhanced focus ring, tab order optimizer (auto-adds tabindex to clickable elements), shortcuts overlay (`?` key), arrow key group navigation, escape-to-deselect, MutationObserver for dynamic content
+- [x] Predictive Input (`content/motor/predictive-input.ts`): frequency-based word prediction (~500 word dictionary), session learning, floating suggestion panel (Alt+1-5 or Tab to accept), phrase auto-complete (~50 phrases), form field intelligence (email/phone/address/name detection), contenteditable support, 80ms debounced
+- [x] Domain Connectors v0: Banking (`content/domains/banking.ts`) + Insurance (`content/domains/insurance.ts`) + Registry (`content/domains/index.ts`)
+  - Banking: transaction simplifier, form assistance with validation, jargon decoder (25 terms), security alerts, Indian numbering amount reader (Lakh/Crore/Arab)
+  - Insurance: policy simplifier, jargon decoder (35 terms), comparison helper, claim form assistant, premium calculator helper
+  - Registry: auto-detect and activate matching connector per domain
+- [x] Email Summarization UI (`content/ai/email-ui.ts`): Gmail toolbar inject (Summarize/Simplify buttons), Outlook toolbar inject, generic email FAB, slide-in summary panel (300px, bullets + reading time + complexity score), Read Aloud (Web Speech API), Copy button, auto-summarize mode (2s delay), MutationObserver for SPA navigation
+- [x] All 4 features wired: popup toggles send messages to content script, background featureMap updated, profile-based auto-start, REVERT_ALL cleanup
+- [x] AdaptationType enum extended: KEYBOARD_ONLY, PREDICTIVE_INPUT
+- [x] TypeScript zero errors, Vite build succeeds (content: 130KB, background: 28KB, sidepanel: 19KB, CSS: 38KB)
+- [x] 62 unit tests still passing
+- [x] Code pushed to GitHub
+
+### Completed (Day 3, Shift 1)
 - [x] AI engine wired end-to-end: background service worker hosts AIEngine + SummarizerService + SimplifierService, content script has AIBridge for page/email summarization and text simplification
 - [x] AI message types: SUMMARIZE_TEXT, SUMMARIZE_EMAIL, SIMPLIFY_TEXT, AI_READABILITY, AI_SET_KEY, AI_GET_STATS
 - [x] Dwell Click System (`content/motor/dwell-click.ts`): radial SVG progress indicator, auto-click after configurable delay, 15px movement threshold, visual pulse on click, target highlight
@@ -37,23 +51,18 @@
 
 ### NOT Done (Carry Forward)
 - [ ] Extension NOT tested in Chrome yet (build succeeds, needs manual sideload test)
-- [ ] GitHub push — code not yet pushed (remote exists: manishjnv/AccessBridge)
-- [ ] Email summarization UI — AIBridge backend is wired but no Gmail/Outlook-specific UI
-- [ ] Keyboard-only mode implementation (toggle exists in popup, not wired)
-- [ ] Predictive input implementation (toggle exists in popup, not wired)
 - [ ] VPS deployment — not done this session
 - [ ] PPT/presentation for TopGear submission
 - [ ] Demo video recording
+- [ ] Real API keys for Gemini/Claude AI tiers (local tier works offline)
 
 ### Day 4 Priority (April 7)
-1. **Sideload test**: Load dist/ in Chrome, verify all features work end-to-end
-2. **GitHub push**: Push all code to remote
-3. **Email adapter UI**: Gmail/Outlook summarization overlay triggered by auto-summarize
-4. **Keyboard-only mode**: Tab-focus management, skip links, keyboard shortcuts overlay
-5. **VPS deploy**: Push, build, and host demo
-6. **PPT**: Create presentation for TopGear Ideathon submission
-7. **Demo video**: Record walkthrough of all features
-8. **Polish**: Fix any bugs found during testing
+1. **Sideload test**: Load dist/ in Chrome, verify ALL features end-to-end
+2. **VPS deploy**: Push, build, and host demo
+3. **Bug fixes**: Fix any issues found during Chrome testing
+4. **PPT**: Create presentation for TopGear Ideathon submission
+5. **Demo video**: Record walkthrough of all 10+ features
+6. **Polish**: UI refinements, error handling edge cases
 
 ### Architecture Notes
 - Monorepo: packages/core, packages/extension, packages/ai-engine
@@ -64,21 +73,28 @@
 - AI engine runs in background service worker, content script uses AIBridge for communication
 
 ### Key Files Added/Modified (Day 3)
+
 ```
-packages/extension/src/background/index.ts          — AI engine integration (6 new message handlers)
-packages/extension/src/content/index.ts              — Integrates AIBridge, DwellClick, EyeTracker, Hindi commands
-packages/extension/src/content/ai/bridge.ts          — Content-side AI interface (summarize, simplify, readability)
+# Shift 2 — new features
+packages/extension/src/content/motor/keyboard-mode.ts   — Keyboard-only mode (skip links, focus ring, shortcuts)
+packages/extension/src/content/motor/predictive-input.ts — Predictive input with word/phrase suggestions
+packages/extension/src/content/domains/banking.ts        — Banking domain connector (jargon, forms, amounts)
+packages/extension/src/content/domains/insurance.ts      — Insurance domain connector (policy, claims, comparison)
+packages/extension/src/content/domains/index.ts          — Domain connector registry
+packages/extension/src/content/ai/email-ui.ts            — Email summarization UI (Gmail/Outlook/generic)
+packages/core/src/types/adaptation.ts                    — Added KEYBOARD_ONLY, PREDICTIVE_INPUT enums
+
+# Shift 1
+packages/extension/src/background/index.ts          — AI engine + feature toggle integration
+packages/extension/src/content/index.ts              — All modules integrated (10+ features)
+packages/extension/src/content/ai/bridge.ts          — Content-side AI interface
 packages/extension/src/content/motor/dwell-click.ts  — Dwell click with SVG radial progress
 packages/extension/src/content/motor/eye-tracker.ts  — Webcam face-position gaze cursor
-packages/extension/src/content/motor/hindi-commands.ts — Hindi voice command mappings + matcher
-packages/extension/src/content/styles.css            — AI panels, dwell click, eye tracker, calibration CSS
-packages/extension/src/sidepanel/index.tsx            — Full rich side panel (dashboard, history, insights, controls)
-packages/extension/src/popup/App.tsx                  — Dwell click direct toggle wiring
-packages/extension/package.json                       — Added @accessbridge/ai-engine dependency
-packages/core/src/__tests__/struggle-detector.test.ts — 16 tests
-packages/core/src/__tests__/decision-engine.test.ts   — 21 tests
-packages/core/src/__tests__/profile-store.test.ts     — 25 tests
-packages/core/vitest.config.ts                        — Vitest configuration
+packages/extension/src/content/motor/hindi-commands.ts — Hindi voice command mappings
+packages/extension/src/content/styles.css            — All feature CSS (38KB)
+packages/extension/src/sidepanel/index.tsx            — Rich side panel dashboard
+packages/extension/src/popup/App.tsx                  — All toggles wired
+packages/core/src/__tests__/                          — 62 unit tests (3 suites)
 ```
 
 ### Key Commands

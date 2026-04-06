@@ -22,6 +22,7 @@ import { DwellClickSystem } from './motor/dwell-click.js';
 import { EyeTracker } from './motor/eye-tracker.js';
 import { KeyboardOnlyMode } from './motor/keyboard-mode.js';
 import { PredictiveInputSystem } from './motor/predictive-input.js';
+import { DomainConnectorRegistry } from './domains/index.js';
 
 // ---------- App Detection ----------
 
@@ -236,6 +237,7 @@ let eyeTracker: EyeTracker | null = null;
 let keyboardMode: KeyboardOnlyMode | null = null;
 let predictiveInput: PredictiveInputSystem | null = null;
 let emailUI: EmailSummarizationUI | null = null;
+let domainRegistry: DomainConnectorRegistry | null = null;
 
 function getAI(): AIBridge {
   if (!aiBridge) {
@@ -277,6 +279,13 @@ function getEmailUI(): EmailSummarizationUI {
     emailUI = new EmailSummarizationUI();
   }
   return emailUI;
+}
+
+function getDomainRegistry(): DomainConnectorRegistry {
+  if (!domainRegistry) {
+    domainRegistry = new DomainConnectorRegistry();
+  }
+  return domainRegistry;
 }
 
 function getCognitive(): CognitiveSimplifier {
@@ -434,6 +443,7 @@ function listenForCommands(adapter: BaseAdapter, sensory: SensoryAdapter): void 
           getPredictive().stop();
           getEmailUI().stop();
           getAI().dismiss();
+          getDomainRegistry().deactivateAll();
           sendResponse({ reverted: true });
           break;
         }
@@ -590,6 +600,9 @@ function init(): void {
   if (app === 'gmail' || app === 'outlook' || app === 'generic') {
     getEmailUI().start(getAI());
   }
+
+  // Detect and activate domain-specific connector (banking, insurance, etc.)
+  getDomainRegistry().detectAndActivate();
 
   // Load profile and check for pre-enabled features
   chrome.runtime.sendMessage({ type: 'GET_PROFILE' }).then((profile) => {

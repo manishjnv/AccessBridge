@@ -64,6 +64,12 @@ ssh "$REMOTE" bash -s <<'REMOTE_SCRIPT'
   echo "  Building on VPS..."
   pnpm build 2>/dev/null || npm run build
 
+  # Copy landing page to nginx serve directory
+  if [ -d /var/www/accessbridge ]; then
+    cp -r deploy/* /var/www/accessbridge/ 2>/dev/null || true
+    echo "  Landing page copied to /var/www/accessbridge/"
+  fi
+
   echo "  Deploy complete on VPS."
 REMOTE_SCRIPT
 

@@ -16,20 +16,25 @@
       --warning: #f59e0b;
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; overflow-x: hidden; width: 100%; }
     body {
       font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
       background: var(--bg);
       color: var(--text);
       line-height: 1.6;
       min-height: 100vh;
+      min-height: 100dvh;
+      overflow-x: hidden;
+      width: 100%;
     }
-    .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+    .container { max-width: 100%; margin: 0 auto; padding: 0 5vw; width: 100%; }
 
     /* Hero */
     .hero {
       text-align: center;
-      padding: 80px 0 60px;
+      padding: 60px 0 48px;
       background: linear-gradient(180deg, rgba(123,104,238,0.12) 0%, transparent 80%);
+      width: 100%;
     }
     .hero-badge {
       display: inline-block;
@@ -37,37 +42,39 @@
       border: 1px solid rgba(123,104,238,0.4);
       border-radius: 20px;
       padding: 4px 16px;
-      font-size: 13px;
+      font-size: 12px;
       color: var(--accent);
-      margin-bottom: 20px;
+      margin-bottom: 16px;
     }
     .hero h1 {
-      font-size: 3rem;
+      font-size: clamp(2rem, 6vw, 3.2rem);
       font-weight: 800;
       background: linear-gradient(135deg, var(--primary), var(--accent));
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
-      margin-bottom: 16px;
+      margin-bottom: 14px;
     }
     .hero p {
-      font-size: 1.2rem;
+      font-size: clamp(0.95rem, 2.5vw, 1.15rem);
       color: var(--muted);
       max-width: 600px;
-      margin: 0 auto 32px;
+      margin: 0 auto 28px;
+      padding: 0 12px;
     }
-    .hero-actions { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+    .hero-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; padding: 0 12px; }
     .btn {
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      padding: 12px 28px;
+      padding: 11px 24px;
       border-radius: 8px;
-      font-size: 15px;
+      font-size: 14px;
       font-weight: 600;
       text-decoration: none;
       transition: all 0.2s;
       cursor: pointer;
       border: none;
+      white-space: nowrap;
     }
     .btn-primary {
       background: linear-gradient(135deg, var(--primary), var(--accent));
@@ -84,131 +91,139 @@
     /* Stats */
     .stats {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-      gap: 16px;
-      padding: 40px 0;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+      padding: 32px 0;
+      width: 100%;
     }
     .stat {
       text-align: center;
       background: var(--surface);
       border-radius: 12px;
-      padding: 24px 16px;
+      padding: 20px 12px;
       border: 1px solid rgba(123,104,238,0.15);
     }
-    .stat-value { font-size: 2rem; font-weight: 700; color: var(--accent); }
-    .stat-label { font-size: 13px; color: var(--muted); margin-top: 4px; }
+    .stat-value { font-size: clamp(1.4rem, 4vw, 2rem); font-weight: 700; color: var(--accent); }
+    .stat-label { font-size: 12px; color: var(--muted); margin-top: 4px; }
 
     /* Features */
     .section-title {
       text-align: center;
-      font-size: 2rem;
+      font-size: clamp(1.5rem, 4vw, 2rem);
       font-weight: 700;
-      margin-bottom: 12px;
+      margin-bottom: 10px;
     }
     .section-sub {
       text-align: center;
       color: var(--muted);
-      margin-bottom: 40px;
-      font-size: 1.05rem;
+      margin-bottom: 32px;
+      font-size: clamp(0.9rem, 2vw, 1.05rem);
+      padding: 0 12px;
     }
     .features {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 20px;
-      padding-bottom: 60px;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      padding-bottom: 48px;
+      width: 100%;
     }
     .feature {
       background: var(--surface);
       border-radius: 12px;
-      padding: 28px;
+      padding: 24px;
       border: 1px solid rgba(123,104,238,0.15);
       transition: border-color 0.2s;
     }
     .feature:hover { border-color: var(--primary); }
     .feature-icon {
-      width: 44px;
-      height: 44px;
+      width: 40px;
+      height: 40px;
       background: rgba(123,104,238,0.15);
       border-radius: 10px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 22px;
-      margin-bottom: 16px;
+      font-size: 20px;
+      margin-bottom: 12px;
     }
-    .feature h3 { font-size: 1.1rem; margin-bottom: 8px; }
-    .feature p { color: var(--muted); font-size: 14px; }
+    .feature h3 { font-size: 1rem; margin-bottom: 6px; }
+    .feature p { color: var(--muted); font-size: 13px; }
 
     /* Architecture */
     .arch {
       background: var(--surface);
       border-radius: 16px;
-      padding: 40px;
-      margin-bottom: 60px;
+      padding: clamp(16px, 4vw, 32px);
+      margin-bottom: 48px;
       border: 1px solid rgba(123,104,238,0.15);
+      width: 100%;
     }
-    .arch h2 { margin-bottom: 24px; }
+    .arch h2 { margin-bottom: 20px; }
     .arch-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 16px;
+      gap: 12px;
+      width: 100%;
     }
     .arch-item {
       background: rgba(123,104,238,0.08);
       border-radius: 8px;
-      padding: 16px;
+      padding: 14px;
       border-left: 3px solid var(--primary);
     }
-    .arch-item h4 { color: var(--accent); margin-bottom: 6px; font-size: 14px; }
-    .arch-item p { color: var(--muted); font-size: 13px; }
+    .arch-item h4 { color: var(--accent); margin-bottom: 4px; font-size: 13px; }
+    .arch-item p { color: var(--muted); font-size: 12px; }
 
     /* Install */
     .install {
       background: linear-gradient(135deg, rgba(123,104,238,0.15), rgba(187,134,252,0.1));
       border-radius: 16px;
-      padding: 48px;
+      padding: clamp(20px, 4vw, 36px) clamp(16px, 3vw, 24px);
       text-align: center;
-      margin-bottom: 60px;
+      margin-bottom: 48px;
       border: 1px solid rgba(123,104,238,0.3);
+      width: 100%;
     }
-    .install h2 { margin-bottom: 12px; }
-    .install p { color: var(--muted); margin-bottom: 24px; }
+    .install h2 { margin-bottom: 10px; }
+    .install p { color: var(--muted); margin-bottom: 20px; font-size: 14px; }
     .install-steps {
       display: flex;
-      gap: 24px;
+      gap: 16px;
       justify-content: center;
       flex-wrap: wrap;
-      margin-top: 24px;
+      margin-top: 20px;
     }
     .step {
       background: var(--surface);
       border-radius: 10px;
-      padding: 20px 24px;
+      padding: 16px 20px;
       text-align: left;
-      min-width: 220px;
+      flex: 1;
+      min-width: 180px;
+      max-width: 240px;
     }
     .step-num {
       display: inline-block;
-      width: 28px;
-      height: 28px;
+      width: 26px;
+      height: 26px;
       background: var(--primary);
       color: white;
       border-radius: 50%;
       text-align: center;
-      line-height: 28px;
+      line-height: 26px;
       font-weight: 700;
-      font-size: 14px;
+      font-size: 13px;
       margin-bottom: 8px;
     }
-    .step p { font-size: 14px; color: var(--muted); }
+    .step p { font-size: 13px; color: var(--muted); }
 
     /* Footer */
     footer {
       border-top: 1px solid rgba(123,104,238,0.15);
-      padding: 32px 0;
+      padding: 28px 0;
       text-align: center;
       color: var(--muted);
-      font-size: 13px;
+      font-size: 12px;
     }
     footer a { color: var(--accent); text-decoration: none; }
 
@@ -224,6 +239,32 @@
     @keyframes pulse-dot {
       0%, 100% { opacity: 1; }
       50% { opacity: 0.5; }
+    }
+
+    /* ---- Mobile responsive ---- */
+    @media (max-width: 768px) {
+      .container { padding: 0 4vw; }
+      .hero { padding: 40px 0 32px; }
+      .stats { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+      .features { grid-template-columns: 1fr; gap: 12px; }
+      .feature { padding: 20px; }
+      .arch-grid { grid-template-columns: 1fr; }
+      .install-steps { flex-direction: column; align-items: stretch; }
+      .step { max-width: 100%; min-width: auto; width: 100%; }
+    }
+
+    @media (max-width: 480px) {
+      .container { padding: 0 3.5vw; }
+      .hero { padding: 32px 0 24px; }
+      .hero-actions { flex-direction: column; align-items: stretch; }
+      .btn { width: 100%; justify-content: center; }
+      .stats { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+      .stat { padding: 16px 8px; }
+      .stat-value { font-size: 1.3rem; }
+      .stat-label { font-size: 11px; }
+      .feature { padding: 16px; }
+      .feature h3 { font-size: 0.95rem; }
+      .feature p { font-size: 12px; }
     }
   </style>
 </head>
@@ -369,7 +410,7 @@
   <footer>
     <div class="container">
       <p><span class="health-dot" id="health-dot"></span>AccessBridge v0.1.0 &mdash; Built for <a href="#">Wipro TopGear Ideathon 2026</a></p>
-      <p style="margin-top:8px">Team: Manish Kumar &amp; Team | <a href="https://github.com/manishjnv/AccessBridge">GitHub</a></p>
+      <p style="margin-top:8px">Team: Manish Kumar | <a href="https://github.com/manishjnv/AccessBridge">GitHub</a></p>
     </div>
   </footer>
 

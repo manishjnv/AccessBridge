@@ -1,6 +1,20 @@
 # AccessBridge - Shift Handoff
 
-## Last Session: Day 4 — Shift 1 (April 6, 2026)
+## Last Session: Day 4 — Shift 2 (April 6, 2026)
+
+### Completed (Day 4, Shift 2)
+- [x] **Full build/typecheck/test verification** — pnpm build, pnpm typecheck, 116 tests all green
+- [x] **Dist sideload audit** — verified all HTML paths are relative, icons present, manifest correct, CSS at right path
+- [x] **PowerPoint presentation created** (15 slides, dark theme, python-pptx) — required deliverable for TopGear submission
+- [x] **Demo script** (`DEMO_SCRIPT.md`): step-by-step 5-7 min walkthrough for judges covering all 10+ features
+- [x] **Landing page responsive polish** — clamp() font sizes, auto-fit grids, 3 breakpoints (desktop/tablet/mobile), smooth scroll, dvh viewport
+- [x] **Deploy downloads setup** — `deploy/downloads/accessbridge-extension.zip` for landing page download button
+- [x] **deploy.sh updated** — copies landing page + downloads to nginx serve directory on VPS
+- [x] **Code review** — background service worker, content script, popup, all message routing verified correct
+
+#### Tool Contribution (Day 4, Shift 2)
+- **Claude:** Build verification, sideload audit, PPT generator + presentation, demo script, deploy updates, code review, HANDOFF update
+- **Codex:** Setup verified (v0.118.0, authenticated, shared session), dispatched for PPT (completed by Claude due to sandbox)
 
 ### Completed (Day 4, Shift 1)
 - [x] **Critical bug fix: Vite base path** — popup and sidepanel HTML had absolute paths (`/assets/...`) which break in Chrome extensions. Added `base: ''` to Vite config → relative paths (`../../assets/...`)
@@ -73,18 +87,18 @@
 
 ### NOT Done (Carry Forward)
 - [ ] Extension NOT tested in Chrome yet (build succeeds with relative paths, needs manual sideload test)
-- [ ] VPS deployment — deploy script created (`deploy.sh`), not yet executed
-- [ ] PPT/presentation for TopGear submission
+- [ ] VPS deployment — deploy script ready (`deploy.sh`), not yet executed
+- [x] PPT/presentation created (15 slides, `AccessBridge_Presentation.pptx`)
 - [ ] Demo video recording
 - [ ] Real API keys for Gemini/Claude AI tiers (local tier works offline)
-- [ ] GitHub push (commit ready, needs push)
+- [ ] GitHub push (need to commit + push Day 4 Shift 2 changes)
 
-### Day 4 Remaining Priority (April 7)
-1. **Sideload test**: Load dist/ in Chrome, verify ALL features end-to-end
-2. **Git push + VPS deploy**: Run `./deploy.sh` or manual push + SSH
+### Remaining Priority (April 7-11)
+1. **Chrome sideload test**: Load dist/ in Chrome, verify ALL features end-to-end
+2. **Git commit + push + VPS deploy**: Run `./deploy.sh`
 3. **Bug fixes**: Fix any issues found during Chrome testing
-4. **PPT**: Create presentation for TopGear Ideathon submission
-5. **Demo video**: Record walkthrough of all 10+ features
+4. **Demo video**: Record walkthrough using DEMO_SCRIPT.md
+5. **PPT polish**: Refine presentation slides if needed
 6. **Polish**: UI refinements, error handling edge cases
 
 ### Architecture Notes
@@ -94,6 +108,18 @@
 - AI: 3-tier (local free → Gemini Flash → Claude) with cache + cost tracking
 - All on-device, zero network for accessibility data
 - AI engine runs in background service worker, content script uses AIBridge for communication
+
+### Key Files Added/Modified (Day 4, Shift 2)
+
+```
+AccessBridge_Presentation.pptx                            — 15-slide TopGear presentation (dark theme, python-pptx)
+generate_presentation.py                                  — Python script to regenerate the PPTX
+DEMO_SCRIPT.md                                            — 5-7 min demo walkthrough for judges
+deploy/index.html                                         — Responsive landing page (clamp, auto-fit, 3 breakpoints)
+deploy/downloads/accessbridge-extension.zip               — Chrome extension download for landing page
+deploy.sh                                                 — Updated: copies landing page to nginx on VPS
+HANDOFF.md                                                — Day 4 Shift 2 status update
+```
 
 ### Key Files Added/Modified (Day 4, Shift 1)
 

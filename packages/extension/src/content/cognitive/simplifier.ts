@@ -194,6 +194,11 @@ export class CognitiveSimplifier {
   // Focus Mode
   // =====================================================================
 
+  // SVG elements for focus mode
+  private svgOverlay: SVGSVGElement | null = null;
+  private svgCutout: SVGRectElement | null = null;
+  private svgBorder: SVGRectElement | null = null;
+
   enableFocusMode(): void {
     if (this.focusActive) return;
     this.focusActive = true;
@@ -201,32 +206,96 @@ export class CognitiveSimplifier {
 
     injectStyle(FOCUS_STYLE_ID, buildFocusCSS());
 
-    // Spotlight: glowing purple border + strongly dimmed surroundings
-    const overlay = document.createElement('div');
-    overlay.id = SPOTLIGHT_ID;
-    Object.assign(overlay.style, {
+    // SVG overlay — full screen with a masked rounded-rect cutout
+    // This approach gives mathematically perfect rounded corners, zero artifacts
+    const ns = 'http://www.w3.org/2000/svg';
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+
+    const svg = document.createElementNS(ns, 'svg');
+    svg.id = SPOTLIGHT_ID;
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    Object.assign(svg.style, {
       position: 'fixed',
-      top: '50%',
-      left: '50%',
-      width: '200px',
-      height: '100px',
+      top: '0',
+      left: '0',
+      width: '100vw',
+      height: '100vh',
       zIndex: String(Z_BASE + 5),
       pointerEvents: 'none',
-      background: 'transparent',
-      borderRadius: '12px',
-      boxShadow: '0 0 0 3px rgba(90, 50, 210, 1), 0 0 20px 6px rgba(90, 50, 210, 0.5), 0 0 0 9999px rgba(0, 0, 0, 0.6)',
     });
-    document.body.appendChild(overlay);
-    this.spotlightEl = overlay;
+
+    // Mask: white = visible (dim), black = hidden (cutout)
+    const defs = document.createElementNS(ns, 'defs');
+    const mask = document.createElementNS(ns, 'mask');
+    mask.id = 'ab-focus-mask';
+
+    // White full-screen rect = everything is dimmed
+    const maskBg = document.createElementNS(ns, 'rect');
+    maskBg.setAttribute('width', '100%');
+    maskBg.setAttribute('height', '100%');
+    maskBg.setAttribute('fill', 'white');
+
+    // Black rounded rect = cutout (this area is NOT dimmed)
+    const maskHole = document.createElementNS(ns, 'rect');
+    maskHole.setAttribute('x', String(W / 2 - 100));
+    maskHole.setAttribute('y', String(H / 2 - 50));
+    maskHole.setAttribute('width', '200');
+    maskHole.setAttribute('height', '100');
+    maskHole.setAttribute('rx', '12');
+    maskHole.setAttribute('ry', '12');
+    maskHole.setAttribute('fill', 'black');
+
+    mask.appendChild(maskBg);
+    mask.appendChild(maskHole);
+    defs.appendChild(mask);
+    svg.appendChild(defs);
+
+    // Dim layer (uses the mask)
+    const dimRect = document.createElementNS(ns, 'rect');
+    dimRect.setAttribute('width', '100%');
+    dimRect.setAttribute('height', '100%');
+    dimRect.setAttribute('fill', 'rgba(0, 0, 0, 0.55)');
+    dimRect.setAttribute('mask', 'url(#ab-focus-mask)');
+    svg.appendChild(dimRect);
+
+    // Purple border around the cutout — same position, just stroke
+    const border = document.createElementNS(ns, 'rect');
+    border.setAttribute('x', String(W / 2 - 100));
+    border.setAttribute('y', String(H / 2 - 50));
+    border.setAttribute('width', '200');
+    border.setAttribute('height', '100');
+    border.setAttribute('rx', '12');
+    border.setAttribute('ry', '12');
+    border.setAttribute('fill', 'none');
+    border.setAttribute('stroke', 'rgba(100, 60, 220, 0.9)');
+    border.setAttribute('stroke-width', '2.5');
+    svg.appendChild(border);
+
+    document.body.appendChild(svg);
+    this.svgOverlay = svg;
+    this.svgCutout = maskHole;
+    this.svgBorder = border;
+    this.spotlightEl = svg as unknown as HTMLElement;
     this.focusBorderEl = null;
 
     // Track target rect for smooth lerp animation
     this.targetRect = { top: 0, left: 0, width: 200, height: 100 };
-    this.currentRect = { top: window.innerHeight / 2, left: window.innerWidth / 2, width: 200, height: 100 };
+    this.currentRect = { top: H / 2 - 50, left: W / 2 - 100, width: 200, height: 100 };
     this.startLerpLoop();
 
+    // Resize handler to update SVG viewBox
+    window.addEventListener('resize', this.handleResize);
     document.addEventListener('mousemove', this.handleFocusMove, { passive: true });
   }
+
+  private handleResize = (): void => {
+    if (this.svgOverlay) {
+      const W = window.innerWidth;
+      const H = window.innerHeight;
+      this.svgOverlay.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    }
+  };
 
   disableFocusMode(): void {
     if (!this.focusActive) return;
@@ -243,9 +312,12 @@ export class CognitiveSimplifier {
     this.lastFocusTarget = null;
 
     document.removeEventListener('mousemove', this.handleFocusMove);
+    window.removeEventListener('resize', this.handleResize);
     removeElement(SPOTLIGHT_ID);
-    removeElement(FOCUS_BORDER_ID);
     removeStyle(FOCUS_STYLE_ID);
+    this.svgOverlay = null;
+    this.svgCutout = null;
+    this.svgBorder = null;
     this.spotlightEl = null;
     this.focusBorderEl = null;
   }
@@ -283,9 +355,9 @@ export class CognitiveSimplifier {
   private lerpRafId: number | null = null;
 
   private startLerpLoop(): void {
-    const LERP = 0.12; // smoothing factor — lower = smoother/slower
+    const LERP = 0.1; // smoothing factor — lower = smoother/slower
     const tick = () => {
-      if (!this.focusActive || !this.spotlightEl) return;
+      if (!this.focusActive || !this.svgCutout || !this.svgBorder) return;
       this.lerpRafId = requestAnimationFrame(tick);
 
       // Interpolate current towards target
@@ -294,10 +366,21 @@ export class CognitiveSimplifier {
       this.currentRect.width += (this.targetRect.width - this.currentRect.width) * LERP;
       this.currentRect.height += (this.targetRect.height - this.currentRect.height) * LERP;
 
-      this.spotlightEl.style.top = `${this.currentRect.top}px`;
-      this.spotlightEl.style.left = `${this.currentRect.left}px`;
-      this.spotlightEl.style.width = `${this.currentRect.width}px`;
-      this.spotlightEl.style.height = `${this.currentRect.height}px`;
+      const x = String(this.currentRect.left);
+      const y = String(this.currentRect.top);
+      const w = String(this.currentRect.width);
+      const h = String(this.currentRect.height);
+
+      // Update both the mask cutout and the visible border — identical position
+      this.svgCutout.setAttribute('x', x);
+      this.svgCutout.setAttribute('y', y);
+      this.svgCutout.setAttribute('width', w);
+      this.svgCutout.setAttribute('height', h);
+
+      this.svgBorder.setAttribute('x', x);
+      this.svgBorder.setAttribute('y', y);
+      this.svgBorder.setAttribute('width', w);
+      this.svgBorder.setAttribute('height', h);
     };
     this.lerpRafId = requestAnimationFrame(tick);
   }
@@ -311,10 +394,10 @@ export class CognitiveSimplifier {
       this.focusRafId = null;
       if (!this.spotlightEl) return;
 
-      // Hide overlay so elementFromPoint hits actual content
-      this.spotlightEl.style.display = 'none';
+      // Hide SVG overlay so elementFromPoint hits actual content
+      if (this.svgOverlay) this.svgOverlay.style.display = 'none';
       const target = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
-      this.spotlightEl.style.display = '';
+      if (this.svgOverlay) this.svgOverlay.style.display = '';
 
       if (!target) return;
 

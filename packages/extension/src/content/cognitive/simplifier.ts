@@ -201,7 +201,8 @@ export class CognitiveSimplifier {
 
     injectStyle(FOCUS_STYLE_ID, buildFocusCSS());
 
-    // Single spotlight element — dim overlay + outline glow (outline sits outside, never touches content)
+    // Spotlight: transparent window with massive box-shadow to dim surroundings
+    // No border, no outline — the clear-vs-dim contrast is the indicator
     const overlay = document.createElement('div');
     overlay.id = SPOTLIGHT_ID;
     overlay.style.cssText = `
@@ -213,17 +214,17 @@ export class CognitiveSimplifier {
       z-index: ${Z_BASE + 5};
       pointer-events: none;
       background: transparent;
-      border: none;
-      border-radius: 10px;
-      outline: 2px solid rgba(123, 104, 238, 0.7);
-      outline-offset: 4px;
+      border-radius: 12px;
       box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
-      transition: top 0.4s ease, left 0.4s ease, width 0.4s ease, height 0.4s ease;
     `;
     document.body.appendChild(overlay);
     this.spotlightEl = overlay;
-    // No separate border element — single element avoids dual-edge issue
     this.focusBorderEl = null;
+
+    // Track target rect for smooth lerp animation
+    this.targetRect = { top: 0, left: 0, width: 200, height: 100 };
+    this.currentRect = { top: window.innerHeight / 2, left: window.innerWidth / 2, width: 200, height: 100 };
+    this.startLerpLoop();
 
     document.addEventListener('mousemove', this.handleFocusMove, { passive: true });
   }
@@ -236,9 +237,9 @@ export class CognitiveSimplifier {
       cancelAnimationFrame(this.focusRafId);
       this.focusRafId = null;
     }
-    if (this.focusDebounceTimer !== null) {
-      clearTimeout(this.focusDebounceTimer);
-      this.focusDebounceTimer = null;
+    if (this.lerpRafId !== null) {
+      cancelAnimationFrame(this.lerpRafId);
+      this.lerpRafId = null;
     }
     this.lastFocusTarget = null;
 
@@ -277,46 +278,60 @@ export class CognitiveSimplifier {
     return el;
   }
 
-  private focusDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  // Smooth lerp animation state
+  private targetRect = { top: 0, left: 0, width: 200, height: 100 };
+  private currentRect = { top: 0, left: 0, width: 200, height: 100 };
+  private lerpRafId: number | null = null;
+
+  private startLerpLoop(): void {
+    const LERP = 0.12; // smoothing factor — lower = smoother/slower
+    const tick = () => {
+      if (!this.focusActive || !this.spotlightEl) return;
+      this.lerpRafId = requestAnimationFrame(tick);
+
+      // Interpolate current towards target
+      this.currentRect.top += (this.targetRect.top - this.currentRect.top) * LERP;
+      this.currentRect.left += (this.targetRect.left - this.currentRect.left) * LERP;
+      this.currentRect.width += (this.targetRect.width - this.currentRect.width) * LERP;
+      this.currentRect.height += (this.targetRect.height - this.currentRect.height) * LERP;
+
+      this.spotlightEl.style.top = `${this.currentRect.top}px`;
+      this.spotlightEl.style.left = `${this.currentRect.left}px`;
+      this.spotlightEl.style.width = `${this.currentRect.width}px`;
+      this.spotlightEl.style.height = `${this.currentRect.height}px`;
+    };
+    this.lerpRafId = requestAnimationFrame(tick);
+  }
 
   private onFocusMouseMove(e: MouseEvent): void {
     if (!this.spotlightEl) return;
 
-    // Debounce: wait 150ms after mouse stops before updating spotlight
-    if (this.focusDebounceTimer !== null) clearTimeout(this.focusDebounceTimer);
-    this.focusDebounceTimer = setTimeout(() => {
-      this.focusDebounceTimer = null;
+    // Use rAF to find target element (throttled to once per frame)
+    if (this.focusRafId !== null) return;
+    this.focusRafId = requestAnimationFrame(() => {
+      this.focusRafId = null;
       if (!this.spotlightEl) return;
 
-      // Temporarily hide overlay so elementFromPoint hits actual content
+      // Hide overlay so elementFromPoint hits actual content
       this.spotlightEl.style.display = 'none';
-      let target = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
+      const target = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
       this.spotlightEl.style.display = '';
 
       if (!target) return;
 
-      target = this.findFocusBlock(target);
+      const block = this.findFocusBlock(target);
+      if (block === this.lastFocusTarget) return;
+      this.lastFocusTarget = block;
 
-      if (target === this.lastFocusTarget) return;
-      this.lastFocusTarget = target;
+      const rect = block.getBoundingClientRect();
+      const pad = 16;
 
-      const rect = target.getBoundingClientRect();
-      const pad = 20;
-      const r = 10;
-
-      const top = rect.top - pad;
-      const left = rect.left - pad;
-      const w = rect.width + pad * 2;
-      const h = rect.height + pad * 2;
-
-      // Single spotlight element — no separate border (eliminates dual edge)
-      // Uses box-shadow for dim + outline glow in one element
-      this.spotlightEl.style.top = `${top}px`;
-      this.spotlightEl.style.left = `${left}px`;
-      this.spotlightEl.style.width = `${w}px`;
-      this.spotlightEl.style.height = `${h}px`;
-      this.spotlightEl.style.borderRadius = `${r}px`;
-    }, 150);
+      // Set target — lerp loop will smoothly animate towards it
+      this.targetRect.top = rect.top - pad;
+      this.targetRect.left = rect.left - pad;
+      this.targetRect.width = rect.width + pad * 2;
+      this.targetRect.height = rect.height + pad * 2;
+    });
   }
 
   // =====================================================================

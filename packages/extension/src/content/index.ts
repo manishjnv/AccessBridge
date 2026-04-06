@@ -16,9 +16,12 @@ import { CognitiveSimplifier } from './cognitive/simplifier.js';
 import { VoiceCommandSystem } from './motor/voice-commands.js';
 import { FatigueAdaptiveUI } from './fatigue/adaptive-ui.js';
 import { AIBridge } from './ai/bridge.js';
+import { EmailSummarizationUI } from './ai/email-ui.js';
 import { matchHindiCommand } from './motor/hindi-commands.js';
 import { DwellClickSystem } from './motor/dwell-click.js';
 import { EyeTracker } from './motor/eye-tracker.js';
+import { KeyboardOnlyMode } from './motor/keyboard-mode.js';
+import { PredictiveInputSystem } from './motor/predictive-input.js';
 
 // ---------- App Detection ----------
 
@@ -230,6 +233,9 @@ let fatigueUI: FatigueAdaptiveUI | null = null;
 let aiBridge: AIBridge | null = null;
 let dwellClick: DwellClickSystem | null = null;
 let eyeTracker: EyeTracker | null = null;
+let keyboardMode: KeyboardOnlyMode | null = null;
+let predictiveInput: PredictiveInputSystem | null = null;
+let emailUI: EmailSummarizationUI | null = null;
 
 function getAI(): AIBridge {
   if (!aiBridge) {
@@ -250,6 +256,27 @@ function getEyeTracker(): EyeTracker {
     eyeTracker = new EyeTracker();
   }
   return eyeTracker;
+}
+
+function getKeyboard(): KeyboardOnlyMode {
+  if (!keyboardMode) {
+    keyboardMode = new KeyboardOnlyMode();
+  }
+  return keyboardMode;
+}
+
+function getPredictive(): PredictiveInputSystem {
+  if (!predictiveInput) {
+    predictiveInput = new PredictiveInputSystem();
+  }
+  return predictiveInput;
+}
+
+function getEmailUI(): EmailSummarizationUI {
+  if (!emailUI) {
+    emailUI = new EmailSummarizationUI();
+  }
+  return emailUI;
 }
 
 function getCognitive(): CognitiveSimplifier {
@@ -403,6 +430,9 @@ function listenForCommands(adapter: BaseAdapter, sensory: SensoryAdapter): void 
           getVoice().stop();
           getDwell().stop();
           getEyeTracker().stop();
+          getKeyboard().stop();
+          getPredictive().stop();
+          getEmailUI().stop();
           getAI().dismiss();
           sendResponse({ reverted: true });
           break;
@@ -411,6 +441,20 @@ function listenForCommands(adapter: BaseAdapter, sensory: SensoryAdapter): void 
           const { enabled, delay } = message.payload as { enabled: boolean; delay?: number };
           if (enabled) getDwell().start(delay);
           else getDwell().stop();
+          sendResponse({ success: true });
+          break;
+        }
+        case 'TOGGLE_KEYBOARD_MODE': {
+          const { enabled: kbEnabled } = message.payload as { enabled: boolean };
+          if (kbEnabled) getKeyboard().start();
+          else getKeyboard().stop();
+          sendResponse({ success: true });
+          break;
+        }
+        case 'TOGGLE_PREDICTIVE_INPUT': {
+          const { enabled: piEnabled } = message.payload as { enabled: boolean };
+          if (piEnabled) getPredictive().start();
+          else getPredictive().stop();
           sendResponse({ success: true });
           break;
         }
@@ -474,6 +518,14 @@ function applyAdaptation(adaptation: Adaptation, adapter: BaseAdapter, sensory: 
       if (adaptation.value) getEyeTracker().start();
       else getEyeTracker().stop();
       break;
+    case AdaptationType.KEYBOARD_ONLY:
+      if (adaptation.value) getKeyboard().start();
+      else getKeyboard().stop();
+      break;
+    case AdaptationType.PREDICTIVE_INPUT:
+      if (adaptation.value) getPredictive().start();
+      else getPredictive().stop();
+      break;
 
     default:
       adapter.apply(adaptation);
@@ -534,6 +586,11 @@ function init(): void {
   // Start fatigue monitoring
   getFatigue().start();
 
+  // Start email summarization UI on email providers
+  if (app === 'gmail' || app === 'outlook' || app === 'generic') {
+    getEmailUI().start(getAI());
+  }
+
   // Load profile and check for pre-enabled features
   chrome.runtime.sendMessage({ type: 'GET_PROFILE' }).then((profile) => {
     if (!profile || typeof profile !== 'object') return;
@@ -561,9 +618,11 @@ function init(): void {
     if (p.cognitive?.focusModeEnabled) getCognitive().enableFocusMode();
     if (p.cognitive?.distractionShield) getCognitive().enableDistractionShield();
     // Dwell click and eye tracking from profile
-    const pm = profile as { motor?: { dwellClickEnabled?: boolean; dwellClickDelay?: number; eyeTrackingEnabled?: boolean } };
+    const pm = profile as { motor?: { dwellClickEnabled?: boolean; dwellClickDelay?: number; eyeTrackingEnabled?: boolean; keyboardOnlyMode?: boolean; predictiveInput?: boolean } };
     if (pm.motor?.dwellClickEnabled) getDwell().start(pm.motor?.dwellClickDelay);
     if (pm.motor?.eyeTrackingEnabled) getEyeTracker().start();
+    if (pm.motor?.keyboardOnlyMode) getKeyboard().start();
+    if (pm.motor?.predictiveInput) getPredictive().start();
   }).catch(() => {});
 
   console.log('[AccessBridge] Content script initialized (Day 2)');

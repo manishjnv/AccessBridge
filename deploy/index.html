@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AccessBridge - Ambient Accessibility Operating Layer</title>
+  <style>
+    :root {
+      --bg: #0a0a1a;
+      --surface: #1a1a2e;
+      --primary: #7b68ee;
+      --accent: #bb86fc;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --success: #10b981;
+      --warning: #f59e0b;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+    .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+
+    /* Hero */
+    .hero {
+      text-align: center;
+      padding: 80px 0 60px;
+      background: linear-gradient(180deg, rgba(123,104,238,0.12) 0%, transparent 80%);
+    }
+    .hero-badge {
+      display: inline-block;
+      background: rgba(123,104,238,0.2);
+      border: 1px solid rgba(123,104,238,0.4);
+      border-radius: 20px;
+      padding: 4px 16px;
+      font-size: 13px;
+      color: var(--accent);
+      margin-bottom: 20px;
+    }
+    .hero h1 {
+      font-size: 3rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 16px;
+    }
+    .hero p {
+      font-size: 1.2rem;
+      color: var(--muted);
+      max-width: 600px;
+      margin: 0 auto 32px;
+    }
+    .hero-actions { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 28px;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s;
+      cursor: pointer;
+      border: none;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      color: white;
+    }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(123,104,238,0.4); }
+    .btn-secondary {
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid rgba(123,104,238,0.3);
+    }
+    .btn-secondary:hover { border-color: var(--primary); }
+
+    /* Stats */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 16px;
+      padding: 40px 0;
+    }
+    .stat {
+      text-align: center;
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 24px 16px;
+      border: 1px solid rgba(123,104,238,0.15);
+    }
+    .stat-value { font-size: 2rem; font-weight: 700; color: var(--accent); }
+    .stat-label { font-size: 13px; color: var(--muted); margin-top: 4px; }
+
+    /* Features */
+    .section-title {
+      text-align: center;
+      font-size: 2rem;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+    .section-sub {
+      text-align: center;
+      color: var(--muted);
+      margin-bottom: 40px;
+      font-size: 1.05rem;
+    }
+    .features {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 20px;
+      padding-bottom: 60px;
+    }
+    .feature {
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 28px;
+      border: 1px solid rgba(123,104,238,0.15);
+      transition: border-color 0.2s;
+    }
+    .feature:hover { border-color: var(--primary); }
+    .feature-icon {
+      width: 44px;
+      height: 44px;
+      background: rgba(123,104,238,0.15);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      margin-bottom: 16px;
+    }
+    .feature h3 { font-size: 1.1rem; margin-bottom: 8px; }
+    .feature p { color: var(--muted); font-size: 14px; }
+
+    /* Architecture */
+    .arch {
+      background: var(--surface);
+      border-radius: 16px;
+      padding: 40px;
+      margin-bottom: 60px;
+      border: 1px solid rgba(123,104,238,0.15);
+    }
+    .arch h2 { margin-bottom: 24px; }
+    .arch-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+    }
+    .arch-item {
+      background: rgba(123,104,238,0.08);
+      border-radius: 8px;
+      padding: 16px;
+      border-left: 3px solid var(--primary);
+    }
+    .arch-item h4 { color: var(--accent); margin-bottom: 6px; font-size: 14px; }
+    .arch-item p { color: var(--muted); font-size: 13px; }
+
+    /* Install */
+    .install {
+      background: linear-gradient(135deg, rgba(123,104,238,0.15), rgba(187,134,252,0.1));
+      border-radius: 16px;
+      padding: 48px;
+      text-align: center;
+      margin-bottom: 60px;
+      border: 1px solid rgba(123,104,238,0.3);
+    }
+    .install h2 { margin-bottom: 12px; }
+    .install p { color: var(--muted); margin-bottom: 24px; }
+    .install-steps {
+      display: flex;
+      gap: 24px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 24px;
+    }
+    .step {
+      background: var(--surface);
+      border-radius: 10px;
+      padding: 20px 24px;
+      text-align: left;
+      min-width: 220px;
+    }
+    .step-num {
+      display: inline-block;
+      width: 28px;
+      height: 28px;
+      background: var(--primary);
+      color: white;
+      border-radius: 50%;
+      text-align: center;
+      line-height: 28px;
+      font-weight: 700;
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+    .step p { font-size: 14px; color: var(--muted); }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid rgba(123,104,238,0.15);
+      padding: 32px 0;
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    footer a { color: var(--accent); text-decoration: none; }
+
+    /* API Health indicator */
+    .health-dot {
+      display: inline-block;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      margin-right: 6px;
+      background: var(--success);
+      animation: pulse-dot 2s infinite;
+    }
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+  </style>
+</head>
+<body>
+
+  <section class="hero">
+    <div class="container">
+      <div class="hero-badge">Wipro TopGear Ideathon 2026</div>
+      <h1>AccessBridge</h1>
+      <p>The Ambient Accessibility Operating Layer. Zero disclosure, AI-powered, cross-application accessibility for enterprise web apps.</p>
+      <div class="hero-actions">
+        <a href="/downloads/accessbridge-extension.zip" class="btn btn-primary">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+          Download Extension
+        </a>
+        <a href="https://github.com/manishjnv/AccessBridge" target="_blank" class="btn btn-secondary">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+          GitHub
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <section class="container">
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-value">10+</div>
+        <div class="stat-label">Accessibility Features</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">25+</div>
+        <div class="stat-label">Voice Commands</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">8</div>
+        <div class="stat-label">Languages Supported</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">0</div>
+        <div class="stat-label">Network Dependency</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="container">
+    <h2 class="section-title">Core Features</h2>
+    <p class="section-sub">Ambient, invisible accessibility that adapts in real-time to user struggles</p>
+    <div class="features">
+      <div class="feature">
+        <div class="feature-icon">&#x1f9e0;</div>
+        <h3>Struggle Detection</h3>
+        <p>Real-time behavioral signal analysis: scroll velocity, click accuracy, typing rhythm, cursor path, dwell time, hesitation patterns.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">&#x2699;&#xfe0f;</div>
+        <h3>Auto Adaptations</h3>
+        <p>Decision engine evaluates struggle scores and automatically applies font scaling, contrast, layout simplification, and more.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">&#x1f3af;</div>
+        <h3>Focus &amp; Reading Mode</h3>
+        <p>Cognitive simplifier with spotlight focus, distraction shield, and reading guide for users with attention difficulties.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">&#x1f3a4;</div>
+        <h3>Voice Commands</h3>
+        <p>20+ hands-free commands via Web Speech API: scroll, click, type, navigate tabs, zoom, find text, and more. Hindi supported.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">&#x1f441;&#xfe0f;</div>
+        <h3>Eye Tracking</h3>
+        <p>Webcam-based gaze cursor for motor-impaired users. Face-position tracking with 5-point calibration and smooth interpolation.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">&#x1f5b1;&#xfe0f;</div>
+        <h3>Dwell Click</h3>
+        <p>Auto-click after configurable hover delay. Radial SVG progress indicator, 15px movement threshold, visual pulse feedback.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">&#x1f4a4;</div>
+        <h3>Fatigue-Adaptive UI</h3>
+        <p>4-level progressive interface simplification based on time-of-day, session duration, and declining interaction rates.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">&#x1f916;</div>
+        <h3>AI-Powered Insights</h3>
+        <p>3-tier AI engine (local free, Gemini Flash, Claude) for page summarization, text simplification, and readability scoring.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">&#x1f30d;</div>
+        <h3>Multi-Language</h3>
+        <p>Voice commands in Hindi, English, Spanish, French, German, Chinese, Japanese, Arabic. Profile-based language selection.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="container">
+    <div class="arch">
+      <h2 class="section-title" style="text-align:left">Architecture</h2>
+      <div class="arch-grid">
+        <div class="arch-item">
+          <h4>@accessbridge/core</h4>
+          <p>Types, ProfileStore, StruggleDetector, DecisionEngine. Zero dependencies.</p>
+        </div>
+        <div class="arch-item">
+          <h4>@accessbridge/extension</h4>
+          <p>Manifest V3 Chrome extension. React popup, side panel, content scripts, sensory adapter.</p>
+        </div>
+        <div class="arch-item">
+          <h4>@accessbridge/ai-engine</h4>
+          <p>3-tier AI with caching and cost tracking. Summarizer, simplifier, classifier, translator.</p>
+        </div>
+        <div class="arch-item">
+          <h4>Content Modules</h4>
+          <p>Cognitive Simplifier, Voice Commands, Fatigue Adaptive UI, Dwell Click, Eye Tracker, AI Bridge.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="container">
+    <div class="install">
+      <h2>Install in Chrome</h2>
+      <p>AccessBridge runs entirely on-device. No server required for core accessibility features.</p>
+      <a href="/downloads/accessbridge-extension.zip" class="btn btn-primary">Download Extension (.zip)</a>
+      <div class="install-steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <p>Download and unzip the extension package</p>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <p>Open <code>chrome://extensions</code> and enable Developer Mode</p>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <p>Click "Load unpacked" and select the unzipped folder</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="container">
+      <p><span class="health-dot" id="health-dot"></span>AccessBridge v0.1.0 &mdash; Built for <a href="#">Wipro TopGear Ideathon 2026</a></p>
+      <p style="margin-top:8px">Team: Manish Kumar &amp; Team | <a href="https://github.com/manishjnv/AccessBridge">GitHub</a></p>
+    </div>
+  </footer>
+
+  <script>
+    // Check API health
+    fetch('/api/health').then(r => r.json()).then(d => {
+      if (d.status === 'ok') document.getElementById('health-dot').style.background = '#10b981';
+    }).catch(() => {
+      document.getElementById('health-dot').style.background = '#ef4444';
+    });
+  </script>
+</body>
+</html>

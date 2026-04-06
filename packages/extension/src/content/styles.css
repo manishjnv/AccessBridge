@@ -695,3 +695,422 @@
     transform: translate(-50%, -50%) scale(1);
   }
 }
+
+/* ============================================
+   Keyboard-Only Mode
+   ============================================ */
+
+/* ---- Skip links container ---- */
+.ab-kbd-skip-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2147483646;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  pointer-events: none;
+}
+
+/* ---- Individual skip link (hidden until focused) ---- */
+.ab-kbd-skip-link {
+  position: absolute;
+  top: -100%;
+  left: 4px;
+  background: #1a1a2e;
+  color: #bb86fc;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 20px;
+  border-radius: 0 0 8px 8px;
+  border: 2px solid #7b68ee;
+  border-top: none;
+  text-decoration: none;
+  pointer-events: auto;
+  transition: top 0.15s ease;
+  outline: none;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+}
+
+.ab-kbd-skip-link:focus {
+  top: 0;
+}
+
+/* ---- Enhanced focus indicator (when keyboard mode is active) ---- */
+.ab-kbd-focus-style *:focus {
+  outline: 3px solid #e94560 !important;
+  outline-offset: 3px !important;
+  box-shadow: 0 0 0 6px rgba(233, 69, 96, 0.3) !important;
+}
+
+.ab-kbd-focus-style *:focus:not(:focus-visible) {
+  outline: 3px solid #e94560 !important;
+  outline-offset: 3px !important;
+  box-shadow: 0 0 0 6px rgba(233, 69, 96, 0.3) !important;
+}
+
+/* ---- Active arrow-key group highlight ---- */
+.ab-kbd-active-group {
+  outline: 2px dashed rgba(123, 104, 238, 0.5) !important;
+  outline-offset: 4px !important;
+  border-radius: 4px;
+}
+
+/* ---- Shortcuts overlay backdrop ---- */
+.ab-kbd-overlay-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 10, 26, 0.75);
+  z-index: 2147483644;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+
+/* ---- Shortcuts overlay panel ---- */
+.ab-kbd-overlay {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 90vw;
+  max-width: 520px;
+  max-height: 80vh;
+  background: #1a1a2e;
+  color: #e2e8f0;
+  border-radius: 12px;
+  border: 1px solid rgba(123, 104, 238, 0.4);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6);
+  font-family: system-ui, -apple-system, sans-serif;
+  z-index: 2147483645;
+  overflow: hidden;
+  animation: ab-panel-in 0.2s ease-out;
+}
+
+.ab-kbd-overlay-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  background: rgba(123, 104, 238, 0.15);
+  border-bottom: 1px solid rgba(123, 104, 238, 0.3);
+  font-weight: 600;
+  font-size: 16px;
+  color: #bb86fc;
+}
+
+.ab-kbd-overlay-close {
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 22px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.ab-kbd-overlay-close:hover {
+  color: #e94560;
+}
+
+.ab-kbd-overlay-section {
+  margin: 0 0 8px;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #e94560;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ---- Keyboard shortcut key badge ---- */
+.ab-kbd-overlay-key {
+  display: inline-block;
+  background: rgba(123, 104, 238, 0.2);
+  color: #bb86fc;
+  border: 1px solid rgba(123, 104, 238, 0.4);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 12px;
+  font-weight: 500;
+  min-width: 24px;
+  text-align: center;
+  line-height: 1.4;
+}
+
+/* ============================================
+   Email Summarization UI
+   ============================================ */
+
+/* ---- Injected button group (Gmail / Outlook toolbar) ---- */
+.ab-email-btn-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+.ab-email-btn {
+  background: rgba(123, 104, 238, 0.18);
+  color: #7b68ee;
+  border: 1px solid rgba(123, 104, 238, 0.35);
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+  line-height: 1.4;
+}
+
+.ab-email-btn:hover {
+  background: rgba(123, 104, 238, 0.35);
+  color: #bb86fc;
+}
+
+.ab-email-btn:focus-visible {
+  outline: 2px solid #bb86fc;
+  outline-offset: 2px;
+}
+
+/* ---- Generic FAB ---- */
+.ab-email-fab {
+  position: fixed;
+  bottom: 80px;
+  right: 20px;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #7b68ee;
+  color: #fff;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 14px rgba(123, 104, 238, 0.5);
+  cursor: pointer;
+  z-index: 2147483630;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.ab-email-fab:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 20px rgba(123, 104, 238, 0.65);
+}
+
+.ab-email-fab:focus-visible {
+  outline: 3px solid #bb86fc;
+  outline-offset: 3px;
+}
+
+/* ---- Slide-in panel ---- */
+.ab-email-panel {
+  position: fixed;
+  top: 0;
+  right: -320px;
+  width: 300px;
+  height: 100vh;
+  background: #1a1a2e;
+  color: #e2e8f0;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  z-index: 2147483640;
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.5);
+  border-left: 1px solid rgba(123, 104, 238, 0.3);
+  display: flex;
+  flex-direction: column;
+  transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+.ab-email-panel--open {
+  right: 0;
+}
+
+.ab-email-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  background: rgba(123, 104, 238, 0.15);
+  border-bottom: 1px solid rgba(123, 104, 238, 0.3);
+  flex-shrink: 0;
+}
+
+.ab-email-panel-title {
+  font-weight: 600;
+  color: #bb86fc;
+  font-size: 15px;
+}
+
+.ab-email-panel-close {
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 22px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.ab-email-panel-close:hover {
+  color: #e94560;
+}
+
+.ab-email-panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+/* ---- Meta row ---- */
+.ab-email-meta {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 14px;
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.ab-email-meta span {
+  background: rgba(123, 104, 238, 0.12);
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+
+/* ---- Bullet list ---- */
+.ab-email-bullets {
+  margin: 0;
+  padding-left: 18px;
+  line-height: 1.7;
+}
+
+.ab-email-bullets li {
+  margin-bottom: 8px;
+  color: #cbd5e1;
+}
+
+/* ---- Loading / error states ---- */
+.ab-email-loading {
+  text-align: center;
+  padding: 32px 0;
+  color: #94a3b8;
+  animation: ab-email-loading-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes ab-email-loading-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+.ab-email-error {
+  text-align: center;
+  padding: 24px 0;
+  color: #e94560;
+}
+
+/* ---- Action bar at bottom of panel ---- */
+.ab-email-panel-actions {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid rgba(123, 104, 238, 0.2);
+  flex-shrink: 0;
+}
+
+/* ============================================
+   Predictive Input System
+   ============================================ */
+
+/* ---- Floating suggestion panel ---- */
+.ab-predict-panel {
+  position: fixed;
+  z-index: 2147483646;
+  width: 280px;
+  background: #1a1a2e;
+  border: 1px solid rgba(123, 104, 238, 0.45);
+  border-radius: 8px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 13px;
+  overflow: hidden;
+  animation: ab-predict-in 0.12s ease-out;
+}
+
+@keyframes ab-predict-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ---- Individual suggestion item ---- */
+.ab-predict-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+  cursor: pointer;
+  color: #e2e8f0;
+  transition: background 0.1s;
+  border-bottom: 1px solid rgba(123, 104, 238, 0.1);
+}
+
+.ab-predict-item:last-child {
+  border-bottom: none;
+}
+
+.ab-predict-item:hover,
+.ab-predict-item-active {
+  background: rgba(123, 104, 238, 0.2);
+}
+
+/* ---- Keyboard shortcut badge ---- */
+.ab-predict-key {
+  display: inline-block;
+  background: rgba(123, 104, 238, 0.2);
+  color: #bb86fc;
+  border: 1px solid rgba(123, 104, 238, 0.4);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 10px;
+  font-weight: 500;
+  min-width: 32px;
+  text-align: center;
+  line-height: 1.5;
+  flex-shrink: 0;
+}
+
+/* ---- Suggestion label text ---- */
+.ab-predict-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #cbd5e1;
+}
+
+/* ---- Phrase badge ---- */
+.ab-predict-phrase {
+  display: inline-block;
+  background: rgba(233, 69, 96, 0.15);
+  color: #e94560;
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 5px;
+  border-radius: 3px;
+  margin-left: 6px;
+  vertical-align: middle;
+}

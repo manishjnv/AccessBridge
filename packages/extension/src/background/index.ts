@@ -350,6 +350,8 @@ async function handleToggleFeature(feature: string, enabled: boolean): Promise<u
     'auto-summarize': AdaptationType.AUTO_SUMMARIZE,
     'voice-nav': AdaptationType.VOICE_NAV,
     'eye-tracking': AdaptationType.EYE_TRACKING,
+    'keyboard-only': AdaptationType.KEYBOARD_ONLY,
+    'predictive-input': AdaptationType.PREDICTIVE_INPUT,
   };
 
   const adaptationType = featureMap[feature];

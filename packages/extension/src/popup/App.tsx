@@ -383,12 +383,32 @@ function MotorTab({
       <Toggle
         label="Keyboard-Only Mode"
         value={motor.keyboardOnlyMode}
-        onChange={(v) => onChange({ keyboardOnlyMode: v })}
+        onChange={(v) => {
+          onChange({ keyboardOnlyMode: v });
+          chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
+            if (tab?.id) {
+              chrome.tabs.sendMessage(tab.id, {
+                type: 'TOGGLE_KEYBOARD_MODE',
+                payload: { enabled: v },
+              }).catch(() => {});
+            }
+          });
+        }}
       />
       <Toggle
         label="Predictive Input"
         value={motor.predictiveInput}
-        onChange={(v) => onChange({ predictiveInput: v })}
+        onChange={(v) => {
+          onChange({ predictiveInput: v });
+          chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
+            if (tab?.id) {
+              chrome.tabs.sendMessage(tab.id, {
+                type: 'TOGGLE_PREDICTIVE_INPUT',
+                payload: { enabled: v },
+              }).catch(() => {});
+            }
+          });
+        }}
       />
       <Toggle
         label="Dwell Click"

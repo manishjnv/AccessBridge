@@ -220,19 +220,19 @@ export class CognitiveSimplifier {
     document.body.appendChild(overlay);
     this.spotlightEl = overlay;
 
-    // Purple border element that follows the focused block
+    // Purple border element that follows the focused block — fixed position to match spotlight
     const border = document.createElement('div');
     border.id = FOCUS_BORDER_ID;
     border.style.cssText = `
-      position: absolute !important;
-      z-index: ${Z_BASE + 6} !important;
-      pointer-events: none !important;
-      border: 3px solid rgba(123, 104, 238, 0.85) !important;
-      border-radius: 12px !important;
-      box-shadow: 0 0 30px 6px rgba(123, 104, 238, 0.45), inset 0 0 15px 3px rgba(123, 104, 238, 0.12) !important;
-      transition: top 0.4s ease-in-out, left 0.4s ease-in-out, width 0.4s ease-in-out, height 0.4s ease-in-out !important;
-      top: ${window.scrollY + window.innerHeight / 2 - 50}px;
-      left: ${window.innerWidth / 2 - 100}px;
+      position: fixed;
+      z-index: ${Z_BASE + 6};
+      pointer-events: none;
+      border: 3px solid rgba(123, 104, 238, 0.85);
+      border-radius: 10px;
+      box-shadow: 0 0 24px 4px rgba(123, 104, 238, 0.4);
+      transition: top 0.35s ease, left 0.35s ease, width 0.35s ease, height 0.35s ease;
+      top: 50%;
+      left: 50%;
       width: 200px;
       height: 100px;
     `;
@@ -265,12 +265,13 @@ export class CognitiveSimplifier {
    * spotlighting tiny inline elements like <span> or <em>.
    */
   private findFocusBlock(el: HTMLElement): HTMLElement {
-    const MIN_SIZE = 60; // minimum width/height to be a useful spotlight target
+    const MIN_SIZE = 30; // track small and large blocks equally
     const BLOCK_TAGS = new Set([
       'P', 'DIV', 'SECTION', 'ARTICLE', 'LI', 'BLOCKQUOTE',
       'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'FIGURE', 'TABLE',
       'FORM', 'UL', 'OL', 'NAV', 'HEADER', 'FOOTER', 'MAIN',
       'PRE', 'CODE', 'TD', 'TH', 'TR', 'DETAILS', 'SUMMARY',
+      'A', 'BUTTON', 'IMG', 'SPAN', 'LABEL', 'INPUT', 'SELECT',
     ]);
 
     let current: HTMLElement | null = el;
@@ -289,51 +290,51 @@ export class CognitiveSimplifier {
   private onFocusMouseMove(e: MouseEvent): void {
     if (!this.spotlightEl) return;
 
-    // Use rAF to throttle updates to once per frame
     if (this.focusRafId !== null) return;
     this.focusRafId = requestAnimationFrame(() => {
       this.focusRafId = null;
       if (!this.spotlightEl) return;
 
+      // Temporarily hide overlay so elementFromPoint hits actual content
+      this.spotlightEl.style.display = 'none';
+      if (this.focusBorderEl) this.focusBorderEl.style.display = 'none';
+
       let target = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
-      if (!target || target === this.spotlightEl || target === this.focusBorderEl) return;
+
+      this.spotlightEl.style.display = '';
+      if (this.focusBorderEl) this.focusBorderEl.style.display = '';
+
+      if (!target) return;
 
       // Walk up to a meaningful content block
       target = this.findFocusBlock(target);
 
-      // Skip if same target — avoid redundant style updates
+      // Skip if same target
       if (target === this.lastFocusTarget) return;
       this.lastFocusTarget = target;
 
       const rect = target.getBoundingClientRect();
-      const pad = 12;
+      const pad = 10;
+      const r = 10;
 
-      // Use box-shadow to dim everything except the focused area.
-      // The overlay becomes a small transparent box with a massive box-shadow.
+      // Spotlight: fixed position, viewport coords
       const top = rect.top - pad;
       const left = rect.left - pad;
       const w = rect.width + pad * 2;
       const h = rect.height + pad * 2;
-      const r = 12;
 
-      this.spotlightEl.style.background = 'transparent';
-      this.spotlightEl.style.clipPath = 'none';
       this.spotlightEl.style.top = `${top}px`;
       this.spotlightEl.style.left = `${left}px`;
       this.spotlightEl.style.width = `${w}px`;
       this.spotlightEl.style.height = `${h}px`;
       this.spotlightEl.style.borderRadius = `${r}px`;
-      this.spotlightEl.style.boxShadow = '0 0 0 9999px rgba(0, 0, 0, 0.55)';
-      this.spotlightEl.style.transition = 'top 0.35s ease, left 0.35s ease, width 0.35s ease, height 0.35s ease';
 
-      // Move the purple border to match
+      // Border: also fixed position to match spotlight
       if (this.focusBorderEl) {
-        const scrollX = window.scrollX;
-        const scrollY = window.scrollY;
-        this.focusBorderEl.style.top = `${rect.top + scrollY - pad}px`;
-        this.focusBorderEl.style.left = `${rect.left + scrollX - pad}px`;
-        this.focusBorderEl.style.width = `${rect.width + pad * 2}px`;
-        this.focusBorderEl.style.height = `${rect.height + pad * 2}px`;
+        this.focusBorderEl.style.top = `${top}px`;
+        this.focusBorderEl.style.left = `${left}px`;
+        this.focusBorderEl.style.width = `${w}px`;
+        this.focusBorderEl.style.height = `${h}px`;
       }
     });
   }

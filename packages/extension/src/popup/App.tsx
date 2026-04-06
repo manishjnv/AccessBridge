@@ -41,6 +41,11 @@ export default function App() {
 
   // Load profile and poll struggle score
   useEffect(() => {
+    // Restore enabled state from storage
+    chrome.storage.local.get('accessbridge_enabled').then((result) => {
+      if (result.accessbridge_enabled === false) setEnabled(false);
+    }).catch(() => {});
+
     chrome.runtime.sendMessage({ type: 'GET_PROFILE' }).then((p) => {
       if (p) setProfile(p as AccessibilityProfile);
     }).catch(() => {});
@@ -102,10 +107,15 @@ export default function App() {
   );
 
   const handleToggleAll = useCallback(() => {
-    if (enabled) {
+    const newState = !enabled;
+    setEnabled(newState);
+    chrome.storage.local.set({ accessbridge_enabled: newState });
+
+    if (!newState) {
+      // Disable: revert all adaptations on all tabs
       chrome.runtime.sendMessage({ type: 'REVERT_ALL' }).catch(() => {});
     }
-    setEnabled(!enabled);
+    // When re-enabled, user manually turns on features they want
   }, [enabled]);
 
   const handleExport = useCallback(() => {
@@ -213,20 +223,30 @@ export default function App() {
       <TabNav tabs={TABS} active={tab} onChange={(id) => setTab(id as Tab)} />
 
       {/* Tab content */}
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
-        {tab === 'overview' && (
+      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3" style={!enabled ? { opacity: 0.4, pointerEvents: 'none' } : undefined}>
+        {!enabled && (
+          <div style={{
+            textAlign: 'center',
+            padding: '24px 12px',
+            color: '#94a3b8',
+            fontSize: '13px',
+          }}>
+            AccessBridge is disabled. Toggle On to use features.
+          </div>
+        )}
+        {enabled && tab === 'overview' && (
           <OverviewTab score={struggleScore} activeCount={activeCount} />
         )}
-        {tab === 'sensory' && (
+        {enabled && tab === 'sensory' && (
           <SensoryTab sensory={profile.sensory} onChange={updateSensory} />
         )}
-        {tab === 'cognitive' && (
+        {enabled && tab === 'cognitive' && (
           <CognitiveTab cognitive={profile.cognitive} onChange={updateCognitive} />
         )}
-        {tab === 'motor' && (
+        {enabled && tab === 'motor' && (
           <MotorTab motor={profile.motor} onChange={updateMotor} />
         )}
-        {tab === 'settings' && (
+        {enabled && tab === 'settings' && (
           <SettingsTab
             profile={profile}
             onSave={saveProfile}

@@ -201,7 +201,7 @@ export class CognitiveSimplifier {
 
     injectStyle(FOCUS_STYLE_ID, buildFocusCSS());
 
-    // Single spotlight element — dim overlay + purple glow border in one
+    // Single spotlight element — dim overlay + outline glow (outline sits outside, never touches content)
     const overlay = document.createElement('div');
     overlay.id = SPOTLIGHT_ID;
     overlay.style.cssText = `
@@ -213,9 +213,11 @@ export class CognitiveSimplifier {
       z-index: ${Z_BASE + 5};
       pointer-events: none;
       background: transparent;
-      border: 2px solid rgba(123, 104, 238, 0.7);
+      border: none;
       border-radius: 10px;
-      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5), 0 0 20px 4px rgba(123, 104, 238, 0.35);
+      outline: 2px solid rgba(123, 104, 238, 0.7);
+      outline-offset: 4px;
+      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
       transition: top 0.4s ease, left 0.4s ease, width 0.4s ease, height 0.4s ease;
     `;
     document.body.appendChild(overlay);
@@ -299,7 +301,7 @@ export class CognitiveSimplifier {
       this.lastFocusTarget = target;
 
       const rect = target.getBoundingClientRect();
-      const pad = 12;
+      const pad = 20;
       const r = 10;
 
       const top = rect.top - pad;

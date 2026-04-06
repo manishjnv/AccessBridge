@@ -201,7 +201,7 @@ export class CognitiveSimplifier {
 
     injectStyle(FOCUS_STYLE_ID, buildFocusCSS());
 
-    // Spotlight overlay — starts as a small transparent box with huge box-shadow to dim surroundings
+    // Single spotlight element — dim overlay + purple glow border in one
     const overlay = document.createElement('div');
     overlay.id = SPOTLIGHT_ID;
     overlay.style.cssText = `
@@ -213,31 +213,15 @@ export class CognitiveSimplifier {
       z-index: ${Z_BASE + 5};
       pointer-events: none;
       background: transparent;
-      border-radius: 12px;
-      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55);
-      transition: top 0.35s ease, left 0.35s ease, width 0.35s ease, height 0.35s ease;
+      border: 2px solid rgba(123, 104, 238, 0.7);
+      border-radius: 10px;
+      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5), 0 0 20px 4px rgba(123, 104, 238, 0.35);
+      transition: top 0.4s ease, left 0.4s ease, width 0.4s ease, height 0.4s ease;
     `;
     document.body.appendChild(overlay);
     this.spotlightEl = overlay;
-
-    // Purple border element that follows the focused block — fixed position to match spotlight
-    const border = document.createElement('div');
-    border.id = FOCUS_BORDER_ID;
-    border.style.cssText = `
-      position: fixed;
-      z-index: ${Z_BASE + 6};
-      pointer-events: none;
-      border: 3px solid rgba(123, 104, 238, 0.85);
-      border-radius: 10px;
-      box-shadow: 0 0 24px 4px rgba(123, 104, 238, 0.4);
-      transition: top 0.35s ease, left 0.35s ease, width 0.35s ease, height 0.35s ease;
-      top: 50%;
-      left: 50%;
-      width: 200px;
-      height: 100px;
-    `;
-    document.body.appendChild(border);
-    this.focusBorderEl = border;
+    // No separate border element — single element avoids dual-edge issue
+    this.focusBorderEl = null;
 
     document.addEventListener('mousemove', this.handleFocusMove, { passive: true });
   }
@@ -249,6 +233,10 @@ export class CognitiveSimplifier {
     if (this.focusRafId !== null) {
       cancelAnimationFrame(this.focusRafId);
       this.focusRafId = null;
+    }
+    if (this.focusDebounceTimer !== null) {
+      clearTimeout(this.focusDebounceTimer);
+      this.focusDebounceTimer = null;
     }
     this.lastFocusTarget = null;
 
@@ -287,56 +275,46 @@ export class CognitiveSimplifier {
     return el;
   }
 
+  private focusDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
   private onFocusMouseMove(e: MouseEvent): void {
     if (!this.spotlightEl) return;
 
-    if (this.focusRafId !== null) return;
-    this.focusRafId = requestAnimationFrame(() => {
-      this.focusRafId = null;
+    // Debounce: wait 150ms after mouse stops before updating spotlight
+    if (this.focusDebounceTimer !== null) clearTimeout(this.focusDebounceTimer);
+    this.focusDebounceTimer = setTimeout(() => {
+      this.focusDebounceTimer = null;
       if (!this.spotlightEl) return;
 
       // Temporarily hide overlay so elementFromPoint hits actual content
       this.spotlightEl.style.display = 'none';
-      if (this.focusBorderEl) this.focusBorderEl.style.display = 'none';
-
       let target = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
-
       this.spotlightEl.style.display = '';
-      if (this.focusBorderEl) this.focusBorderEl.style.display = '';
 
       if (!target) return;
 
-      // Walk up to a meaningful content block
       target = this.findFocusBlock(target);
 
-      // Skip if same target
       if (target === this.lastFocusTarget) return;
       this.lastFocusTarget = target;
 
       const rect = target.getBoundingClientRect();
-      const pad = 10;
+      const pad = 12;
       const r = 10;
 
-      // Spotlight: fixed position, viewport coords
       const top = rect.top - pad;
       const left = rect.left - pad;
       const w = rect.width + pad * 2;
       const h = rect.height + pad * 2;
 
+      // Single spotlight element — no separate border (eliminates dual edge)
+      // Uses box-shadow for dim + outline glow in one element
       this.spotlightEl.style.top = `${top}px`;
       this.spotlightEl.style.left = `${left}px`;
       this.spotlightEl.style.width = `${w}px`;
       this.spotlightEl.style.height = `${h}px`;
       this.spotlightEl.style.borderRadius = `${r}px`;
-
-      // Border: also fixed position to match spotlight
-      if (this.focusBorderEl) {
-        this.focusBorderEl.style.top = `${top}px`;
-        this.focusBorderEl.style.left = `${left}px`;
-        this.focusBorderEl.style.width = `${w}px`;
-        this.focusBorderEl.style.height = `${h}px`;
-      }
-    });
+    }, 150);
   }
 
   // =====================================================================

@@ -215,9 +215,9 @@ export class CognitiveSimplifier {
       background: transparent;
       border-radius: 10px;
       box-shadow:
-        0 0 0 2px rgba(123, 104, 238, 0.8),
-        0 0 12px 2px rgba(123, 104, 238, 0.4),
-        0 0 0 9999px rgba(0, 0, 0, 0.5);
+        0 0 0 3px rgba(100, 60, 220, 1),
+        0 0 18px 6px rgba(100, 60, 220, 0.6),
+        0 0 0 9999px rgba(0, 0, 0, 0.45);
     `;
     document.body.appendChild(overlay);
     this.spotlightEl = overlay;

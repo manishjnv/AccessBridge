@@ -429,19 +429,19 @@ function listenForCommands(adapter: BaseAdapter, sensory: SensoryAdapter): void 
           };
           if (s.fontScale !== undefined) {
             if (s.fontScale !== 1.0) sensory.applyFontScale(s.fontScale);
-            else { document.documentElement.style.removeProperty('--a11y-font-scale'); document.body.classList.remove('a11y-font-scaled'); }
+            else document.body.style.zoom = '';
           }
           if (s.contrastLevel !== undefined) {
             if (s.contrastLevel !== 1.0) sensory.applyContrast(s.contrastLevel);
-            else { document.documentElement.style.removeProperty('--a11y-contrast'); document.body.classList.remove('a11y-contrast'); }
+            else document.body.style.filter = '';
           }
           if (s.lineHeight !== undefined) {
             if (s.lineHeight !== 1.5) sensory.applyLineHeight(s.lineHeight);
-            else { document.documentElement.style.removeProperty('--a11y-line-height'); document.body.classList.remove('a11y-line-height'); }
+            else document.getElementById('a11y-rule-a11y-line-height')?.remove();
           }
           if (s.letterSpacing !== undefined) {
             if (s.letterSpacing !== 0) sensory.applyLetterSpacing(s.letterSpacing);
-            else { document.documentElement.style.removeProperty('--a11y-letter-spacing'); document.body.classList.remove('a11y-letter-spacing'); }
+            else document.getElementById('a11y-rule-a11y-letter-spacing')?.remove();
           }
           if (s.colorCorrectionMode !== undefined) sensory.applyColorCorrection(s.colorCorrectionMode);
           if (s.reducedMotion !== undefined) sensory.applyReducedMotion(s.reducedMotion);

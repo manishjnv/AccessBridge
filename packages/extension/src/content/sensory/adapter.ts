@@ -54,14 +54,15 @@ export class SensoryAdapter {
 
   applyFontScale(scale: number): void {
     const clamped = Math.max(0.5, Math.min(3.0, scale));
-    document.documentElement.style.setProperty('--a11y-font-scale', String(clamped));
-    document.body.classList.add('a11y-font-scaled', 'a11y-transition');
+    // Direct inline zoom — most reliable across all sites
+    document.body.style.zoom = String(clamped);
+    console.log(`[AccessBridge] Font scale applied: ${clamped}`);
   }
 
   applyContrast(level: number): void {
     const clamped = Math.max(0.5, Math.min(3.0, level));
-    document.documentElement.style.setProperty('--a11y-contrast', String(clamped));
-    document.body.classList.add('a11y-contrast', 'a11y-transition');
+    document.body.style.filter = `contrast(${clamped})`;
+    console.log(`[AccessBridge] Contrast applied: ${clamped}`);
   }
 
   applyColorCorrection(mode: string): void {
@@ -84,14 +85,15 @@ export class SensoryAdapter {
 
   applyLineHeight(height: number): void {
     const clamped = Math.max(1.0, Math.min(4.0, height));
-    document.documentElement.style.setProperty('--a11y-line-height', String(clamped));
-    document.body.classList.add('a11y-line-height', 'a11y-transition');
+    // Inject a style rule that overrides all elements
+    this.injectRule('a11y-line-height', `* { line-height: ${clamped} !important; }`);
+    console.log(`[AccessBridge] Line height applied: ${clamped}`);
   }
 
   applyLetterSpacing(spacing: number): void {
     const clamped = Math.max(0, Math.min(10, spacing));
-    document.documentElement.style.setProperty('--a11y-letter-spacing', `${clamped}px`);
-    document.body.classList.add('a11y-letter-spacing', 'a11y-transition');
+    this.injectRule('a11y-letter-spacing', `* { letter-spacing: ${clamped}px !important; }`);
+    console.log(`[AccessBridge] Letter spacing applied: ${clamped}px`);
   }
 
   applyCursorSize(size: number): void {
@@ -139,6 +141,14 @@ export class SensoryAdapter {
     // Remove reading mode from main content
     this.getMainContent()?.classList.remove('a11y-reading-mode');
 
+    // Reset inline styles
+    document.body.style.zoom = '';
+    document.body.style.filter = '';
+
+    // Remove injected style rules
+    this.removeRule('a11y-line-height');
+    this.removeRule('a11y-letter-spacing');
+
     // Reset CSS custom properties
     const varsToReset = [
       '--a11y-font-scale',
@@ -149,13 +159,22 @@ export class SensoryAdapter {
     ];
     varsToReset.forEach((v) => document.documentElement.style.removeProperty(v));
 
-    // Remove color correction filter
-    document.body.style.removeProperty('filter');
-
     this.activeAdaptations.clear();
   }
 
   // ---------- Private helpers ----------
+
+  private injectRule(id: string, css: string): void {
+    this.removeRule(id);
+    const style = document.createElement('style');
+    style.id = `a11y-rule-${id}`;
+    style.textContent = css;
+    document.head.appendChild(style);
+  }
+
+  private removeRule(id: string): void {
+    document.getElementById(`a11y-rule-${id}`)?.remove();
+  }
 
   private ensureStyleElement(): void {
     this.styleEl = document.getElementById(STYLE_ID) as HTMLStyleElement | null;

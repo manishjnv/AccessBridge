@@ -29,16 +29,26 @@ export default function App() {
   const [activeCount, setActiveCount] = useState(0);
   const [enabled, setEnabled] = useState(true);
 
-  // Load profile from background on mount
+  // Load profile and poll struggle score
   useEffect(() => {
     chrome.runtime.sendMessage({ type: 'GET_PROFILE' }).then((p) => {
       if (p) setProfile(p as AccessibilityProfile);
     }).catch(() => {});
-    chrome.runtime.sendMessage({ type: 'GET_STRUGGLE_SCORE' }).then((s) => {
-      if (s && typeof s === 'object' && 'score' in s) {
-        setStruggleScore((s as { score: number }).score);
-      }
-    }).catch(() => {});
+
+    const pollScore = () => {
+      chrome.runtime.sendMessage({ type: 'GET_STRUGGLE_SCORE' }).then((s) => {
+        if (s && typeof s === 'object' && 'score' in s) {
+          setStruggleScore((s as { score: number }).score);
+        }
+      }).catch(() => {});
+      chrome.runtime.sendMessage({ type: 'GET_ACTIVE_ADAPTATIONS' }).then((a) => {
+        if (Array.isArray(a)) setActiveCount(a.length);
+      }).catch(() => {});
+    };
+
+    pollScore();
+    const interval = setInterval(pollScore, 3000);
+    return () => clearInterval(interval);
   }, []);
 
   const saveProfile = useCallback(
@@ -252,6 +262,13 @@ function SensoryTab({
   );
 }
 
+function toggleFeature(feature: string, enabled: boolean): void {
+  chrome.runtime.sendMessage({
+    type: 'TOGGLE_FEATURE',
+    payload: { feature, enabled },
+  }).catch(() => {});
+}
+
 function CognitiveTab({
   cognitive,
   onChange,
@@ -264,18 +281,29 @@ function CognitiveTab({
       <Toggle
         label="Focus Mode"
         value={cognitive.focusModeEnabled}
-        onChange={(v) => onChange({ focusModeEnabled: v })}
+        onChange={(v) => {
+          onChange({ focusModeEnabled: v });
+          toggleFeature('focus-mode', v);
+        }}
+      />
+      <Toggle
+        label="Reading Mode"
+        value={cognitive.readingModeEnabled}
+        onChange={(v) => {
+          onChange({ readingModeEnabled: v });
+          toggleFeature('reading-mode', v);
+        }}
       />
       <div className="space-y-1">
         <label className="text-xs text-a11y-muted">Text Simplification</label>
         <select
           className="w-full bg-a11y-surface text-a11y-text border border-a11y-primary/30 rounded px-2 py-1.5 text-sm"
           value={cognitive.textSimplification}
-          onChange={(e) =>
-            onChange({
-              textSimplification: e.target.value as CognitiveProfile['textSimplification'],
-            })
-          }
+          onChange={(e) => {
+            const val = e.target.value as CognitiveProfile['textSimplification'];
+            onChange({ textSimplification: val });
+            toggleFeature('text-simplify', val !== 'off');
+          }}
         >
           <option value="off">Off</option>
           <option value="mild">Mild</option>
@@ -302,12 +330,18 @@ function CognitiveTab({
       <Toggle
         label="Auto Summarize"
         value={cognitive.autoSummarize}
-        onChange={(v) => onChange({ autoSummarize: v })}
+        onChange={(v) => {
+          onChange({ autoSummarize: v });
+          toggleFeature('auto-summarize', v);
+        }}
       />
       <Toggle
         label="Distraction Shield"
         value={cognitive.distractionShield}
-        onChange={(v) => onChange({ distractionShield: v })}
+        onChange={(v) => {
+          onChange({ distractionShield: v });
+          toggleFeature('distraction-shield', v);
+        }}
       />
     </>
   );
@@ -325,17 +359,26 @@ function MotorTab({
       <Toggle
         label="Voice Navigation"
         value={motor.voiceNavigationEnabled}
-        onChange={(v) => onChange({ voiceNavigationEnabled: v })}
+        onChange={(v) => {
+          onChange({ voiceNavigationEnabled: v });
+          toggleFeature('voice-nav', v);
+        }}
       />
       <Toggle
         label="Eye Tracking"
         value={motor.eyeTrackingEnabled}
-        onChange={(v) => onChange({ eyeTrackingEnabled: v })}
+        onChange={(v) => {
+          onChange({ eyeTrackingEnabled: v });
+          toggleFeature('eye-tracking', v);
+        }}
       />
       <Toggle
         label="Smart Click Targets"
         value={motor.smartClickTargets}
-        onChange={(v) => onChange({ smartClickTargets: v })}
+        onChange={(v) => {
+          onChange({ smartClickTargets: v });
+          toggleFeature('smart-targets', v);
+        }}
       />
       <Toggle
         label="Keyboard-Only Mode"

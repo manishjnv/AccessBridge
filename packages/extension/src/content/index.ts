@@ -2,22 +2,26 @@
  * AccessBridge Content Script
  * Detects the current application, sets up signal collection,
  * and applies accessibility adaptations.
+ * Day 2: Integrates Cognitive Simplifier, Voice Commands, Fatigue Adaptive UI.
  */
 
 import type { Adaptation, BehaviorSignal } from '@accessbridge/core/types';
-import { SignalType } from '@accessbridge/core/types';
+import { SignalType, AdaptationType } from '@accessbridge/core/types';
 import { SensoryAdapter } from './sensory/adapter.js';
 import { GmailAdapter } from './adapters/gmail.js';
 import { OutlookAdapter } from './adapters/outlook.js';
 import { GenericAdapter } from './adapters/generic.js';
 import type { BaseAdapter } from './adapters/base.js';
+import { CognitiveSimplifier } from './cognitive/simplifier.js';
+import { VoiceCommandSystem } from './motor/voice-commands.js';
+import { FatigueAdaptiveUI } from './fatigue/adaptive-ui.js';
 
 // ---------- App Detection ----------
 
 type AppType = 'gmail' | 'outlook' | 'docs' | 'teams' | 'sap-fiori' | 'servicenow' | 'generic';
 
 function detectApp(): AppType {
-  const { hostname, pathname } = window.location;
+  const { hostname } = window.location;
   if (hostname.includes('mail.google.com')) return 'gmail';
   if (hostname.includes('outlook.live.com') || hostname.includes('outlook.office.com'))
     return 'outlook';
@@ -45,7 +49,7 @@ function createAdapter(app: AppType): BaseAdapter {
 // ---------- Signal collection ----------
 
 const signalBuffer: BehaviorSignal[] = [];
-const SIGNAL_FLUSH_INTERVAL = 5_000; // 5 seconds
+const SIGNAL_FLUSH_INTERVAL = 5_000;
 
 function collectScrollSignal(): void {
   let lastScrollY = window.scrollY;
@@ -58,7 +62,7 @@ function collectScrollSignal(): void {
       const dt = now - lastScrollTime;
       if (dt === 0) return;
       const distance = Math.abs(window.scrollY - lastScrollY);
-      const velocity = distance / dt; // px/ms
+      const velocity = distance / dt;
 
       signalBuffer.push({
         type: SignalType.SCROLL_VELOCITY,
@@ -81,7 +85,6 @@ function collectClickSignal(): void {
     const now = Date.now();
     const target = e.target as HTMLElement;
 
-    // Click accuracy: distance from center of target
     const rect = target.getBoundingClientRect();
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
@@ -96,7 +99,6 @@ function collectClickSignal(): void {
       normalized: accuracy,
     });
 
-    // Hesitation between clicks
     if (lastClickTime > 0) {
       const gap = now - lastClickTime;
       signalBuffer.push({
@@ -181,7 +183,6 @@ function collectMouseSignal(): void {
           moveCount = 0;
         }
 
-        // Dwell detection – slow movement
         const dt = now - lastPos.time;
         if (dt > 0 && distance / dt < 0.05) {
           signalBuffer.push({
@@ -203,7 +204,6 @@ function flushSignals(): void {
 
   const batch = signalBuffer.splice(0, signalBuffer.length);
 
-  // Compute a simple struggle score from the batch
   const avgNormalized =
     batch.reduce((sum, s) => sum + s.normalized, 0) / batch.length;
 
@@ -215,9 +215,124 @@ function flushSignals(): void {
       signals: batch,
       timestamp: Date.now(),
     },
-  }).catch(() => {
-    // Extension context may be invalidated – ignore
-  });
+  }).catch(() => {});
+}
+
+// ---------- Feature module instances ----------
+
+let cognitiveSimplifier: CognitiveSimplifier | null = null;
+let voiceCommands: VoiceCommandSystem | null = null;
+let fatigueUI: FatigueAdaptiveUI | null = null;
+
+function getCognitive(): CognitiveSimplifier {
+  if (!cognitiveSimplifier) {
+    cognitiveSimplifier = new CognitiveSimplifier();
+  }
+  return cognitiveSimplifier;
+}
+
+function getVoice(): VoiceCommandSystem {
+  if (!voiceCommands) {
+    voiceCommands = new VoiceCommandSystem({
+      onCommand: (command: string, args: string) => {
+        handleVoiceCommand(command, args);
+      },
+    });
+  }
+  return voiceCommands;
+}
+
+function getFatigue(): FatigueAdaptiveUI {
+  if (!fatigueUI) {
+    fatigueUI = new FatigueAdaptiveUI();
+  }
+  return fatigueUI;
+}
+
+// ---------- Voice command handler ----------
+
+function handleVoiceCommand(command: string, args: string): void {
+  switch (command) {
+    case 'scroll-up':
+      window.scrollBy({ top: -300, behavior: 'smooth' });
+      break;
+    case 'scroll-down':
+      window.scrollBy({ top: 300, behavior: 'smooth' });
+      break;
+    case 'go-to-top':
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      break;
+    case 'go-to-bottom':
+      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+      break;
+    case 'go-back':
+      history.back();
+      break;
+    case 'go-forward':
+      history.forward();
+      break;
+    case 'reload':
+      location.reload();
+      break;
+    case 'zoom-in':
+      document.body.style.zoom = String(parseFloat(document.body.style.zoom || '1') + 0.1);
+      break;
+    case 'zoom-out':
+      document.body.style.zoom = String(Math.max(0.5, parseFloat(document.body.style.zoom || '1') - 0.1));
+      break;
+    case 'focus-mode':
+      getCognitive().enableFocusMode();
+      break;
+    case 'reading-mode':
+      getCognitive().enableReadingGuide();
+      break;
+    case 'next-tab':
+    case 'prev-tab':
+    case 'close-tab':
+    case 'new-tab':
+      chrome.runtime.sendMessage({ type: 'TAB_COMMAND', payload: { command } }).catch(() => {});
+      break;
+    case 'click':
+      clickElementByText(args);
+      break;
+    case 'type':
+      typeIntoFocused(args);
+      break;
+    case 'find':
+      highlightText(args);
+      break;
+    case 'stop-listening':
+      getVoice().stop();
+      break;
+  }
+}
+
+function clickElementByText(text: string): void {
+  if (!text) return;
+  const lower = text.toLowerCase();
+  const interactives = document.querySelectorAll('a, button, [role="button"], input[type="submit"], input[type="button"]');
+  for (const el of interactives) {
+    if ((el.textContent ?? '').toLowerCase().includes(lower)) {
+      (el as HTMLElement).click();
+      return;
+    }
+  }
+}
+
+function typeIntoFocused(text: string): void {
+  const el = document.activeElement;
+  if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+    el.value += text;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  } else if (el?.getAttribute('contenteditable') === 'true') {
+    document.execCommand('insertText', false, text);
+  }
+}
+
+function highlightText(text: string): void {
+  if (!text) return;
+  // Use window.find for basic text search
+  (window as unknown as { find: (s: string) => boolean }).find(text);
 }
 
 // ---------- Message listener from background ----------
@@ -228,24 +343,24 @@ function listenForCommands(adapter: BaseAdapter, sensory: SensoryAdapter): void 
       switch (message.type) {
         case 'APPLY_ADAPTATION': {
           const adaptation = message.payload as Adaptation;
-          sensory.applyAdaptation(adaptation);
-          adapter.apply(adaptation);
+          applyAdaptation(adaptation, adapter, sensory);
           sendResponse({ applied: true });
           break;
         }
         case 'REVERT_ADAPTATION': {
           const id = message.payload as string;
-          adapter.revert(id);
+          revertAdaptation(id, adapter, sensory);
           sendResponse({ reverted: true });
           break;
         }
         case 'REVERT_ALL': {
           sensory.revertAll();
+          getCognitive().disableAll();
+          getVoice().stop();
           sendResponse({ reverted: true });
           break;
         }
         case 'PROFILE_UPDATED': {
-          // Profile was updated – could trigger re-evaluation
           sendResponse({ received: true });
           break;
         }
@@ -253,6 +368,53 @@ function listenForCommands(adapter: BaseAdapter, sensory: SensoryAdapter): void 
       return false;
     },
   );
+}
+
+function applyAdaptation(adaptation: Adaptation, adapter: BaseAdapter, sensory: SensoryAdapter): void {
+  switch (adaptation.type) {
+    // Sensory adaptations
+    case AdaptationType.FONT_SCALE:
+    case AdaptationType.CONTRAST:
+    case AdaptationType.COLOR_CORRECTION:
+    case AdaptationType.LINE_HEIGHT:
+    case AdaptationType.LETTER_SPACING:
+    case AdaptationType.CURSOR_SIZE:
+    case AdaptationType.REDUCED_MOTION:
+    case AdaptationType.READING_MODE:
+      sensory.applyAdaptation(adaptation);
+      break;
+
+    // Cognitive adaptations
+    case AdaptationType.FOCUS_MODE:
+      if (adaptation.value) getCognitive().enableFocusMode();
+      else getCognitive().disableFocusMode();
+      break;
+    case AdaptationType.LAYOUT_SIMPLIFY:
+      if (adaptation.value) getCognitive().enableDistractionShield();
+      else getCognitive().disableDistractionShield();
+      break;
+    case AdaptationType.TEXT_SIMPLIFY:
+      // Handled by AI engine via popup/sidepanel
+      adapter.apply(adaptation);
+      break;
+
+    // Motor adaptations
+    case AdaptationType.CLICK_TARGET_ENLARGE:
+      adapter.apply(adaptation);
+      break;
+    case AdaptationType.VOICE_NAV:
+      if (adaptation.value) getVoice().start();
+      else getVoice().stop();
+      break;
+
+    default:
+      adapter.apply(adaptation);
+      break;
+  }
+}
+
+function revertAdaptation(id: string, adapter: BaseAdapter, _sensory: SensoryAdapter): void {
+  adapter.revert(id);
 }
 
 // ---------- Mutation observer for dynamic content ----------
@@ -267,7 +429,6 @@ function observeDynamicContent(adapter: BaseAdapter): void {
       }
     }
     if (significantChange) {
-      // Re-collect signals for new content regions if needed
       adapter.collectSignals();
     }
   });
@@ -302,7 +463,22 @@ function init(): void {
   // Watch for dynamic content
   observeDynamicContent(adapter);
 
-  console.log('[AccessBridge] Content script initialized');
+  // Start fatigue monitoring
+  getFatigue().start();
+
+  // Load profile and check for pre-enabled features
+  chrome.runtime.sendMessage({ type: 'GET_PROFILE' }).then((profile) => {
+    if (!profile || typeof profile !== 'object') return;
+    const p = profile as {
+      motor?: { voiceNavigationEnabled?: boolean };
+      cognitive?: { focusModeEnabled?: boolean; distractionShield?: boolean };
+    };
+    if (p.motor?.voiceNavigationEnabled) getVoice().start();
+    if (p.cognitive?.focusModeEnabled) getCognitive().enableFocusMode();
+    if (p.cognitive?.distractionShield) getCognitive().enableDistractionShield();
+  }).catch(() => {});
+
+  console.log('[AccessBridge] Content script initialized (Day 2)');
 }
 
 init();

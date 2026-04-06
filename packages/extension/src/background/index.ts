@@ -1,34 +1,36 @@
 /**
  * AccessBridge Service Worker
- * Handles message routing between content scripts, popup, and side panel.
+ * Handles message routing, runs StruggleDetector + DecisionEngine,
+ * and auto-applies adaptations to content scripts.
  */
 
+import {
+  StruggleDetector,
+  DecisionEngine,
+  DEFAULT_PROFILE,
+  AdaptationType,
+} from '@accessbridge/core';
 import type {
   AccessibilityProfile,
   Adaptation,
   StruggleScore,
-} from '@accessbridge/core/types';
+  BehaviorSignal,
+} from '@accessbridge/core';
 
-// ---------- Message protocol ----------
-
-type MessageType =
-  | 'GET_PROFILE'
-  | 'SAVE_PROFILE'
-  | 'GET_STRUGGLE_SCORE'
-  | 'APPLY_ADAPTATION'
-  | 'REVERT_ADAPTATION'
-  | 'REVERT_ALL';
-
-interface Message {
-  type: MessageType;
-  payload?: unknown;
-}
-
-// ---------- In-memory state (persisted to chrome.storage) ----------
+// ---------- State ----------
 
 let currentProfile: AccessibilityProfile | null = null;
+const struggleDetector = new StruggleDetector();
+let decisionEngine: DecisionEngine | null = null;
 let latestStruggleScore: StruggleScore | null = null;
 const activeAdaptations: Map<string, Adaptation> = new Map();
+
+function getOrCreateEngine(): DecisionEngine {
+  if (!decisionEngine) {
+    decisionEngine = new DecisionEngine(currentProfile ?? { ...DEFAULT_PROFILE });
+  }
+  return decisionEngine;
+}
 
 // ---------- Storage helpers ----------
 
@@ -40,6 +42,48 @@ async function loadProfile(): Promise<AccessibilityProfile | null> {
 async function saveProfile(profile: AccessibilityProfile): Promise<void> {
   currentProfile = profile;
   await chrome.storage.local.set({ profile });
+  // Update the decision engine with the new profile
+  getOrCreateEngine().updateProfile(profile);
+}
+
+// ---------- Auto-adaptation pipeline ----------
+
+async function processSignalBatch(signals: BehaviorSignal[]): Promise<void> {
+  // Feed signals into the struggle detector
+  for (const signal of signals) {
+    struggleDetector.addSignal(signal);
+  }
+
+  // Get updated struggle score
+  const score = struggleDetector.getStruggleScore();
+  latestStruggleScore = score;
+
+  // Run decision engine to determine adaptations
+  const engine = getOrCreateEngine();
+  const newAdaptations = engine.evaluate(score);
+
+  if (newAdaptations.length === 0) return;
+
+  // Apply new adaptations to the active tab
+  const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!activeTab?.id) return;
+
+  for (const adaptation of newAdaptations) {
+    activeAdaptations.set(adaptation.id, adaptation);
+    try {
+      await chrome.tabs.sendMessage(activeTab.id, {
+        type: 'APPLY_ADAPTATION',
+        payload: adaptation,
+      });
+    } catch {
+      // Tab may not have content script — ignore
+    }
+  }
+
+  // Periodically update baseline (every 30 signal batches)
+  if (Math.random() < 0.03) {
+    struggleDetector.updateBaseline();
+  }
 }
 
 // ---------- Install / Startup ----------
@@ -50,16 +94,39 @@ chrome.runtime.onInstalled.addListener((details) => {
   );
   loadProfile().then((p) => {
     currentProfile = p;
+    if (p) {
+      decisionEngine = new DecisionEngine(p);
+    }
   });
 });
 
 chrome.runtime.onStartup.addListener(() => {
   loadProfile().then((p) => {
     currentProfile = p;
+    if (p) {
+      decisionEngine = new DecisionEngine(p);
+    }
   });
 });
 
 // ---------- Message handler ----------
+
+type MessageType =
+  | 'GET_PROFILE'
+  | 'SAVE_PROFILE'
+  | 'GET_STRUGGLE_SCORE'
+  | 'GET_ACTIVE_ADAPTATIONS'
+  | 'APPLY_ADAPTATION'
+  | 'REVERT_ADAPTATION'
+  | 'REVERT_ALL'
+  | 'SIGNAL_BATCH'
+  | 'TOGGLE_FEATURE'
+  | 'TAB_COMMAND';
+
+interface Message {
+  type: MessageType;
+  payload?: unknown;
+}
 
 chrome.runtime.onMessage.addListener(
   (
@@ -73,8 +140,6 @@ chrome.runtime.onMessage.addListener(
         console.error('[AccessBridge] message error', err);
         sendResponse({ error: String(err) });
       });
-
-    // Return true to keep the message channel open for async response
     return true;
   },
 );
@@ -91,13 +156,10 @@ async function handleMessage(message: Message): Promise<unknown> {
     case 'SAVE_PROFILE': {
       const profile = message.payload as AccessibilityProfile;
       await saveProfile(profile);
-      // Broadcast profile update to all content scripts
       const tabs = await chrome.tabs.query({});
       for (const tab of tabs) {
         if (tab.id) {
-          chrome.tabs.sendMessage(tab.id, { type: 'PROFILE_UPDATED', payload: profile }).catch(() => {
-            // Tab may not have content script injected – ignore
-          });
+          chrome.tabs.sendMessage(tab.id, { type: 'PROFILE_UPDATED', payload: profile }).catch(() => {});
         }
       }
       return { success: true };
@@ -107,10 +169,20 @@ async function handleMessage(message: Message): Promise<unknown> {
       return latestStruggleScore;
     }
 
+    case 'GET_ACTIVE_ADAPTATIONS': {
+      return Array.from(activeAdaptations.values()).filter(a => a.applied);
+    }
+
+    case 'SIGNAL_BATCH': {
+      const batch = message.payload as StruggleScore;
+      // Process signals through the full pipeline
+      await processSignalBatch(batch.signals);
+      return { received: true, score: latestStruggleScore?.score ?? 0 };
+    }
+
     case 'APPLY_ADAPTATION': {
       const adaptation = message.payload as Adaptation;
       activeAdaptations.set(adaptation.id, { ...adaptation, applied: true });
-      // Forward to active tab content script
       const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (activeTab?.id) {
         await chrome.tabs.sendMessage(activeTab.id, {
@@ -124,6 +196,8 @@ async function handleMessage(message: Message): Promise<unknown> {
     case 'REVERT_ADAPTATION': {
       const adaptationId = message.payload as string;
       activeAdaptations.delete(adaptationId);
+      const engine = getOrCreateEngine();
+      engine.revertAdaptation(adaptationId);
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (tab?.id) {
         await chrome.tabs.sendMessage(tab.id, {
@@ -136,6 +210,8 @@ async function handleMessage(message: Message): Promise<unknown> {
 
     case 'REVERT_ALL': {
       activeAdaptations.clear();
+      const engine = getOrCreateEngine();
+      engine.revertAll();
       const tabs = await chrome.tabs.query({});
       for (const tab of tabs) {
         if (tab.id) {
@@ -145,26 +221,123 @@ async function handleMessage(message: Message): Promise<unknown> {
       return { success: true };
     }
 
-    default:
+    case 'TOGGLE_FEATURE': {
+      const { feature, enabled } = message.payload as { feature: string; enabled: boolean };
+      return handleToggleFeature(feature, enabled);
+    }
+
+    case 'TAB_COMMAND': {
+      const { command } = message.payload as { command: string };
+      return handleTabCommand(command);
+    }
+
+    default: {
+      // Handle voice command messages (format: { action: 'nextTab' })
+      const msg = message as unknown as Record<string, string>;
+      if (msg.action) {
+        const actionMap: Record<string, string> = {
+          nextTab: 'next-tab',
+          previousTab: 'prev-tab',
+          closeTab: 'close-tab',
+          newTab: 'new-tab',
+        };
+        const command = actionMap[msg.action];
+        if (command) return handleTabCommand(command);
+      }
       return { error: `Unknown message type: ${(message as Message).type}` };
+    }
   }
 }
 
-// ---------- Receive signals from content scripts ----------
+// ---------- Feature toggles (from popup/voice commands) ----------
 
-chrome.runtime.onMessage.addListener(
-  (
-    message: { type: string; payload?: unknown },
-    _sender,
-    sendResponse,
-  ) => {
-    if (message.type === 'SIGNAL_BATCH') {
-      // Store latest struggle score computed from signals
-      latestStruggleScore = message.payload as StruggleScore;
-      sendResponse({ received: true });
+async function handleToggleFeature(feature: string, enabled: boolean): Promise<unknown> {
+  const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!activeTab?.id) return { error: 'No active tab' };
+
+  // Map feature names to adaptation types
+  const featureMap: Record<string, AdaptationType> = {
+    'focus-mode': AdaptationType.FOCUS_MODE,
+    'reading-mode': AdaptationType.READING_MODE,
+    'distraction-shield': AdaptationType.LAYOUT_SIMPLIFY,
+    'smart-targets': AdaptationType.CLICK_TARGET_ENLARGE,
+    'text-simplify': AdaptationType.TEXT_SIMPLIFY,
+    'reduced-motion': AdaptationType.REDUCED_MOTION,
+    'auto-summarize': AdaptationType.AUTO_SUMMARIZE,
+    'voice-nav': AdaptationType.VOICE_NAV,
+    'eye-tracking': AdaptationType.EYE_TRACKING,
+  };
+
+  const adaptationType = featureMap[feature];
+  if (!adaptationType) return { error: `Unknown feature: ${feature}` };
+
+  if (enabled) {
+    const adaptation: Adaptation = {
+      id: `manual-${feature}-${Date.now()}`,
+      type: adaptationType,
+      value: true,
+      confidence: 1,
+      applied: true,
+      timestamp: Date.now(),
+      reversible: true,
+    };
+    activeAdaptations.set(adaptation.id, adaptation);
+    await chrome.tabs.sendMessage(activeTab.id, {
+      type: 'APPLY_ADAPTATION',
+      payload: adaptation,
+    });
+  } else {
+    // Find and revert adaptations of this type
+    for (const [id, a] of activeAdaptations) {
+      if (a.type === adaptationType) {
+        activeAdaptations.delete(id);
+        await chrome.tabs.sendMessage(activeTab.id, {
+          type: 'REVERT_ADAPTATION',
+          payload: id,
+        });
+      }
     }
-    return false;
-  },
-);
+  }
+
+  return { success: true };
+}
+
+// ---------- Tab commands (from voice navigation) ----------
+
+async function handleTabCommand(command: string): Promise<unknown> {
+  switch (command) {
+    case 'next-tab': {
+      const tabs = await chrome.tabs.query({ currentWindow: true });
+      const [active] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (active?.index !== undefined) {
+        const nextIndex = (active.index + 1) % tabs.length;
+        const nextTab = tabs[nextIndex];
+        if (nextTab?.id) await chrome.tabs.update(nextTab.id, { active: true });
+      }
+      return { success: true };
+    }
+    case 'prev-tab': {
+      const tabs = await chrome.tabs.query({ currentWindow: true });
+      const [active] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (active?.index !== undefined) {
+        const prevIndex = (active.index - 1 + tabs.length) % tabs.length;
+        const prevTab = tabs[prevIndex];
+        if (prevTab?.id) await chrome.tabs.update(prevTab.id, { active: true });
+      }
+      return { success: true };
+    }
+    case 'close-tab': {
+      const [active] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (active?.id) await chrome.tabs.remove(active.id);
+      return { success: true };
+    }
+    case 'new-tab': {
+      await chrome.tabs.create({});
+      return { success: true };
+    }
+    default:
+      return { error: `Unknown tab command: ${command}` };
+  }
+}
 
 console.log('AccessBridge service worker initialized');

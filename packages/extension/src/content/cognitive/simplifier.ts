@@ -201,24 +201,21 @@ export class CognitiveSimplifier {
 
     injectStyle(FOCUS_STYLE_ID, buildFocusCSS());
 
-    // Spotlight: thin glowing purple border + dim surroundings — single element, no dual edge
+    // Spotlight: glowing purple border + strongly dimmed surroundings
     const overlay = document.createElement('div');
     overlay.id = SPOTLIGHT_ID;
-    overlay.style.cssText = `
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      width: 200px;
-      height: 100px;
-      z-index: ${Z_BASE + 5};
-      pointer-events: none;
-      background: transparent;
-      border-radius: 10px;
-      box-shadow:
-        0 0 0 3px rgba(100, 60, 220, 1),
-        0 0 18px 6px rgba(100, 60, 220, 0.6),
-        0 0 0 9999px rgba(0, 0, 0, 0.45);
-    `;
+    Object.assign(overlay.style, {
+      position: 'fixed',
+      top: '50%',
+      left: '50%',
+      width: '200px',
+      height: '100px',
+      zIndex: String(Z_BASE + 5),
+      pointerEvents: 'none',
+      background: 'transparent',
+      borderRadius: '12px',
+      boxShadow: '0 0 0 3px rgba(90, 50, 210, 1), 0 0 20px 6px rgba(90, 50, 210, 0.5), 0 0 0 9999px rgba(0, 0, 0, 0.6)',
+    });
     document.body.appendChild(overlay);
     this.spotlightEl = overlay;
     this.focusBorderEl = null;

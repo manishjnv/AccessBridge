@@ -1,20 +1,41 @@
 /**
  * EyeTracker – webcam-based gaze cursor for AccessBridge.
  *
- * Approach (prototype):
- *   1. Opens the webcam via getUserMedia.
- *   2. Every animation frame, draws the video to an off-screen canvas and
- *      runs a fast skin-colour centroid tracker to find the face region.
- *   3. Maps the face centroid's X/Y displacement from its resting position
- *      to a gaze cursor position on the screen.
- *   4. Applies exponential-moving-average smoothing so the cursor doesn't
- *      jitter.
- *   5. Renders a semi-transparent gaze cursor <div> on top of the page.
- *   6. Supports a 5-point calibration mode (4 corners + centre).
- *   7. Optionally shows a small live webcam preview in the top-right corner.
+ * Detection strategy (prioritised):
+ *   1. Chrome FaceDetector API (Shape Detection) – returns face bounding box
+ *      and eye/mouth landmarks natively.  No external dependencies.
+ *   2. Skin-colour centroid fallback – used when FaceDetector is unavailable
+ *      (e.g. older Chrome or non-Chrome browsers).
  *
- * Accuracy is intentionally approximate – this is a functional prototype.
+ * Common pipeline:
+ *   - Opens webcam via getUserMedia.
+ *   - Each frame, detects face and extracts a normalised gaze point.
+ *   - Applies EMA smoothing and renders a gaze cursor overlay.
+ *   - Supports 5-point calibration (4 corners + centre).
+ *   - Optionally shows a small live webcam preview.
  */
+
+// ---------------------------------------------------------------------------
+// FaceDetector type declarations (Shape Detection API – not in lib.dom)
+// ---------------------------------------------------------------------------
+
+interface DetectedFace {
+  boundingBox: DOMRectReadOnly;
+  landmarks: ReadonlyArray<{
+    type: 'eye' | 'mouth' | 'nose';
+    locations: ReadonlyArray<{ x: number; y: number }>;
+  }>;
+}
+
+interface FaceDetectorOptions {
+  maxDetectedFaces?: number;
+  fastMode?: boolean;
+}
+
+declare class FaceDetector {
+  constructor(options?: FaceDetectorOptions);
+  detect(image: ImageBitmapSource): Promise<DetectedFace[]>;
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -45,7 +66,6 @@ interface EyeTrackerOptions {
 // Constants
 // ---------------------------------------------------------------------------
 
-/** How many calibration targets are shown (corners + centre). */
 const CALIBRATION_TARGETS: ReadonlyArray<Point> = [
   { x: 0.05, y: 0.05 },   // top-left
   { x: 0.95, y: 0.05 },   // top-right
@@ -54,27 +74,25 @@ const CALIBRATION_TARGETS: ReadonlyArray<Point> = [
   { x: 0.95, y: 0.95 },   // bottom-right
 ];
 
-/** Dwell duration on each calibration target before advancing (ms). */
 const CALIBRATION_DWELL_MS = 2_000;
-
-/** Radius of the gaze cursor (px). */
 const GAZE_CURSOR_RADIUS = 30;
 
 /** Processing canvas dimensions – smaller = faster. */
 const PROC_WIDTH  = 160;
 const PROC_HEIGHT = 120;
 
-/** Skin-colour thresholds in RGB space (permissive, works across skin tones). */
+/** Skin-colour thresholds in RGB space (fallback detection). */
 const SKIN_R_MIN = 60;
 const SKIN_R_MAX = 255;
 const SKIN_G_MIN = 30;
 const SKIN_G_MAX = 220;
 const SKIN_B_MIN = 20;
 const SKIN_B_MAX = 200;
-
-/** The R channel must be meaningfully larger than G and B. */
 const SKIN_RG_DIFF = 10;
 const SKIN_RB_DIFF = 20;
+
+/** Throttle FaceDetector to every N-th frame (heavier than skin centroid). */
+const FACE_DETECT_INTERVAL_MS = 60; // ~16 fps max
 
 // ---------------------------------------------------------------------------
 // EyeTracker
@@ -86,6 +104,12 @@ export class EyeTracker {
   private calibrating = false;
   private rafId: number | null = null;
 
+  // --- Detection backend ---
+  private useFaceDetector = false;
+  private faceDetector: FaceDetector | null = null;
+  private lastDetectTime = 0;
+  private pendingDetect = false;
+
   // --- Media ---
   private stream: MediaStream | null = null;
   private videoEl: HTMLVideoElement | null = null;
@@ -96,6 +120,7 @@ export class EyeTracker {
   private restFace: Point = { x: PROC_WIDTH / 2, y: PROC_HEIGHT / 2 };
   private smoothGaze: Point = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
   private calibPoints: CalibrationPoint[] = [];
+  private lastFacePoint: Point | null = null;
 
   // --- Calibration state ---
   private calibIndex = 0;
@@ -125,10 +150,6 @@ export class EyeTracker {
   // Public API
   // -------------------------------------------------------------------------
 
-  /**
-   * Start the eye tracker: requests webcam access, builds DOM elements, and
-   * begins the tracking loop.
-   */
   async start(): Promise<void> {
     if (this.running) return;
 
@@ -147,12 +168,14 @@ export class EyeTracker {
       throw new Error(msg);
     }
 
+    // Probe for FaceDetector API
+    this.initDetectionBackend();
+
     this.buildDOM();
     this.running = true;
     this.startLoop();
   }
 
-  /** Stop tracking, release the webcam, and remove all DOM elements. */
   stop(): void {
     if (!this.running) return;
     this.running = false;
@@ -179,17 +202,14 @@ export class EyeTracker {
 
     this.previewEl?.remove();
     this.previewEl = null;
+
+    this.faceDetector = null;
   }
 
-  /** Whether the tracker is currently active. */
   isRunning(): boolean {
     return this.running;
   }
 
-  /**
-   * Run the 5-point calibration sequence.  Returns a Promise that resolves
-   * when calibration is complete (or rejects if the tracker is not running).
-   */
   calibrate(): Promise<void> {
     if (!this.running) {
       return Promise.reject(new Error('EyeTracker: call start() before calibrate()'));
@@ -206,11 +226,30 @@ export class EyeTracker {
   }
 
   // -------------------------------------------------------------------------
+  // Detection backend selection
+  // -------------------------------------------------------------------------
+
+  private initDetectionBackend(): void {
+    try {
+      if (typeof (globalThis as unknown as Record<string, unknown>).FaceDetector === 'function') {
+        this.faceDetector = new FaceDetector({ maxDetectedFaces: 1, fastMode: true });
+        this.useFaceDetector = true;
+        console.log('[AccessBridge] Eye tracker: using FaceDetector API');
+      } else {
+        this.useFaceDetector = false;
+        console.log('[AccessBridge] Eye tracker: FaceDetector unavailable, using skin-colour fallback');
+      }
+    } catch {
+      this.useFaceDetector = false;
+      console.log('[AccessBridge] Eye tracker: FaceDetector init failed, using skin-colour fallback');
+    }
+  }
+
+  // -------------------------------------------------------------------------
   // DOM construction
   // -------------------------------------------------------------------------
 
   private buildDOM(): void {
-    // Hidden video element – streams webcam feed
     const video = document.createElement('video');
     video.srcObject = this.stream;
     video.autoplay  = true;
@@ -228,7 +267,6 @@ export class EyeTracker {
     document.body.appendChild(video);
     this.videoEl = video;
 
-    // Off-screen processing canvas
     const canvas = document.createElement('canvas');
     canvas.width  = PROC_WIDTH;
     canvas.height = PROC_HEIGHT;
@@ -244,7 +282,6 @@ export class EyeTracker {
     this.procCanvas = canvas;
     this.procCtx    = canvas.getContext('2d', { willReadFrequently: true })!;
 
-    // Gaze cursor overlay
     const cursor = document.createElement('div');
     cursor.className = 'ab-gaze-cursor';
     cursor.setAttribute('aria-hidden', 'true');
@@ -252,7 +289,6 @@ export class EyeTracker {
     document.body.appendChild(cursor);
     this.gazeCursorEl = cursor;
 
-    // Webcam preview (toggle-able)
     if (this.opts.showPreview) {
       this.buildPreview();
     }
@@ -263,8 +299,6 @@ export class EyeTracker {
     wrapper.className = 'ab-webcam-preview';
     wrapper.title     = 'Eye tracker preview – click to hide';
 
-    // Mirror the video into this small preview using a separate <video>
-    // pointing at the same stream so we don't show the hidden one.
     const previewVideo = document.createElement('video');
     previewVideo.srcObject  = this.stream;
     previewVideo.autoplay   = true;
@@ -273,7 +307,7 @@ export class EyeTracker {
     previewVideo.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:6px;transform:scaleX(-1);';
 
     const label = document.createElement('span');
-    label.textContent = 'Eye Tracker';
+    label.textContent = this.useFaceDetector ? 'Eye Tracker (FaceDetector)' : 'Eye Tracker (fallback)';
     label.style.cssText =
       'position:absolute;bottom:4px;left:0;right:0;text-align:center;' +
       'font:10px/1 system-ui,sans-serif;color:#fff;' +
@@ -282,11 +316,12 @@ export class EyeTracker {
     wrapper.appendChild(previewVideo);
     wrapper.appendChild(label);
 
-    // Click to toggle visibility of the video (keeps the wrapper as handle)
     wrapper.addEventListener('click', () => {
       const hidden = previewVideo.style.visibility === 'hidden';
       previewVideo.style.visibility = hidden ? 'visible' : 'hidden';
-      label.textContent = hidden ? 'Eye Tracker' : 'Eye Tracker (paused)';
+      label.textContent = hidden
+        ? (this.useFaceDetector ? 'Eye Tracker (FaceDetector)' : 'Eye Tracker (fallback)')
+        : 'Eye Tracker (paused)';
     });
 
     document.body.appendChild(wrapper);
@@ -311,55 +346,119 @@ export class EyeTracker {
     const video = this.videoEl;
     if (!ctx || !video || video.readyState < 2) return;
 
-    // Draw downscaled frame (mirrored so left/right feel natural)
+    // Draw downscaled mirrored frame to processing canvas
     ctx.save();
     ctx.translate(PROC_WIDTH, 0);
     ctx.scale(-1, 1);
     ctx.drawImage(video, 0, 0, PROC_WIDTH, PROC_HEIGHT);
     ctx.restore();
 
-    const imageData = ctx.getImageData(0, 0, PROC_WIDTH, PROC_HEIGHT);
-    const faceCentroid = this.findFaceCentroid(imageData);
-
-    if (!faceCentroid) return;  // no face found this frame – hold last position
-
-    // During calibration, record the face position for each target
-    if (this.calibrating) {
-      this.handleCalibrationFrame(faceCentroid);
-      return;
+    if (this.useFaceDetector && this.faceDetector) {
+      this.processWithFaceDetector();
+    } else {
+      this.processWithSkinCentroid(ctx);
     }
-
-    // Map face position to screen gaze coordinates
-    const gazeRaw = this.faceToGaze(faceCentroid);
-
-    // Exponential moving average smoothing
-    const alpha = 1 - this.opts.smoothing;
-    this.smoothGaze = {
-      x: this.smoothGaze.x * this.opts.smoothing + gazeRaw.x * alpha,
-      y: this.smoothGaze.y * this.opts.smoothing + gazeRaw.y * alpha,
-    };
-
-    this.updateGazeCursor(this.smoothGaze.x, this.smoothGaze.y);
-    this.opts.onGaze(this.smoothGaze.x, this.smoothGaze.y);
   }
 
   // -------------------------------------------------------------------------
-  // Skin-colour face centroid detection
+  // FaceDetector API path
   // -------------------------------------------------------------------------
 
+  private processWithFaceDetector(): void {
+    const now = Date.now();
+    if (this.pendingDetect || now - this.lastDetectTime < FACE_DETECT_INTERVAL_MS) {
+      // Use last known face point while waiting
+      if (this.lastFacePoint) {
+        this.applyFacePoint(this.lastFacePoint);
+      }
+      return;
+    }
+
+    this.pendingDetect = true;
+    this.lastDetectTime = now;
+
+    // FaceDetector.detect() works on ImageBitmapSource (canvas, video, etc.)
+    this.faceDetector!.detect(this.procCanvas!)
+      .then((faces) => {
+        this.pendingDetect = false;
+        if (!this.running) return;
+
+        if (faces.length === 0) return; // no face – hold last position
+
+        const face = faces[0];
+        const gazePoint = this.extractGazeFromFace(face);
+        this.lastFacePoint = gazePoint;
+        this.applyFacePoint(gazePoint);
+      })
+      .catch(() => {
+        this.pendingDetect = false;
+        // FaceDetector failed this frame — fall through silently
+      });
+  }
+
   /**
-   * Fast skin-pixel centroid.  Returns the weighted centroid of all pixels
-   * that pass the skin-colour test, normalised to [0,1] in both axes.
-   * Returns null if too few skin pixels are found (face not in frame).
+   * Extract a normalised gaze-direction point from a detected face.
+   *
+   * If eye landmarks are available, compute gaze from eye positions relative
+   * to the face bounding box.  If only the bounding box is available, fall
+   * back to face-centre tracking (similar to skin centroid but more precise).
    */
+  private extractGazeFromFace(face: DetectedFace): Point {
+    const bb = face.boundingBox;
+    const landmarks = face.landmarks;
+
+    // Try to find eye landmarks
+    const eyeLandmarks = landmarks.filter(l => l.type === 'eye');
+
+    if (eyeLandmarks.length >= 2) {
+      // We have both eyes — compute gaze from eye midpoint position
+      // relative to face bounding box
+      const allEyePoints = eyeLandmarks.flatMap(e => e.locations);
+      const eyeMidX = allEyePoints.reduce((s, p) => s + p.x, 0) / allEyePoints.length;
+      const eyeMidY = allEyePoints.reduce((s, p) => s + p.y, 0) / allEyePoints.length;
+
+      // Normalise eye position within the face bounding box
+      // When eyes shift left within the face → looking right (mirrored)
+      const relX = (eyeMidX - bb.x) / bb.width;
+      const relY = (eyeMidY - bb.y) / bb.height;
+
+      // Also factor in face position within the video frame
+      const faceCenterX = (bb.x + bb.width / 2) / PROC_WIDTH;
+      const faceCenterY = (bb.y + bb.height / 2) / PROC_HEIGHT;
+
+      // Blend face position (head pose) with eye-in-face position (eye gaze)
+      // Weight: 60% head pose, 40% eye offset for a more stable signal
+      return {
+        x: faceCenterX * 0.6 + relX * 0.4,
+        y: faceCenterY * 0.6 + relY * 0.4,
+      };
+    }
+
+    // Fallback: use face bounding box centre
+    return {
+      x: (bb.x + bb.width / 2) / PROC_WIDTH,
+      y: (bb.y + bb.height / 2) / PROC_HEIGHT,
+    };
+  }
+
+  // -------------------------------------------------------------------------
+  // Skin-colour centroid fallback path
+  // -------------------------------------------------------------------------
+
+  private processWithSkinCentroid(ctx: CanvasRenderingContext2D): void {
+    const imageData = ctx.getImageData(0, 0, PROC_WIDTH, PROC_HEIGHT);
+    const faceCentroid = this.findFaceCentroid(imageData);
+    if (!faceCentroid) return;
+    this.lastFacePoint = faceCentroid;
+    this.applyFacePoint(faceCentroid);
+  }
+
   private findFaceCentroid(imageData: ImageData): Point | null {
     const { data, width, height } = imageData;
 
     let sumX = 0;
     let sumY = 0;
     let count = 0;
-
-    // Step over pixels in a 4×4 grid for performance (every 4th pixel)
     const step = 4;
 
     for (let y = 0; y < height; y += step) {
@@ -377,11 +476,11 @@ export class EyeTracker {
       }
     }
 
-    const minPixels = (PROC_WIDTH * PROC_HEIGHT) / (step * step) * 0.01; // 1% of sampled area
+    const minPixels = (PROC_WIDTH * PROC_HEIGHT) / (step * step) * 0.01;
     if (count < minPixels) return null;
 
     return {
-      x: sumX / count / PROC_WIDTH,   // normalise to 0-1
+      x: sumX / count / PROC_WIDTH,
       y: sumY / count / PROC_HEIGHT,
     };
   }
@@ -397,16 +496,31 @@ export class EyeTracker {
   }
 
   // -------------------------------------------------------------------------
+  // Common gaze application
+  // -------------------------------------------------------------------------
+
+  private applyFacePoint(facePoint: Point): void {
+    if (this.calibrating) {
+      this.handleCalibrationFrame(facePoint);
+      return;
+    }
+
+    const gazeRaw = this.faceToGaze(facePoint);
+
+    const alpha = 1 - this.opts.smoothing;
+    this.smoothGaze = {
+      x: this.smoothGaze.x * this.opts.smoothing + gazeRaw.x * alpha,
+      y: this.smoothGaze.y * this.opts.smoothing + gazeRaw.y * alpha,
+    };
+
+    this.updateGazeCursor(this.smoothGaze.x, this.smoothGaze.y);
+    this.opts.onGaze(this.smoothGaze.x, this.smoothGaze.y);
+  }
+
+  // -------------------------------------------------------------------------
   // Coordinate mapping
   // -------------------------------------------------------------------------
 
-  /**
-   * Convert a normalised face centroid position to a screen pixel coordinate.
-   *
-   * If we have calibration data, use bilinear interpolation from the 5 known
-   * face→screen mappings.  Otherwise fall back to a linear stretch that maps
-   * face movement around `restFace` to screen extent.
-   */
   private faceToGaze(face: Point): Point {
     if (this.calibPoints.length >= 2) {
       return this.interpolateFromCalib(face);
@@ -415,7 +529,6 @@ export class EyeTracker {
   }
 
   private linearFaceToGaze(face: Point): Point {
-    // Movement sensitivity: a shift of 0.15 in face space → full screen span
     const sensitivity = 5;
     const restX = this.restFace.x / PROC_WIDTH;
     const restY = this.restFace.y / PROC_HEIGHT;
@@ -429,10 +542,6 @@ export class EyeTracker {
     };
   }
 
-  /**
-   * Inverse-distance-weighted interpolation from calibration points.
-   * Each calibration point says "when my face is at face[i], gaze is at screen[i]".
-   */
   private interpolateFromCalib(face: Point): Point {
     const weights: number[] = this.calibPoints.map((cp) => {
       const d = dist(face, cp.face);
@@ -483,7 +592,6 @@ export class EyeTracker {
       'Eye Tracker Calibration – look at each dot until it fills, then it will advance automatically.';
     overlay.appendChild(instructions);
 
-    // The moving target dot is added per-step
     const dot = document.createElement('div');
     dot.className = 'ab-calibration-dot';
     overlay.appendChild(dot);
@@ -503,16 +611,12 @@ export class EyeTracker {
     const dot    = this.calibDot;
     if (!dot) return;
 
-    // Position the dot
     const screenX = target.x * window.innerWidth;
     const screenY = target.y * window.innerHeight;
     dot.style.left = `${screenX}px`;
     dot.style.top  = `${screenY}px`;
 
-    // Reset dwell timer
     this.calibDwellStart = Date.now();
-
-    // Animate a fill ring on the dot to give visual dwell feedback
     dot.style.setProperty('--dwell-progress', '0%');
 
     if (this.calibProgressInterval !== null) {
@@ -531,11 +635,9 @@ export class EyeTracker {
     const elapsed = Date.now() - this.calibDwellStart;
     if (elapsed < CALIBRATION_DWELL_MS) return;
 
-    // Record this calibration point
     const target = CALIBRATION_TARGETS[this.calibIndex];
     this.calibPoints.push({ screen: target, face: { ...face } });
 
-    // On the first calibration point, set the rest position
     if (this.calibIndex === 0) {
       this.restFace = {
         x: face.x * PROC_WIDTH,

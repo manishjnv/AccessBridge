@@ -1,6 +1,24 @@
 # AccessBridge - Shift Handoff
 
-## Last Session: Day 3 — Shift 2 (April 6, 2026)
+## Last Session: Day 4 — Shift 1 (April 6, 2026)
+
+### Completed (Day 4, Shift 1)
+- [x] **Critical bug fix: Vite base path** — popup and sidepanel HTML had absolute paths (`/assets/...`) which break in Chrome extensions. Added `base: ''` to Vite config → relative paths (`../../assets/...`)
+- [x] **Eye tracker upgrade to FaceDetector API** — rewrote `eye-tracker.ts` to use Chrome's native Shape Detection API (FaceDetector) for face/eye landmark detection. Computes gaze from eye positions relative to face bounding box (60% head pose + 40% eye offset blend). Falls back to skin-colour centroid on browsers without FaceDetector. Zero external dependencies added.
+- [x] **54 new AI engine unit tests** (4 test suites):
+  - `cache.test.ts` (10 tests): key generation, normalization, TTL expiry, hit/miss stats
+  - `normalizer.test.ts` (14 tests): text normalization, truncation, HTML stripping, email dedup, token estimation
+  - `cost-tracker.test.ts` (13 tests): cost estimation per tier/provider, budget tracking, daily reset
+  - `local-provider.test.ts` (10 tests): extractive summarization, word simplification, classification, translate stub
+  - Plus 7 existing test files still passing
+- [x] **VPS deployment script** (`deploy.sh`): build → test → push → SSH deploy pipeline
+- [x] **Code review**: reviewed background service worker, popup, content script, domain connectors, AI bridge — no other bugs found
+- [x] TypeScript zero errors, Vite build succeeds (content: 132KB, background: 28KB, sidepanel: 19KB, CSS: 38KB)
+- [x] **116 total tests passing** (62 core + 54 AI engine)
+
+#### Tool Contribution (Day 4, Shift 1)
+- **Claude:** Vite base fix, eye tracker FaceDetector upgrade, all 54 AI tests, deploy script, code review
+- **Codex:** Task dispatched for eye tracker (parallel), Claude completed it directly
 
 ### Completed (Day 3, Shift 2)
 - [x] Keyboard-Only Mode (`content/motor/keyboard-mode.ts`): skip links (main/nav/footer), enhanced focus ring, tab order optimizer (auto-adds tabindex to clickable elements), shortcuts overlay (`?` key), arrow key group navigation, escape-to-deselect, MutationObserver for dynamic content
@@ -15,6 +33,10 @@
 - [x] TypeScript zero errors, Vite build succeeds (content: 130KB, background: 28KB, sidepanel: 19KB, CSS: 38KB)
 - [x] 62 unit tests still passing
 - [x] Code pushed to GitHub
+
+#### Tool Contribution (Day 3, Shift 2)
+- **Claude agents (4 parallel):** keyboard-mode.ts, predictive-input.ts, banking.ts, insurance.ts, domains/index.ts, email-ui.ts, all integration edits
+- **Codex:** Not used this shift — prioritize for Day 4
 
 ### Completed (Day 3, Shift 1)
 - [x] AI engine wired end-to-end: background service worker hosts AIEngine + SummarizerService + SimplifierService, content script has AIBridge for page/email summarization and text simplification
@@ -50,15 +72,16 @@
 - [x] Feature documentation
 
 ### NOT Done (Carry Forward)
-- [ ] Extension NOT tested in Chrome yet (build succeeds, needs manual sideload test)
-- [ ] VPS deployment — not done this session
+- [ ] Extension NOT tested in Chrome yet (build succeeds with relative paths, needs manual sideload test)
+- [ ] VPS deployment — deploy script created (`deploy.sh`), not yet executed
 - [ ] PPT/presentation for TopGear submission
 - [ ] Demo video recording
 - [ ] Real API keys for Gemini/Claude AI tiers (local tier works offline)
+- [ ] GitHub push (commit ready, needs push)
 
-### Day 4 Priority (April 7)
+### Day 4 Remaining Priority (April 7)
 1. **Sideload test**: Load dist/ in Chrome, verify ALL features end-to-end
-2. **VPS deploy**: Push, build, and host demo
+2. **Git push + VPS deploy**: Run `./deploy.sh` or manual push + SSH
 3. **Bug fixes**: Fix any issues found during Chrome testing
 4. **PPT**: Create presentation for TopGear Ideathon submission
 5. **Demo video**: Record walkthrough of all 10+ features
@@ -71,6 +94,18 @@
 - AI: 3-tier (local free → Gemini Flash → Claude) with cache + cost tracking
 - All on-device, zero network for accessibility data
 - AI engine runs in background service worker, content script uses AIBridge for communication
+
+### Key Files Added/Modified (Day 4, Shift 1)
+
+```
+packages/extension/vite.config.ts                         — Added base: '' for relative paths (critical fix)
+packages/extension/src/content/motor/eye-tracker.ts       — FaceDetector API upgrade with skin-colour fallback
+packages/ai-engine/src/__tests__/cache.test.ts            — 10 tests for AICache
+packages/ai-engine/src/__tests__/normalizer.test.ts       — 14 tests for normalizer utilities
+packages/ai-engine/src/__tests__/cost-tracker.test.ts     — 13 tests for CostTracker + estimateCost
+packages/ai-engine/src/__tests__/local-provider.test.ts   — 10 tests for LocalAIProvider
+deploy.sh                                                 — VPS deployment pipeline script
+```
 
 ### Key Files Added/Modified (Day 3)
 

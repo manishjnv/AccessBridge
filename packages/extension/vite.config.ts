@@ -46,6 +46,7 @@ function copyManifestPlugin() {
 
 export default defineConfig({
   plugins: [react(), copyManifestPlugin()],
+  base: '',
   build: {
     outDir: 'dist',
     emptyOutDir: true,

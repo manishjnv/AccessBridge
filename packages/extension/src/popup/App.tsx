@@ -22,12 +22,22 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'settings', label: 'Settings' },
 ];
 
+interface UpdateInfo {
+  hasUpdate: boolean;
+  currentVersion: string;
+  latestVersion: string;
+  downloadUrl: string;
+  changelog: string;
+}
+
 export default function App() {
   const [tab, setTab] = useState<Tab>('overview');
   const [profile, setProfile] = useState<AccessibilityProfile>({ ...DEFAULT_PROFILE });
   const [struggleScore, setStruggleScore] = useState(0);
   const [activeCount, setActiveCount] = useState(0);
   const [enabled, setEnabled] = useState(true);
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+  const [updating, setUpdating] = useState(false);
 
   // Load profile and poll struggle score
   useEffect(() => {
@@ -48,6 +58,14 @@ export default function App() {
 
     pollScore();
     const interval = setInterval(pollScore, 3000);
+
+    // Check for updates on popup open
+    chrome.runtime.sendMessage({ type: 'CHECK_UPDATE' }).then((res) => {
+      if (res && typeof res === 'object' && 'hasUpdate' in res && res.hasUpdate) {
+        setUpdateInfo(res as UpdateInfo);
+      }
+    }).catch(() => {});
+
     return () => clearInterval(interval);
   }, []);
 
@@ -119,13 +137,74 @@ export default function App() {
     input.click();
   }, [saveProfile]);
 
+  const handleDownloadUpdate = useCallback(() => {
+    if (updateInfo?.downloadUrl) {
+      chrome.tabs.create({ url: updateInfo.downloadUrl });
+    }
+  }, [updateInfo]);
+
+  const handleReloadExtension = useCallback(() => {
+    setUpdating(true);
+    chrome.runtime.sendMessage({ type: 'APPLY_UPDATE' }).catch(() => {});
+  }, []);
+
   return (
     <div className="bg-a11y-bg text-a11y-text min-h-[300px] flex flex-col">
+      {/* Update banner */}
+      {updateInfo?.hasUpdate && (
+        <div style={{
+          background: 'linear-gradient(135deg, rgba(123,104,238,0.25), rgba(187,134,252,0.15))',
+          borderBottom: '1px solid rgba(123,104,238,0.4)',
+          padding: '8px 16px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          fontSize: '12px',
+        }}>
+          <span style={{ flex: 1 }}>
+            <strong>v{updateInfo.latestVersion}</strong> available
+            <span style={{ color: '#94a3b8', marginLeft: '4px' }}>({updateInfo.changelog})</span>
+          </span>
+          <button
+            onClick={handleDownloadUpdate}
+            style={{
+              background: 'rgba(123,104,238,0.3)',
+              border: '1px solid rgba(123,104,238,0.5)',
+              color: '#e2e8f0',
+              borderRadius: '4px',
+              padding: '3px 10px',
+              fontSize: '11px',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            Download
+          </button>
+          <button
+            onClick={handleReloadExtension}
+            disabled={updating}
+            style={{
+              background: 'linear-gradient(135deg, #7b68ee, #bb86fc)',
+              border: 'none',
+              color: 'white',
+              borderRadius: '4px',
+              padding: '3px 10px',
+              fontSize: '11px',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              opacity: updating ? 0.6 : 1,
+            }}
+          >
+            {updating ? 'Reloading...' : 'Reload'}
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 bg-a11y-surface border-b border-a11y-primary/30">
         <div className="flex items-center gap-2">
           <span className="text-a11y-accent font-bold text-base">AccessBridge</span>
-          <span className="text-a11y-muted text-xs">v0.1.0</span>
+          <span className="text-a11y-muted text-xs">v{chrome.runtime.getManifest().version}</span>
         </div>
         <Toggle value={enabled} onChange={handleToggleAll} size="sm" />
       </div>

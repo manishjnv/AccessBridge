@@ -139,6 +139,10 @@ chrome.runtime.onStartup.addListener(() => {
 
 // ---------- Message handler ----------
 
+// ---------- Update server ----------
+
+const UPDATE_SERVER = 'http://72.61.227.64:8100';
+
 type MessageType =
   | 'GET_PROFILE'
   | 'SAVE_PROFILE'
@@ -155,7 +159,9 @@ type MessageType =
   | 'SIMPLIFY_TEXT'
   | 'AI_READABILITY'
   | 'AI_SET_KEY'
-  | 'AI_GET_STATS';
+  | 'AI_GET_STATS'
+  | 'CHECK_UPDATE'
+  | 'APPLY_UPDATE';
 
 interface Message {
   type: MessageType;
@@ -315,6 +321,32 @@ async function handleMessage(message: Message): Promise<unknown> {
       return getAIEngine().getStats();
     }
 
+    // ---------- Self-update ----------
+
+    case 'CHECK_UPDATE': {
+      try {
+        const res = await fetch(`${UPDATE_SERVER}/version`);
+        const data = await res.json() as { version: string; download_url: string; changelog: string };
+        const currentVersion = chrome.runtime.getManifest().version;
+        const hasUpdate = compareVersions(data.version, currentVersion) > 0;
+        return {
+          hasUpdate,
+          currentVersion,
+          latestVersion: data.version,
+          downloadUrl: `${UPDATE_SERVER}${data.download_url}`,
+          changelog: data.changelog,
+        };
+      } catch {
+        return { hasUpdate: false, error: 'Unable to reach update server' };
+      }
+    }
+
+    case 'APPLY_UPDATE': {
+      // Reload the extension — works for unpacked/sideloaded extensions
+      chrome.runtime.reload();
+      return { success: true };
+    }
+
     default: {
       // Handle voice command messages (format: { action: 'nextTab' })
       const msg = message as unknown as Record<string, string>;
@@ -424,6 +456,20 @@ async function handleTabCommand(command: string): Promise<unknown> {
     default:
       return { error: `Unknown tab command: ${command}` };
   }
+}
+
+// ---------- Version comparison ----------
+
+function compareVersions(a: string, b: string): number {
+  const pa = a.split('.').map(Number);
+  const pb = b.split('.').map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const na = pa[i] ?? 0;
+    const nb = pb[i] ?? 0;
+    if (na > nb) return 1;
+    if (na < nb) return -1;
+  }
+  return 0;
 }
 
 console.log('AccessBridge service worker initialized');

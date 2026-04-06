@@ -201,20 +201,21 @@ export class CognitiveSimplifier {
 
     injectStyle(FOCUS_STYLE_ID, buildFocusCSS());
 
-    // Full-screen dim overlay — all styles inline for bulletproof rendering
+    // Spotlight overlay — starts as a small transparent box with huge box-shadow to dim surroundings
     const overlay = document.createElement('div');
     overlay.id = SPOTLIGHT_ID;
     overlay.style.cssText = `
-      position: fixed !important;
-      top: 0 !important;
-      left: 0 !important;
-      width: 100vw !important;
-      height: 100vh !important;
-      z-index: ${Z_BASE + 5} !important;
-      pointer-events: none !important;
-      background: rgba(0, 0, 0, 0.55) !important;
-      transition: clip-path 0.4s ease-in-out !important;
-      clip-path: inset(0 0 0 0) !important;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      width: 200px;
+      height: 100px;
+      z-index: ${Z_BASE + 5};
+      pointer-events: none;
+      background: transparent;
+      border-radius: 12px;
+      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55);
+      transition: top 0.35s ease, left 0.35s ease, width 0.35s ease, height 0.35s ease;
     `;
     document.body.appendChild(overlay);
     this.spotlightEl = overlay;

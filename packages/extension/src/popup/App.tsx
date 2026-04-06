@@ -37,7 +37,7 @@ export default function App() {
   const [activeCount, setActiveCount] = useState(0);
   const [enabled, setEnabled] = useState(true);
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
-  const [updating, setUpdating] = useState(false);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
 
   // Load profile and poll struggle score
   useEffect(() => {
@@ -63,13 +63,6 @@ export default function App() {
 
     pollScore();
     const interval = setInterval(pollScore, 3000);
-
-    // Check for updates on popup open
-    chrome.runtime.sendMessage({ type: 'CHECK_UPDATE' }).then((res) => {
-      if (res && typeof res === 'object' && 'hasUpdate' in res && res.hasUpdate) {
-        setUpdateInfo(res as UpdateInfo);
-      }
-    }).catch(() => {});
 
     return () => clearInterval(interval);
   }, []);
@@ -147,66 +140,59 @@ export default function App() {
     input.click();
   }, [saveProfile]);
 
-  const handleDownloadUpdate = useCallback(() => {
+  const handleCheckUpdate = useCallback(() => {
+    setCheckingUpdate(true);
+    setUpdateInfo(null);
+    chrome.runtime.sendMessage({ type: 'CHECK_UPDATE' }).then((res) => {
+      setCheckingUpdate(false);
+      if (res && typeof res === 'object' && 'hasUpdate' in res) {
+        setUpdateInfo(res as UpdateInfo);
+      }
+    }).catch(() => {
+      setCheckingUpdate(false);
+      setUpdateInfo({ hasUpdate: false, currentVersion: chrome.runtime.getManifest().version, latestVersion: '', downloadUrl: '', changelog: '' });
+    });
+  }, []);
+
+  const handleInstallUpdate = useCallback(() => {
     if (updateInfo?.downloadUrl) {
       chrome.tabs.create({ url: updateInfo.downloadUrl });
     }
   }, [updateInfo]);
 
-  const handleReloadExtension = useCallback(() => {
-    setUpdating(true);
-    chrome.runtime.sendMessage({ type: 'APPLY_UPDATE' }).catch(() => {});
-  }, []);
-
   return (
     <div className="bg-a11y-bg text-a11y-text min-h-[300px] flex flex-col">
-      {/* Update banner */}
+      {/* Update banner — only shows after user clicks Check for Update */}
       {updateInfo?.hasUpdate && (
         <div style={{
-          background: 'linear-gradient(135deg, rgba(123,104,238,0.25), rgba(187,134,252,0.15))',
-          borderBottom: '1px solid rgba(123,104,238,0.4)',
-          padding: '8px 16px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
+          background: 'linear-gradient(135deg, rgba(16,185,129,0.2), rgba(123,104,238,0.15))',
+          borderBottom: '1px solid rgba(16,185,129,0.4)',
+          padding: '10px 16px',
           fontSize: '12px',
         }}>
-          <span style={{ flex: 1 }}>
-            <strong>v{updateInfo.latestVersion}</strong> available
-            <span style={{ color: '#94a3b8', marginLeft: '4px' }}>({updateInfo.changelog})</span>
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+            <span style={{ color: '#10b981', fontWeight: 700 }}>Update available: v{updateInfo.latestVersion}</span>
+          </div>
+          <div style={{ color: '#94a3b8', fontSize: '11px', marginBottom: '8px' }}>{updateInfo.changelog}</div>
           <button
-            onClick={handleDownloadUpdate}
-            style={{
-              background: 'rgba(123,104,238,0.3)',
-              border: '1px solid rgba(123,104,238,0.5)',
-              color: '#e2e8f0',
-              borderRadius: '4px',
-              padding: '3px 10px',
-              fontSize: '11px',
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            Download
-          </button>
-          <button
-            onClick={handleReloadExtension}
-            disabled={updating}
+            onClick={handleInstallUpdate}
             style={{
               background: 'linear-gradient(135deg, #7b68ee, #bb86fc)',
               border: 'none',
               color: 'white',
-              borderRadius: '4px',
-              padding: '3px 10px',
-              fontSize: '11px',
+              borderRadius: '6px',
+              padding: '6px 16px',
+              fontSize: '12px',
+              fontWeight: 600,
               cursor: 'pointer',
-              whiteSpace: 'nowrap',
-              opacity: updating ? 0.6 : 1,
+              width: '100%',
             }}
           >
-            {updating ? 'Reloading...' : 'Reload'}
+            Download & Install v{updateInfo.latestVersion}
           </button>
+          <div style={{ color: '#64748b', fontSize: '10px', marginTop: '6px', textAlign: 'center' }}>
+            Download zip, unzip, then load unpacked in chrome://extensions
+          </div>
         </div>
       )}
 
@@ -252,6 +238,9 @@ export default function App() {
             onSave={saveProfile}
             onExport={handleExport}
             onImport={handleImport}
+            onCheckUpdate={handleCheckUpdate}
+            checkingUpdate={checkingUpdate}
+            updateInfo={updateInfo}
           />
         )}
       </div>
@@ -563,14 +552,40 @@ function SettingsTab({
   onSave,
   onExport,
   onImport,
+  onCheckUpdate,
+  checkingUpdate,
+  updateInfo,
 }: {
   profile: AccessibilityProfile;
   onSave: (p: AccessibilityProfile) => void;
   onExport: () => void;
   onImport: () => void;
+  onCheckUpdate: () => void;
+  checkingUpdate: boolean;
+  updateInfo: UpdateInfo | null;
 }) {
   return (
     <>
+      {/* Update section */}
+      <div className="bg-a11y-surface rounded-lg p-3 border border-a11y-primary/20">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs text-a11y-muted">Version</span>
+          <span className="text-xs font-mono text-a11y-text">v{chrome.runtime.getManifest().version}</span>
+        </div>
+        <button
+          onClick={onCheckUpdate}
+          disabled={checkingUpdate}
+          className="w-full bg-a11y-primary hover:bg-a11y-primary/80 text-a11y-text text-sm py-2 rounded transition-colors disabled:opacity-50"
+        >
+          {checkingUpdate ? 'Checking...' : 'Check for Update'}
+        </button>
+        {updateInfo && !updateInfo.hasUpdate && (
+          <div className="text-xs text-center mt-2" style={{ color: '#10b981' }}>
+            You are on the latest version
+          </div>
+        )}
+      </div>
+
       <div className="space-y-1">
         <label className="text-xs text-a11y-muted">Adaptation Mode</label>
         <select

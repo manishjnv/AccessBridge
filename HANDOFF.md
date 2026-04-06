@@ -72,6 +72,13 @@ pnpm dev              # Dev mode with watch
 ssh a11yos-vps        # SSH to VPS
 ```
 
+### End-of-Session Checklist
+1. `pnpm build` — verify clean build
+2. `git add` + `git commit` — commit all changes
+3. `git push origin main` — push to GitHub
+4. Deploy to VPS: `ssh a11yos-vps` → pull, rebuild, restart
+5. Update this HANDOFF.md with session status
+
 ### Load Extension in Chrome
 1. chrome://extensions/
 2. Enable Developer Mode

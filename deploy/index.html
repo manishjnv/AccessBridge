@@ -938,7 +938,7 @@
       <div class="install fade-in">
         <h2>Get AccessBridge for Chrome</h2>
         <p>Runs entirely on-device. No server required. No data leaves your browser.</p>
-        <a href="/downloads/accessbridge-extension.zip" class="btn btn-primary">
+        <a id="download-btn" href="/downloads/accessbridge-extension.zip" class="btn btn-primary">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
           Download Extension (.zip)
         </a>
@@ -989,7 +989,7 @@
       </div>
       <div class="footer-bottom">
         <p>
-          <span class="footer-status"><span class="health-dot" id="health-dot"></span> AccessBridge v0.1.1</span>
+          <span class="footer-status"><span class="health-dot" id="health-dot"></span> AccessBridge <span id="app-version">v0.1.1</span></span>
           &nbsp;&mdash;&nbsp; Built for <a href="https://topgear.wipro.com" target="_blank">Wipro TopGear Ideathon 2026</a>
         </p>
         <p>Team: Manish Kumar &nbsp;|&nbsp; <a href="https://github.com/manishjnv/AccessBridge" target="_blank">github.com/manishjnv/AccessBridge</a></p>
@@ -1028,9 +1028,18 @@
 
     document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
 
-    // API health check
-    fetch('/api/health').then(r => r.json()).then(d => {
-      if (d.status === 'ok') document.getElementById('health-dot').style.background = '#10b981';
+    // Fetch version from API and update UI dynamically
+    fetch('/api/version').then(r => r.json()).then(d => {
+      // Update version display
+      const versionEl = document.getElementById('app-version');
+      if (versionEl && d.version) versionEl.textContent = 'v' + d.version;
+
+      // Update download link
+      const downloadBtn = document.getElementById('download-btn');
+      if (downloadBtn && d.download_url) downloadBtn.href = d.download_url;
+
+      // Health is good if we got a response
+      document.getElementById('health-dot').style.background = '#10b981';
     }).catch(() => {
       document.getElementById('health-dot').style.background = '#ef4444';
     });

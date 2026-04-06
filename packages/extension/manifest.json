@@ -1,7 +1,7 @@
 {
   "name": "AccessBridge",
   "description": "Ambient Accessibility Operating Layer - Zero disclosure, cross-application accessibility",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "manifest_version": 3,
   "permissions": ["activeTab", "storage", "offscreen", "sidePanel"],
   "host_permissions": ["<all_urls>"],
@@ -14,8 +14,7 @@
       "matches": ["<all_urls>"],
       "js": ["src/content/index.ts"],
       "css": ["src/content/styles.css"],
-      "run_at": "document_idle",
-      "type": "module"
+      "run_at": "document_idle"
     }
   ],
   "action": {

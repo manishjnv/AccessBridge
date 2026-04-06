@@ -201,8 +201,7 @@ export class CognitiveSimplifier {
 
     injectStyle(FOCUS_STYLE_ID, buildFocusCSS());
 
-    // Spotlight: transparent window with massive box-shadow to dim surroundings
-    // No border, no outline — the clear-vs-dim contrast is the indicator
+    // Spotlight: thin glowing purple border + dim surroundings — single element, no dual edge
     const overlay = document.createElement('div');
     overlay.id = SPOTLIGHT_ID;
     overlay.style.cssText = `
@@ -214,8 +213,11 @@ export class CognitiveSimplifier {
       z-index: ${Z_BASE + 5};
       pointer-events: none;
       background: transparent;
-      border-radius: 12px;
-      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+      border-radius: 10px;
+      box-shadow:
+        0 0 0 2px rgba(123, 104, 238, 0.8),
+        0 0 12px 2px rgba(123, 104, 238, 0.4),
+        0 0 0 9999px rgba(0, 0, 0, 0.5);
     `;
     document.body.appendChild(overlay);
     this.spotlightEl = overlay;

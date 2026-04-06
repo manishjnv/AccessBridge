@@ -1405,3 +1405,142 @@
   border-left-color: rgba(233, 69, 96, 0.4);
   background: rgba(233, 69, 96, 0.06);
 }
+
+/* ---- Domain: Telecom ---- */
+
+.ab-domain-plan-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(123, 104, 238, 0.15);
+  color: #bb86fc;
+  font-size: 11px;
+  font-weight: 600;
+  vertical-align: middle;
+}
+
+.ab-domain-data-readable {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  color: #94a3b8;
+  font-style: italic;
+}
+
+.ab-domain-validity-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.ab-domain-validity-badge[data-urgency="low"]   { background: rgba(16, 185, 129, 0.15); color: #10b981; }
+.ab-domain-validity-badge[data-urgency="medium"]{ background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+.ab-domain-validity-badge[data-urgency="high"]  { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+
+/* ---- Domain: Healthcare ---- */
+
+.ab-domain-lab-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.ab-domain-lab-badge[data-status="low"]    { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+.ab-domain-lab-badge[data-status="normal"] { background: rgba(16, 185, 129, 0.15); color: #10b981; }
+.ab-domain-lab-badge[data-status="high"]   { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+
+.ab-domain-emergency-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border: 2px solid #ef4444;
+  border-radius: 8px;
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.ab-domain-emergency-link:hover,
+.ab-domain-emergency-link:focus {
+  background: rgba(239, 68, 68, 0.25);
+  outline: 2px solid #ef4444;
+  outline-offset: 2px;
+}
+
+/* ---- Domain: Manufacturing ---- */
+
+.ab-domain-status-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.ab-domain-status-badge[data-status="pending"]   { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+.ab-domain-status-badge[data-status="approved"]  { background: rgba(16, 185, 129, 0.15); color: #10b981; }
+.ab-domain-status-badge[data-status="rejected"]  { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+.ab-domain-status-badge[data-status="transit"]   { background: rgba(59, 130, 246, 0.15); color: #3b82f6; }
+.ab-domain-status-badge[data-status="completed"] { background: rgba(16, 185, 129, 0.15); color: #10b981; }
+
+.ab-domain-unit-readable {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  color: #94a3b8;
+  font-style: italic;
+}
+
+.ab-domain-table-summary {
+  display: block;
+  margin-top: 4px;
+  padding: 4px 8px;
+  border-left: 3px solid rgba(123, 104, 238, 0.4);
+  background: rgba(123, 104, 238, 0.06);
+  font-size: 12px;
+  color: #e2e8f0;
+  border-radius: 0 4px 4px 0;
+}
+
+/* ---- Domain: Retail / E-Commerce ---- */
+
+.ab-domain-price-words {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  color: #94a3b8;
+  font-style: italic;
+}
+
+.ab-domain-savings-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.ab-domain-delivery-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+  font-size: 11px;
+  font-weight: 600;
+}

@@ -18,6 +18,7 @@ function copyManifestPlugin() {
       manifest.background.service_worker = 'src/background/index.js';
       manifest.content_scripts[0].js = ['src/content/index.js'];
       manifest.content_scripts[0].css = ['src/content/styles.css'];
+      manifest.content_scripts[0].type = 'module';
       manifest.action.default_popup = 'src/popup/index.html';
       manifest.side_panel.default_path = 'src/sidepanel/index.html';
 

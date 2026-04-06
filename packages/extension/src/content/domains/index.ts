@@ -6,7 +6,11 @@
  */
 
 import { BankingConnector } from './banking.js';
+import { HealthcareConnector } from './healthcare.js';
 import { InsuranceConnector } from './insurance.js';
+import { RetailConnector } from './retail.js';
+import { TelecomConnector } from './telecom.js';
+import { ManufacturingConnector } from './manufacturing.js';
 
 // ---------------------------------------------------------------------------
 // DomainConnector interface
@@ -36,7 +40,11 @@ export class DomainConnectorRegistry {
   constructor() {
     // Register all available domain connectors
     this.connectors.push(new BankingConnector());
+    this.connectors.push(new HealthcareConnector());
     this.connectors.push(new InsuranceConnector());
+    this.connectors.push(new RetailConnector());
+    this.connectors.push(new TelecomConnector());
+    this.connectors.push(new ManufacturingConnector());
   }
 
   /**

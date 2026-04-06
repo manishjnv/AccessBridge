@@ -1,6 +1,21 @@
 # AccessBridge - Shift Handoff
 
-## Last Session: Day 4 — Shift 2 (April 6, 2026)
+## Last Session: Day 5 — FINAL DAY (April 6, 2026)
+
+### Completed (Day 5)
+- [x] **Critical bug fix: content script ES module** — added `"type": "module"` to manifest content_scripts; without this the content script would crash on load in Chrome (it uses ES `import` statements)
+- [x] **4 new domain connectors** — Telecom, Retail (E-Commerce), Healthcare, Manufacturing — all following the same pattern as Banking/Insurance (jargon decoder, form assistance, data readers)
+- [x] **Domain connector CSS** — added styles for new connectors (plan badges, data readables, validity badges, lab badges, emergency links, status badges, delivery badges, savings badges, etc.)
+- [x] **Domain connector registry updated** — all 6 connectors registered (Banking, Insurance, Telecom, Retail, Healthcare, Manufacturing)
+- [x] **Full build verification** — TypeScript zero errors, Vite build succeeds (content: 202KB with 6 domains, background: 28KB, sidepanel: 19KB, CSS: 41KB)
+- [x] **116 tests all green** (62 core + 54 AI engine)
+- [x] **Extension zip updated** — `accessbridge-extension.zip` and `deploy/downloads/accessbridge-extension.zip`
+- [x] **Git commit + push** — all changes pushed to GitHub
+
+#### Tool Contribution (Day 5)
+- **Claude:** Content script module fix, CSS styles, build verification, HANDOFF update, git operations
+- **Claude Agents (4 parallel):** telecom.ts, retail.ts, healthcare.ts, manufacturing.ts domain connectors
+- **Codex:** Setup verified (v0.118.0, authenticated, shared session)
 
 ### Completed (Day 4, Shift 2)
 - [x] **Full build/typecheck/test verification** — pnpm build, pnpm typecheck, 116 tests all green
@@ -86,20 +101,22 @@
 - [x] Feature documentation
 
 ### NOT Done (Carry Forward)
-- [ ] Extension NOT tested in Chrome yet (build succeeds with relative paths, needs manual sideload test)
+
+- [ ] Chrome sideload test — build is ready, `"type": "module"` fix applied, needs manual test in Chrome
 - [ ] VPS deployment — deploy script ready (`deploy.sh`), not yet executed
 - [x] PPT/presentation created (15 slides, `AccessBridge_Presentation.pptx`)
 - [ ] Demo video recording
 - [ ] Real API keys for Gemini/Claude AI tiers (local tier works offline)
-- [ ] GitHub push (need to commit + push Day 4 Shift 2 changes)
+- [x] GitHub push — Day 5 changes committed and pushed
+- [x] Domain connectors — all 6 done (Banking, Insurance, Telecom, Retail, Healthcare, Manufacturing)
 
-### Remaining Priority (April 7-11)
-1. **Chrome sideload test**: Load dist/ in Chrome, verify ALL features end-to-end
-2. **Git commit + push + VPS deploy**: Run `./deploy.sh`
+### Remaining Priority (Before April 11 submission)
+
+1. **Chrome sideload test**: Load `packages/extension/dist/` in Chrome, verify ALL features
+2. **VPS deploy**: Run `./deploy.sh` or manual SSH deploy
 3. **Bug fixes**: Fix any issues found during Chrome testing
-4. **Demo video**: Record walkthrough using DEMO_SCRIPT.md
-5. **PPT polish**: Refine presentation slides if needed
-6. **Polish**: UI refinements, error handling edge cases
+4. **Demo video**: Record walkthrough using `DEMO_SCRIPT.md`
+5. **PPT polish**: Add real screenshots from working extension
 
 ### Architecture Notes
 - Monorepo: packages/core, packages/extension, packages/ai-engine

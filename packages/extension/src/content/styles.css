@@ -317,3 +317,381 @@
   z-index: 999990;
   transition: top 0.05s linear;
 }
+
+/* ============================================
+   Dwell Click System
+   ============================================ */
+
+/* ---- Radial progress indicator following the cursor ---- */
+.ab-dwell-indicator {
+  position: fixed;
+  /* top/left are set dynamically via JS */
+  z-index: 2147483647;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  /* Ensures the element itself does not affect layout */
+  width: 0;
+  height: 0;
+  overflow: visible;
+}
+
+.ab-dwell-indicator svg {
+  display: block;
+  /* Subtle drop-shadow so the ring is visible on any background */
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.45));
+}
+
+/* ---- Outline applied to the element currently being dwelled on ---- */
+.ab-dwell-target {
+  outline: 2px solid rgba(123, 104, 238, 0.75) !important;
+  outline-offset: 3px !important;
+  /* Soft glow to draw attention without being distracting */
+  box-shadow: 0 0 0 4px rgba(123, 104, 238, 0.15) !important;
+  border-radius: 3px;
+  /* Animate the outline appearing for a polished feel */
+  animation: ab-dwell-target-in 0.12s ease forwards;
+}
+
+/* ---- Click-confirmation pulse animation ---- */
+.ab-dwell-click-pulse {
+  animation: ab-dwell-click-pulse 0.4s ease-out forwards !important;
+}
+
+@keyframes ab-dwell-click-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(123, 104, 238, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(123, 104, 238, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(123, 104, 238, 0);
+  }
+}
+
+@keyframes ab-dwell-target-in {
+  from {
+    outline-color: transparent;
+    box-shadow: 0 0 0 4px rgba(123, 104, 238, 0);
+  }
+  to {
+    outline-color: rgba(123, 104, 238, 0.75);
+    box-shadow: 0 0 0 4px rgba(123, 104, 238, 0.15);
+  }
+}
+
+/* ============================================
+   Eye Tracker – Gaze Cursor
+   ============================================ */
+
+/**
+ * .ab-gaze-cursor
+ * Semi-transparent circle that tracks where the user is looking.
+ * top/left are set dynamically by EyeTracker (offset by GAZE_CURSOR_RADIUS).
+ * pointer-events: none so it never blocks real clicks.
+ */
+.ab-gaze-cursor {
+  position: fixed;
+  width: 60px;      /* 2 × GAZE_CURSOR_RADIUS (30 px) */
+  height: 60px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 40% 40%,
+    rgba(123, 104, 238, 0.55),
+    rgba(187, 134, 252, 0.25) 60%,
+    transparent 80%
+  );
+  border: 2.5px solid rgba(187, 134, 252, 0.75);
+  box-shadow:
+    0 0 12px rgba(123, 104, 238, 0.4),
+    inset 0 0 8px rgba(255, 255, 255, 0.15);
+  pointer-events: none;
+  z-index: 2147483640;
+  /* Sub-frame position interpolation */
+  transition: left 40ms linear, top 40ms linear;
+  will-change: left, top;
+  animation: ab-gaze-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes ab-gaze-pulse {
+  0%, 100% {
+    box-shadow: 0 0 12px rgba(123, 104, 238, 0.4),
+                inset 0 0 8px rgba(255, 255, 255, 0.15);
+  }
+  50% {
+    box-shadow: 0 0 22px rgba(123, 104, 238, 0.65),
+                inset 0 0 12px rgba(255, 255, 255, 0.25);
+  }
+}
+
+/* ============================================
+   Eye Tracker – Webcam Preview
+   ============================================ */
+
+/**
+ * .ab-webcam-preview
+ * Small thumbnail in the top-right corner showing the live webcam feed
+ * so the user can confirm tracking is active.  Click to toggle feed visibility.
+ */
+.ab-webcam-preview {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  width: 100px;
+  height: 75px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 2px solid rgba(123, 104, 238, 0.7);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+  background: #0d0d1a;
+  z-index: 2147483641;
+  cursor: pointer;
+  opacity: 0.85;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.ab-webcam-preview:hover {
+  opacity: 1;
+  transform: scale(1.06);
+}
+
+/* ============================================
+   Eye Tracker – Calibration Overlay
+   ============================================ */
+
+/**
+ * .ab-calibration-overlay
+ * Full-screen backdrop shown during the 5-point calibration sequence.
+ */
+.ab-calibration-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 10, 26, 0.88);
+  z-index: 2147483643;
+  pointer-events: none;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+
+/* Instructions banner centred on the overlay */
+.ab-calibration-instructions {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  max-width: 420px;
+  text-align: center;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  color: #e2e8f0;
+  background: rgba(26, 26, 46, 0.9);
+  padding: 14px 24px;
+  border-radius: 10px;
+  border: 1px solid rgba(123, 104, 238, 0.45);
+  pointer-events: none;
+  z-index: 2147483644;
+}
+
+/**
+ * .ab-calibration-dot
+ * The target dot the user must dwell on during calibration.
+ * top/left set inline by JS; --dwell-progress updated each tick.
+ */
+.ab-calibration-dot {
+  position: fixed;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  /* JS uses translate(-50%,-50%) via transform so position is centred */
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle at 38% 38%, #bb86fc, #7b68ee 70%);
+  box-shadow:
+    0 0 0 4px rgba(123, 104, 238, 0.3),
+    0 0 20px rgba(123, 104, 238, 0.6);
+  z-index: 2147483645;
+  pointer-events: none;
+  animation: ab-dot-appear 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* Dwell-progress sweep ring using conic-gradient */
+.ab-calibration-dot::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  background: conic-gradient(
+    rgba(187, 134, 252, 0.9) var(--dwell-progress, 0%),
+    rgba(255, 255, 255, 0.15) var(--dwell-progress, 0%)
+  );
+  z-index: -1;
+  transition: background 50ms linear;
+}
+
+@keyframes ab-dot-appear {
+  from {
+    transform: translate(-50%, -50%) scale(0.4);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+}
+
+/* ============================================
+   AI Summary & Simplification Panels
+   ============================================ */
+
+.ab-summary-panel {
+  position: fixed;
+  bottom: 80px;
+  right: 20px;
+  width: 380px;
+  max-height: 60vh;
+  background: #1a1a2e;
+  color: #e2e8f0;
+  border-radius: 12px;
+  border: 1px solid rgba(123, 104, 238, 0.4);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  z-index: 2147483640;
+  overflow: hidden;
+  animation: ab-panel-in 0.25s ease-out;
+}
+
+.ab-summary-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: rgba(123, 104, 238, 0.15);
+  border-bottom: 1px solid rgba(123, 104, 238, 0.3);
+}
+
+.ab-summary-title {
+  font-weight: 600;
+  color: #bb86fc;
+  flex: 1;
+}
+
+.ab-summary-meta {
+  font-size: 11px;
+  color: #888;
+}
+
+.ab-summary-close {
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.ab-summary-close:hover {
+  color: #e94560;
+}
+
+.ab-summary-content {
+  padding: 12px 16px;
+  overflow-y: auto;
+  max-height: 40vh;
+  line-height: 1.6;
+}
+
+.ab-summary-content ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.ab-summary-content li {
+  margin-bottom: 6px;
+  color: #cbd5e1;
+}
+
+.ab-summary-actions {
+  display: flex;
+  gap: 8px;
+  padding: 10px 16px;
+  border-top: 1px solid rgba(123, 104, 238, 0.2);
+}
+
+.ab-summary-btn {
+  flex: 1;
+  background: rgba(123, 104, 238, 0.2);
+  color: #bb86fc;
+  border: 1px solid rgba(123, 104, 238, 0.3);
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background 0.15s;
+}
+
+.ab-summary-btn:hover {
+  background: rgba(123, 104, 238, 0.35);
+}
+
+/* ---- Simplified content overlay ---- */
+
+.ab-simplified-overlay {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 90vw;
+  max-width: 700px;
+  max-height: 80vh;
+  background: #1a1a2e;
+  color: #e2e8f0;
+  border-radius: 12px;
+  border: 1px solid rgba(123, 104, 238, 0.4);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6);
+  font-family: system-ui, -apple-system, sans-serif;
+  z-index: 2147483645;
+  overflow: hidden;
+  animation: ab-panel-in 0.25s ease-out;
+}
+
+.ab-simplified-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: rgba(123, 104, 238, 0.15);
+  border-bottom: 1px solid rgba(123, 104, 238, 0.3);
+  font-weight: 600;
+  color: #bb86fc;
+}
+
+.ab-simplified-close {
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.ab-simplified-content {
+  padding: 20px;
+  overflow-y: auto;
+  max-height: calc(80vh - 60px);
+  line-height: 1.8;
+  font-size: 16px;
+  word-spacing: 0.05em;
+}
+
+@keyframes ab-panel-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}

@@ -15,6 +15,10 @@ import type { BaseAdapter } from './adapters/base.js';
 import { CognitiveSimplifier } from './cognitive/simplifier.js';
 import { VoiceCommandSystem } from './motor/voice-commands.js';
 import { FatigueAdaptiveUI } from './fatigue/adaptive-ui.js';
+import { AIBridge } from './ai/bridge.js';
+import { matchHindiCommand } from './motor/hindi-commands.js';
+import { DwellClickSystem } from './motor/dwell-click.js';
+import { EyeTracker } from './motor/eye-tracker.js';
 
 // ---------- App Detection ----------
 
@@ -223,6 +227,30 @@ function flushSignals(): void {
 let cognitiveSimplifier: CognitiveSimplifier | null = null;
 let voiceCommands: VoiceCommandSystem | null = null;
 let fatigueUI: FatigueAdaptiveUI | null = null;
+let aiBridge: AIBridge | null = null;
+let dwellClick: DwellClickSystem | null = null;
+let eyeTracker: EyeTracker | null = null;
+
+function getAI(): AIBridge {
+  if (!aiBridge) {
+    aiBridge = new AIBridge();
+  }
+  return aiBridge;
+}
+
+function getDwell(): DwellClickSystem {
+  if (!dwellClick) {
+    dwellClick = new DwellClickSystem();
+  }
+  return dwellClick;
+}
+
+function getEyeTracker(): EyeTracker {
+  if (!eyeTracker) {
+    eyeTracker = new EyeTracker();
+  }
+  return eyeTracker;
+}
 
 function getCognitive(): CognitiveSimplifier {
   if (!cognitiveSimplifier) {
@@ -252,6 +280,13 @@ function getFatigue(): FatigueAdaptiveUI {
 // ---------- Voice command handler ----------
 
 function handleVoiceCommand(command: string, args: string): void {
+  // Try Hindi command matching if the command doesn't match English commands
+  const hindiMatch = matchHindiCommand(command + (args ? ' ' + args : ''));
+  if (hindiMatch) {
+    handleVoiceCommand(hindiMatch.action, hindiMatch.args);
+    return;
+  }
+
   switch (command) {
     case 'scroll-up':
       window.scrollBy({ top: -300, behavior: 'smooth' });
@@ -303,6 +338,15 @@ function handleVoiceCommand(command: string, args: string): void {
       break;
     case 'stop-listening':
       getVoice().stop();
+      break;
+    case 'summarize':
+      getAI().summarizePage(true).catch(() => {});
+      break;
+    case 'simplify':
+      getAI().simplifyContent('mild').catch(() => {});
+      break;
+    case 'summarize-email':
+      getAI().summarizeEmail().catch(() => {});
       break;
   }
 }
@@ -357,7 +401,17 @@ function listenForCommands(adapter: BaseAdapter, sensory: SensoryAdapter): void 
           sensory.revertAll();
           getCognitive().disableAll();
           getVoice().stop();
+          getDwell().stop();
+          getEyeTracker().stop();
+          getAI().dismiss();
           sendResponse({ reverted: true });
+          break;
+        }
+        case 'TOGGLE_DWELL_CLICK': {
+          const { enabled, delay } = message.payload as { enabled: boolean; delay?: number };
+          if (enabled) getDwell().start(delay);
+          else getDwell().stop();
+          sendResponse({ success: true });
           break;
         }
         case 'PROFILE_UPDATED': {
@@ -394,8 +448,18 @@ function applyAdaptation(adaptation: Adaptation, adapter: BaseAdapter, sensory: 
       else getCognitive().disableDistractionShield();
       break;
     case AdaptationType.TEXT_SIMPLIFY:
-      // Handled by AI engine via popup/sidepanel
-      adapter.apply(adaptation);
+      if (adaptation.value) {
+        getAI().simplifyContent('mild').catch(() => {});
+      } else {
+        getAI().dismiss();
+      }
+      break;
+    case AdaptationType.AUTO_SUMMARIZE:
+      if (adaptation.value) {
+        getAI().summarizePage(true).catch(() => {});
+      } else {
+        getAI().dismiss();
+      }
       break;
 
     // Motor adaptations
@@ -405,6 +469,10 @@ function applyAdaptation(adaptation: Adaptation, adapter: BaseAdapter, sensory: 
     case AdaptationType.VOICE_NAV:
       if (adaptation.value) getVoice().start();
       else getVoice().stop();
+      break;
+    case AdaptationType.EYE_TRACKING:
+      if (adaptation.value) getEyeTracker().start();
+      else getEyeTracker().stop();
       break;
 
     default:
@@ -470,12 +538,32 @@ function init(): void {
   chrome.runtime.sendMessage({ type: 'GET_PROFILE' }).then((profile) => {
     if (!profile || typeof profile !== 'object') return;
     const p = profile as {
+      language?: string;
       motor?: { voiceNavigationEnabled?: boolean };
       cognitive?: { focusModeEnabled?: boolean; distractionShield?: boolean };
     };
+    // Set voice command language based on profile
+    const langMap: Record<string, string> = {
+      'en': 'en-US', 'hi': 'hi-IN', 'es': 'es-ES',
+      'fr': 'fr-FR', 'de': 'de-DE', 'zh': 'zh-CN',
+      'ja': 'ja-JP', 'ar': 'ar-SA',
+    };
+    if (p.language && langMap[p.language]) {
+      // Voice system will use this language for recognition
+      voiceCommands = new VoiceCommandSystem({
+        lang: langMap[p.language],
+        onCommand: (command: string, args: string) => {
+          handleVoiceCommand(command, args);
+        },
+      });
+    }
     if (p.motor?.voiceNavigationEnabled) getVoice().start();
     if (p.cognitive?.focusModeEnabled) getCognitive().enableFocusMode();
     if (p.cognitive?.distractionShield) getCognitive().enableDistractionShield();
+    // Dwell click and eye tracking from profile
+    const pm = profile as { motor?: { dwellClickEnabled?: boolean; dwellClickDelay?: number; eyeTrackingEnabled?: boolean } };
+    if (pm.motor?.dwellClickEnabled) getDwell().start(pm.motor?.dwellClickDelay);
+    if (pm.motor?.eyeTrackingEnabled) getEyeTracker().start();
   }).catch(() => {});
 
   console.log('[AccessBridge] Content script initialized (Day 2)');

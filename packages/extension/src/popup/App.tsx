@@ -393,7 +393,18 @@ function MotorTab({
       <Toggle
         label="Dwell Click"
         value={motor.dwellClickEnabled}
-        onChange={(v) => onChange({ dwellClickEnabled: v })}
+        onChange={(v) => {
+          onChange({ dwellClickEnabled: v });
+          // Direct message to content script for dwell click
+          chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
+            if (tab?.id) {
+              chrome.tabs.sendMessage(tab.id, {
+                type: 'TOGGLE_DWELL_CLICK',
+                payload: { enabled: v, delay: motor.dwellClickDelay },
+              }).catch(() => {});
+            }
+          });
+        }}
       />
       {motor.dwellClickEnabled && (
         <Slider

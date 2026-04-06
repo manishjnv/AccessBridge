@@ -17,6 +17,34 @@ import type {
   BehaviorSignal,
 } from '@accessbridge/core';
 
+// AI Engine — lazy-initialized to keep startup fast
+import { AIEngine, SummarizerService, SimplifierService } from '@accessbridge/ai-engine';
+
+let aiEngine: AIEngine | null = null;
+let summarizer: SummarizerService | null = null;
+let simplifier: SimplifierService | null = null;
+
+function getAIEngine(): AIEngine {
+  if (!aiEngine) {
+    aiEngine = new AIEngine(); // starts with local (free) tier
+  }
+  return aiEngine;
+}
+
+function getSummarizer(): SummarizerService {
+  if (!summarizer) {
+    summarizer = new SummarizerService(getAIEngine());
+  }
+  return summarizer;
+}
+
+function getSimplifier(): SimplifierService {
+  if (!simplifier) {
+    simplifier = new SimplifierService(getAIEngine());
+  }
+  return simplifier;
+}
+
 // ---------- State ----------
 
 let currentProfile: AccessibilityProfile | null = null;
@@ -121,7 +149,13 @@ type MessageType =
   | 'REVERT_ALL'
   | 'SIGNAL_BATCH'
   | 'TOGGLE_FEATURE'
-  | 'TAB_COMMAND';
+  | 'TAB_COMMAND'
+  | 'SUMMARIZE_TEXT'
+  | 'SUMMARIZE_EMAIL'
+  | 'SIMPLIFY_TEXT'
+  | 'AI_READABILITY'
+  | 'AI_SET_KEY'
+  | 'AI_GET_STATS';
 
 interface Message {
   type: MessageType;
@@ -229,6 +263,56 @@ async function handleMessage(message: Message): Promise<unknown> {
     case 'TAB_COMMAND': {
       const { command } = message.payload as { command: string };
       return handleTabCommand(command);
+    }
+
+    // ---------- AI Engine messages ----------
+
+    case 'SUMMARIZE_TEXT': {
+      const { text, maxBullets } = message.payload as { text: string; maxBullets?: number };
+      const start = performance.now();
+      const summary = await getSummarizer().summarizeDocument(text, maxBullets ?? 5);
+      const latencyMs = Math.round(performance.now() - start);
+      const stats = getAIEngine().getStats();
+      return {
+        text: summary,
+        cached: false,
+        tier: 'local',
+        latencyMs,
+        costStats: stats.cost,
+      };
+    }
+
+    case 'SUMMARIZE_EMAIL': {
+      const { html } = message.payload as { html: string };
+      const start = performance.now();
+      const summary = await getSummarizer().summarizeEmail(html);
+      const latencyMs = Math.round(performance.now() - start);
+      return { text: summary, cached: false, tier: 'local', latencyMs };
+    }
+
+    case 'SIMPLIFY_TEXT': {
+      const { text, level } = message.payload as { text: string; level?: 'mild' | 'strong' };
+      const start = performance.now();
+      const simplified = await getSimplifier().simplifyText(text, level ?? 'mild');
+      const latencyMs = Math.round(performance.now() - start);
+      return { text: simplified, cached: false, tier: 'local', latencyMs };
+    }
+
+    case 'AI_READABILITY': {
+      const { text } = message.payload as { text: string };
+      const score = getSimplifier().getReadabilityScore(text);
+      const grade = score <= 6 ? 'Easy' : score <= 10 ? 'Medium' : score <= 14 ? 'Hard' : 'Very Hard';
+      return { score, grade };
+    }
+
+    case 'AI_SET_KEY': {
+      const { provider, apiKey } = message.payload as { provider: 'gemini' | 'claude'; apiKey: string };
+      getAIEngine().setApiKey(provider, apiKey);
+      return { success: true };
+    }
+
+    case 'AI_GET_STATS': {
+      return getAIEngine().getStats();
     }
 
     default: {

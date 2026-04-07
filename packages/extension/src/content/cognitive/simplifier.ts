@@ -197,6 +197,7 @@ export class CognitiveSimplifier {
   // SVG elements for focus mode
   private svgOverlay: SVGSVGElement | null = null;
   private svgCutout: SVGRectElement | null = null;
+  private svgInvCutout: SVGRectElement | null = null;
   private svgBorder: SVGRectElement | null = null;
 
   enableFocusMode(): void {
@@ -251,18 +252,45 @@ export class CognitiveSimplifier {
     defs.appendChild(mask);
     svg.appendChild(defs);
 
-    // Dim layer (uses the mask)
+    // Dim layer — covers everything except cutout
     const dimRect = document.createElementNS(ns, 'rect');
     dimRect.setAttribute('width', '100%');
     dimRect.setAttribute('height', '100%');
     dimRect.setAttribute('fill', '#000');
-    dimRect.setAttribute('fill-opacity', '0.45');
+    dimRect.setAttribute('fill-opacity', '0.5');
     dimRect.setAttribute('mask', 'url(#ab-focus-mask)');
     svg.appendChild(dimRect);
 
-    // Purple border — stroke-alignment: outside by offsetting rect 1.5px outward
-    // SVG stroke is centered on path, so we shrink the border rect by half stroke-width
-    // to make stroke sit exactly on the cutout edge (outside the clear area)
+    // Inverted mask — for the brightness boost inside the focused area
+    const invertMask = document.createElementNS(ns, 'mask');
+    invertMask.id = 'ab-focus-mask-inv';
+    const invBg = document.createElementNS(ns, 'rect');
+    invBg.setAttribute('width', '100%');
+    invBg.setAttribute('height', '100%');
+    invBg.setAttribute('fill', 'black');
+    const invHole = document.createElementNS(ns, 'rect');
+    invHole.setAttribute('x', String(W / 2 - 100));
+    invHole.setAttribute('y', String(H / 2 - 50));
+    invHole.setAttribute('width', '200');
+    invHole.setAttribute('height', '100');
+    invHole.setAttribute('rx', '12');
+    invHole.setAttribute('ry', '12');
+    invHole.setAttribute('fill', 'white');
+    invertMask.appendChild(invBg);
+    invertMask.appendChild(invHole);
+    defs.appendChild(invertMask);
+    this.svgInvCutout = invHole;
+
+    // Subtle white boost inside focused area — makes it feel brighter
+    const brightRect = document.createElementNS(ns, 'rect');
+    brightRect.setAttribute('width', '100%');
+    brightRect.setAttribute('height', '100%');
+    brightRect.setAttribute('fill', '#fff');
+    brightRect.setAttribute('fill-opacity', '0.06');
+    brightRect.setAttribute('mask', 'url(#ab-focus-mask-inv)');
+    svg.appendChild(brightRect);
+
+    // Purple border — offset outward so stroke sits outside the cutout
     const sw = 2;
     const border = document.createElementNS(ns, 'rect');
     border.setAttribute('x', String(W / 2 - 100 - sw / 2));
@@ -322,6 +350,7 @@ export class CognitiveSimplifier {
     removeStyle(FOCUS_STYLE_ID);
     this.svgOverlay = null;
     this.svgCutout = null;
+    this.svgInvCutout = null;
     this.svgBorder = null;
     this.spotlightEl = null;
     this.focusBorderEl = null;
@@ -362,7 +391,7 @@ export class CognitiveSimplifier {
   private startLerpLoop(): void {
     const LERP = 0.1; // smoothing factor — lower = smoother/slower
     const tick = () => {
-      if (!this.focusActive || !this.svgCutout || !this.svgBorder) return;
+      if (!this.focusActive || !this.svgCutout || !this.svgBorder || !this.svgInvCutout) return;
       this.lerpRafId = requestAnimationFrame(tick);
 
       // Interpolate current towards target
@@ -377,11 +406,13 @@ export class CognitiveSimplifier {
       const h = this.currentRect.height;
       const sw = 2; // stroke width — border offset
 
-      // Mask cutout — exact content area
-      this.svgCutout.setAttribute('x', String(x));
-      this.svgCutout.setAttribute('y', String(y));
-      this.svgCutout.setAttribute('width', String(w));
-      this.svgCutout.setAttribute('height', String(h));
+      // Mask cutout + inverted mask cutout — exact content area
+      for (const rect of [this.svgCutout, this.svgInvCutout]) {
+        rect.setAttribute('x', String(x));
+        rect.setAttribute('y', String(y));
+        rect.setAttribute('width', String(w));
+        rect.setAttribute('height', String(h));
+      }
 
       // Border — expanded by half stroke-width so stroke sits outside cutout
       this.svgBorder.setAttribute('x', String(x - sw / 2));

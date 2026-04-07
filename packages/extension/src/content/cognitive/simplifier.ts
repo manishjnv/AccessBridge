@@ -391,7 +391,7 @@ export class CognitiveSimplifier {
   private startLerpLoop(): void {
     const LERP = 0.1; // smoothing factor — lower = smoother/slower
     const tick = () => {
-      if (!this.focusActive || !this.svgCutout || !this.svgBorder || !this.svgInvCutout) return;
+      if (!this.focusActive || !this.svgCutout || !this.svgBorder) return;
       this.lerpRafId = requestAnimationFrame(tick);
 
       // Interpolate current towards target
@@ -406,12 +406,18 @@ export class CognitiveSimplifier {
       const h = this.currentRect.height;
       const sw = 2; // stroke width — border offset
 
-      // Mask cutout + inverted mask cutout — exact content area
-      for (const rect of [this.svgCutout, this.svgInvCutout]) {
-        rect.setAttribute('x', String(x));
-        rect.setAttribute('y', String(y));
-        rect.setAttribute('width', String(w));
-        rect.setAttribute('height', String(h));
+      // Mask cutout — exact content area
+      this.svgCutout.setAttribute('x', String(x));
+      this.svgCutout.setAttribute('y', String(y));
+      this.svgCutout.setAttribute('width', String(w));
+      this.svgCutout.setAttribute('height', String(h));
+
+      // Inverted mask cutout — brightness boost area
+      if (this.svgInvCutout) {
+        this.svgInvCutout.setAttribute('x', String(x));
+        this.svgInvCutout.setAttribute('y', String(y));
+        this.svgInvCutout.setAttribute('width', String(w));
+        this.svgInvCutout.setAttribute('height', String(h));
       }
 
       // Border — expanded by half stroke-width so stroke sits outside cutout

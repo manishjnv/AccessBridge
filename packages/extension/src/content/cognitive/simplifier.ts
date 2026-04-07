@@ -255,21 +255,26 @@ export class CognitiveSimplifier {
     const dimRect = document.createElementNS(ns, 'rect');
     dimRect.setAttribute('width', '100%');
     dimRect.setAttribute('height', '100%');
-    dimRect.setAttribute('fill', 'rgba(0, 0, 0, 0.55)');
+    dimRect.setAttribute('fill', '#000');
+    dimRect.setAttribute('fill-opacity', '0.6');
     dimRect.setAttribute('mask', 'url(#ab-focus-mask)');
     svg.appendChild(dimRect);
 
-    // Purple border around the cutout — same position, just stroke
+    // Purple border — stroke-alignment: outside by offsetting rect 1.5px outward
+    // SVG stroke is centered on path, so we shrink the border rect by half stroke-width
+    // to make stroke sit exactly on the cutout edge (outside the clear area)
+    const sw = 2;
     const border = document.createElementNS(ns, 'rect');
-    border.setAttribute('x', String(W / 2 - 100));
-    border.setAttribute('y', String(H / 2 - 50));
-    border.setAttribute('width', '200');
-    border.setAttribute('height', '100');
+    border.setAttribute('x', String(W / 2 - 100 - sw / 2));
+    border.setAttribute('y', String(H / 2 - 50 - sw / 2));
+    border.setAttribute('width', String(200 + sw));
+    border.setAttribute('height', String(100 + sw));
     border.setAttribute('rx', '12');
     border.setAttribute('ry', '12');
     border.setAttribute('fill', 'none');
-    border.setAttribute('stroke', 'rgba(100, 60, 220, 0.9)');
-    border.setAttribute('stroke-width', '2.5');
+    border.setAttribute('stroke', '#6434db');
+    border.setAttribute('stroke-opacity', '0.85');
+    border.setAttribute('stroke-width', String(sw));
     svg.appendChild(border);
 
     document.body.appendChild(svg);
@@ -366,21 +371,23 @@ export class CognitiveSimplifier {
       this.currentRect.width += (this.targetRect.width - this.currentRect.width) * LERP;
       this.currentRect.height += (this.targetRect.height - this.currentRect.height) * LERP;
 
-      const x = String(this.currentRect.left);
-      const y = String(this.currentRect.top);
-      const w = String(this.currentRect.width);
-      const h = String(this.currentRect.height);
+      const x = this.currentRect.left;
+      const y = this.currentRect.top;
+      const w = this.currentRect.width;
+      const h = this.currentRect.height;
+      const sw = 2; // stroke width — border offset
 
-      // Update both the mask cutout and the visible border — identical position
-      this.svgCutout.setAttribute('x', x);
-      this.svgCutout.setAttribute('y', y);
-      this.svgCutout.setAttribute('width', w);
-      this.svgCutout.setAttribute('height', h);
+      // Mask cutout — exact content area
+      this.svgCutout.setAttribute('x', String(x));
+      this.svgCutout.setAttribute('y', String(y));
+      this.svgCutout.setAttribute('width', String(w));
+      this.svgCutout.setAttribute('height', String(h));
 
-      this.svgBorder.setAttribute('x', x);
-      this.svgBorder.setAttribute('y', y);
-      this.svgBorder.setAttribute('width', w);
-      this.svgBorder.setAttribute('height', h);
+      // Border — expanded by half stroke-width so stroke sits outside cutout
+      this.svgBorder.setAttribute('x', String(x - sw / 2));
+      this.svgBorder.setAttribute('y', String(y - sw / 2));
+      this.svgBorder.setAttribute('width', String(w + sw));
+      this.svgBorder.setAttribute('height', String(h + sw));
     };
     this.lerpRafId = requestAnimationFrame(tick);
   }

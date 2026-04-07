@@ -117,6 +117,21 @@ Track every bug fix: what broke, why, how it was fixed, and how to prevent recur
 
 ---
 
+## BUG-008: ALL features broken — content script var collision from IIFE chunk inlining
+
+| Field | Detail |
+|-------|--------|
+| **Date** | 2026-04-07 |
+| **Severity** | Critical |
+| **Symptom** | No features work at all — focus mode, sensory sliders, voice commands, everything broken. No console errors visible in popup, but page console shows SyntaxError |
+| **Root Cause** | Vite minifies shared chunks using short var names (R, I, etc). The custom `copyManifestPlugin` inlines all chunks into one IIFE. Two chunks both declared `var R = ...` — `SyntaxError: Identifier 'R' has already been declared` kills the entire content script on load |
+| **Fix** | Wrap each inlined chunk in its own IIFE that returns exports via a namespace object. Import bindings aliased from namespace. No variable leaks between chunks |
+| **Files Changed** | `packages/extension/vite.config.ts` |
+| **Commit** | `de27d15` |
+| **Prevention** | After ANY change to `vite.config.ts` or adding new shared imports in content script, ALWAYS run `node -c packages/extension/dist/src/content/index.js` to syntax-check the built output. Add this to the build verification checklist |
+
+---
+
 ## Checklist: Version Bump
 
 1. `packages/extension/manifest.json` — update `version` (SINGLE SOURCE OF TRUTH)

@@ -256,7 +256,7 @@ export class CognitiveSimplifier {
     dimRect.setAttribute('width', '100%');
     dimRect.setAttribute('height', '100%');
     dimRect.setAttribute('fill', '#000');
-    dimRect.setAttribute('fill-opacity', '0.6');
+    dimRect.setAttribute('fill-opacity', '0.45');
     dimRect.setAttribute('mask', 'url(#ab-focus-mask)');
     svg.appendChild(dimRect);
 

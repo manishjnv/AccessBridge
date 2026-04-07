@@ -115,8 +115,15 @@ export default function App() {
     chrome.storage.local.set({ accessbridge_enabled: newState });
 
     if (!newState) {
-      // Disable: revert all adaptations on all tabs
+      // Disable: revert all adaptations — send to background AND directly to all tabs
       chrome.runtime.sendMessage({ type: 'REVERT_ALL' }).catch(() => {});
+      chrome.tabs.query({}).then((tabs) => {
+        for (const tab of tabs) {
+          if (tab.id) {
+            chrome.tabs.sendMessage(tab.id, { type: 'REVERT_ALL' }).catch(() => {});
+          }
+        }
+      });
     }
     // When re-enabled, user manually turns on features they want
   }, [enabled]);

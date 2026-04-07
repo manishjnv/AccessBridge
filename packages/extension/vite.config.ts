@@ -61,14 +61,16 @@ function copyManifestPlugin() {
         contentCode = contentCode.replace(imp.full, '');
       }
 
-      // The chunk exports use specific var names. Let's handle the mapping properly.
-      // Re-read chunks and parse their export mappings
+      // Re-read chunks, wrap each in its own IIFE to prevent var collisions,
+      // and expose only the needed exports via a unique global namespace.
       let finalPreamble = '';
+      let chunkIdx = 0;
       for (const imp of imports) {
         const chunkPath = resolve(distDir, 'src/content', imp.path);
         if (!existsSync(chunkPath)) continue;
 
         let chunkCode = readFileSync(chunkPath, 'utf-8');
+        const nsName = `__ab_chunk${chunkIdx++}`;
 
         // Parse the export: export{R as S}
         const exportMatch = chunkCode.match(/export\{([^}]+)\}/);
@@ -85,20 +87,21 @@ function copyManifestPlugin() {
         // Strip export
         chunkCode = chunkCode.replace(/export\{[^}]+\};?\s*$/, '');
 
-        // Parse import bindings and create aliases
+        // Build return object with exported values
+        const exportEntries = Object.entries(exportMap);
+        const returnObj = exportEntries.map(([expName, localVar]) => `${expName}:${localVar}`).join(',');
+
+        // Wrap chunk in IIFE that returns exports via a namespace object
+        finalPreamble += `var ${nsName}=(function(){${chunkCode};return{${returnObj}}})();\n`;
+
+        // Create aliases: map import bindings to namespace properties
         const bindingParts = imp.bindings.split(',').map(b => b.trim());
-        let aliases = '';
         for (const binding of bindingParts) {
           const parts = binding.split(/\s+as\s+/);
-          const importedName = parts[0].trim(); // the export name
-          const localName = (parts[1] || importedName).trim(); // the local alias in content script
-          const chunkVar = exportMap[importedName] || importedName;
-          if (chunkVar !== localName) {
-            aliases += `var ${localName} = ${chunkVar};\n`;
-          }
+          const importedName = parts[0].trim();
+          const localName = (parts[1] || importedName).trim();
+          finalPreamble += `var ${localName}=${nsName}.${importedName};\n`;
         }
-
-        finalPreamble += chunkCode + '\n' + aliases;
       }
 
       // Remove import lines and prepend inlined code

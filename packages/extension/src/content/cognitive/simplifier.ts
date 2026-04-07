@@ -216,6 +216,7 @@ export class CognitiveSimplifier {
     const svg = document.createElementNS(ns, 'svg');
     svg.id = SPOTLIGHT_ID;
     svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    svg.setAttribute('preserveAspectRatio', 'none');
     Object.assign(svg.style, {
       position: 'fixed',
       top: '0',
@@ -233,8 +234,8 @@ export class CognitiveSimplifier {
 
     // White full-screen rect = everything is dimmed
     const maskBg = document.createElementNS(ns, 'rect');
-    maskBg.setAttribute('width', '100%');
-    maskBg.setAttribute('height', '100%');
+    maskBg.setAttribute('width', String(W));
+    maskBg.setAttribute('height', String(H));
     maskBg.setAttribute('fill', 'white');
 
     // Black rounded rect = cutout (this area is NOT dimmed)
@@ -254,8 +255,8 @@ export class CognitiveSimplifier {
 
     // Dim layer — covers everything except cutout
     const dimRect = document.createElementNS(ns, 'rect');
-    dimRect.setAttribute('width', '100%');
-    dimRect.setAttribute('height', '100%');
+    dimRect.setAttribute('width', String(W));
+    dimRect.setAttribute('height', String(H));
     dimRect.setAttribute('fill', '#000');
     dimRect.setAttribute('fill-opacity', '0.5');
     dimRect.setAttribute('mask', 'url(#ab-focus-mask)');
@@ -265,8 +266,8 @@ export class CognitiveSimplifier {
     const invertMask = document.createElementNS(ns, 'mask');
     invertMask.id = 'ab-focus-mask-inv';
     const invBg = document.createElementNS(ns, 'rect');
-    invBg.setAttribute('width', '100%');
-    invBg.setAttribute('height', '100%');
+    invBg.setAttribute('width', String(W));
+    invBg.setAttribute('height', String(H));
     invBg.setAttribute('fill', 'black');
     const invHole = document.createElementNS(ns, 'rect');
     invHole.setAttribute('x', String(W / 2 - 100));
@@ -283,8 +284,8 @@ export class CognitiveSimplifier {
 
     // Subtle white boost inside focused area — makes it feel brighter
     const brightRect = document.createElementNS(ns, 'rect');
-    brightRect.setAttribute('width', '100%');
-    brightRect.setAttribute('height', '100%');
+    brightRect.setAttribute('width', String(W));
+    brightRect.setAttribute('height', String(H));
     brightRect.setAttribute('fill', '#fff');
     brightRect.setAttribute('fill-opacity', '0.06');
     brightRect.setAttribute('mask', 'url(#ab-focus-mask-inv)');

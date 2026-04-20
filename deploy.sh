@@ -67,7 +67,7 @@ if [ "$SKIP_BUILD" = false ]; then
 fi
 
 if [ "$SHOULD_RUN_TESTS" = true ]; then
-  ( npx vitest run --reporter=dot ) > /tmp/accessbridge-test.log 2>&1 &
+  ( pnpm test ) > /tmp/accessbridge-test.log 2>&1 &
   PIDS+=($!); LABELS+=("test")
 else
   echo "  ✓ test — cached pass for ${CURRENT_HEAD:0:7}, skipping"

@@ -53,6 +53,7 @@ else
 fi
 
 VERSION=$(node -p "require('./packages/extension/manifest.json').version")
+DIST_DIR="packages/extension/dist"
 echo "=== AccessBridge Deploy v${VERSION} ==="
 
 # ─────────────────────────────────────────────────────────
@@ -60,9 +61,15 @@ echo "=== AccessBridge Deploy v${VERSION} ==="
 # ─────────────────────────────────────────────────────────
 # typecheck: ALWAYS runs — fast, catches a different class of bugs than vitest
 # test: smart skip — --skip-tests only honored if HEAD matches last-tested and tree clean
+# build: smart skip — if source+config inputs hash unchanged AND dist/ has a
+#        matching manifest.version, reuse the existing dist/. Full rebuild
+#        cost is ~15s; this cache hits on every re-deploy that didn't touch
+#        package source (docs-only, deploy-script-only, re-run after a
+#        transient failure). Save ~15s per hit.
 # Tier 3 #9 — parallelized; Tier 2 #5 — errors no longer swallowed
 
 LAST_TESTED_FILE="/tmp/accessbridge-last-tested.sha"
+LAST_BUILD_FILE="/tmp/accessbridge-last-build.sha256"
 CURRENT_HEAD=$(git rev-parse HEAD)
 DIRTY=$(git status --porcelain)
 LAST_TESTED=$(cat "$LAST_TESTED_FILE" 2>/dev/null || echo "")
@@ -78,6 +85,43 @@ if [ "$SKIP_TESTS" = true ]; then
   fi
 fi
 
+# Compute a stable hash of all inputs that can affect the build output.
+# If this equals the hash of the last successful build AND dist/ still
+# contains a manifest whose version matches the one we're deploying, the
+# build step is a no-op and we skip it.
+BUILD_INPUTS_HASH=$(
+  find \
+    packages/core/src \
+    packages/ai-engine/src \
+    packages/extension/src \
+    packages/extension/manifest.json \
+    packages/extension/vite.config.ts \
+    packages/extension/tsconfig.json \
+    packages/core/tsconfig.json \
+    packages/ai-engine/tsconfig.json \
+    tsconfig.base.json \
+    pnpm-lock.yaml \
+    -type f 2>/dev/null \
+  | sort \
+  | xargs sha256sum 2>/dev/null \
+  | sha256sum \
+  | cut -d' ' -f1
+)
+STORED_BUILD_HASH=$(cat "$LAST_BUILD_FILE" 2>/dev/null || echo "")
+
+SHOULD_RUN_BUILD=true
+if [ "$SKIP_BUILD" = true ]; then
+  SHOULD_RUN_BUILD=false
+elif [ -f "$DIST_DIR/src/content/index.js" ] \
+  && [ -f "$DIST_DIR/manifest.json" ] \
+  && [ -n "$BUILD_INPUTS_HASH" ] \
+  && [ "$BUILD_INPUTS_HASH" = "$STORED_BUILD_HASH" ]; then
+  DIST_VERSION=$(node -p "require('./$DIST_DIR/manifest.json').version" 2>/dev/null || echo "")
+  if [ "$DIST_VERSION" = "$VERSION" ]; then
+    SHOULD_RUN_BUILD=false
+  fi
+fi
+
 echo "[1/6] typecheck + build + test (parallel)..."
 PIDS=()
 LABELS=()
@@ -85,9 +129,15 @@ LABELS=()
 ( pnpm typecheck ) > /tmp/accessbridge-typecheck.log 2>&1 &
 PIDS+=($!); LABELS+=("typecheck")
 
-if [ "$SKIP_BUILD" = false ]; then
+if [ "$SHOULD_RUN_BUILD" = true ]; then
   ( pnpm build ) > /tmp/accessbridge-build.log 2>&1 &
   PIDS+=($!); LABELS+=("build")
+else
+  if [ "$SKIP_BUILD" = true ]; then
+    echo "  ✓ build — --skip-build, reusing dist/"
+  else
+    echo "  ✓ build — inputs unchanged vs last successful build, reusing dist/ (${BUILD_INPUTS_HASH:0:7})"
+  fi
 fi
 
 if [ "$SHOULD_RUN_TESTS" = true ]; then
@@ -114,6 +164,12 @@ if [ "$SHOULD_RUN_TESTS" = true ]; then
   echo "$CURRENT_HEAD" > "$LAST_TESTED_FILE"
 fi
 
+# Record successful build so the next invocation can skip it when inputs
+# are unchanged. Only write on an actual build run (not skip path).
+if [ "$SHOULD_RUN_BUILD" = true ] && [ -n "$BUILD_INPUTS_HASH" ]; then
+  echo "$BUILD_INPUTS_HASH" > "$LAST_BUILD_FILE"
+fi
+
 # ─────────────────────────────────────────────────────────
 # [1.5/6] Re-zip dist/ — guarantees zip manifest matches
 # the freshly-bumped version. Runs even on --skip-build so
@@ -122,7 +178,6 @@ fi
 # See RCA BUG-011.
 # ─────────────────────────────────────────────────────────
 echo "[1.5/6] Re-packaging extension zip from dist/ ..."
-DIST_DIR="packages/extension/dist"
 if [ ! -d "$DIST_DIR" ]; then
   echo "  ✗ $DIST_DIR not found. Run pnpm build first or drop --skip-build."
   exit 1
@@ -175,40 +230,43 @@ if [ ! -f accessbridge-extension.zip ]; then
   exit 1
 fi
 
-sync_via_scp() {
-  # Idempotent fallback: zip via scp, deploy/ via tar-over-ssh.
-  # In-place extract over $WWW_DIR — overwrites matching files but won't
-  # remove stale ones (no --delete semantic). Safe for landing-page content.
+upload_zip() {
+  # Try rsync, fall through to scp on runtime failure (Windows Git Bash).
+  if command -v rsync >/dev/null 2>&1 \
+    && rsync -az --no-progress accessbridge-extension.zip \
+         "$REMOTE:$REMOTE_DIR/docs/downloads/" 2>/dev/null; then
+    return 0
+  fi
   scp -q accessbridge-extension.zip "$REMOTE:$REMOTE_DIR/docs/downloads/"
-  echo "  ✓ Extension zip synced (${VERSION})."
-
-  ssh "$REMOTE" "mkdir -p '$WWW_DIR'"
-  tar -C deploy -czf - . | ssh "$REMOTE" "tar -xzf - -C '$WWW_DIR'"
-  echo "  ✓ Landing page synced (in-place, no delete)."
 }
 
-RSYNC_OK=false
-if command -v rsync >/dev/null 2>&1; then
-  # rsync IS installed but may fail at runtime on Windows Git Bash
-  # ("dup() in/out/err failed"). We try it, catch runtime failure, and
-  # fall through to the scp+tar path. See RCA BUG-011.
-  if rsync -az --no-progress accessbridge-extension.zip \
-       "$REMOTE:$REMOTE_DIR/docs/downloads/" 2>/dev/null \
-     && rsync -az --delete deploy/ "$REMOTE:$WWW_DIR/" 2>/dev/null; then
-    echo "  ✓ Extension zip synced (${VERSION})."
-    echo "  ✓ Landing page synced."
-    RSYNC_OK=true
-  else
-    echo "  ⚠ rsync failed at runtime — falling back to scp + tar-over-ssh."
+upload_landing() {
+  # In-place extract over $WWW_DIR. Scp fallback overwrites but won't
+  # --delete, which is safe — landing page rarely removes files.
+  if command -v rsync >/dev/null 2>&1 \
+    && rsync -az --delete deploy/ "$REMOTE:$WWW_DIR/" 2>/dev/null; then
+    return 0
   fi
+  ssh "$REMOTE" "mkdir -p '$WWW_DIR'"
+  tar -C deploy -czf - . | ssh "$REMOTE" "tar -xzf - -C '$WWW_DIR'"
+}
+
+# Zip upload — compare local vs remote SHA to skip a no-op transfer.
+# The SHA probe is one SSH handshake (~1s) but saves ~3-5s on re-deploys
+# where only docs/script/infra files changed and dist/ was rebuilt to the
+# same version (identical artifact).
+LOCAL_ZIP_SHA=$(sha256sum accessbridge-extension.zip | cut -d' ' -f1)
+REMOTE_ZIP_SHA=$(ssh "$REMOTE" "sha256sum '$REMOTE_DIR/docs/downloads/accessbridge-extension.zip' 2>/dev/null | cut -d' ' -f1" 2>/dev/null || echo "")
+
+if [ -n "$LOCAL_ZIP_SHA" ] && [ "$LOCAL_ZIP_SHA" = "$REMOTE_ZIP_SHA" ]; then
+  echo "  ✓ Zip unchanged (${LOCAL_ZIP_SHA:0:7}) — skipping upload."
+else
+  upload_zip
+  echo "  ✓ Extension zip synced (${VERSION}, ${LOCAL_ZIP_SHA:0:7})."
 fi
 
-if [ "$RSYNC_OK" = false ]; then
-  if ! command -v rsync >/dev/null 2>&1; then
-    echo "  ℹ rsync not found — using scp + tar-over-ssh."
-  fi
-  sync_via_scp
-fi
+upload_landing
+echo "  ✓ Landing page synced."
 
 # Ship CHANGELOG.md + API main.py + restart API — all in one SSH session
 # so we pay one handshake instead of three. On Windows Git Bash where
@@ -246,12 +304,20 @@ fi
 # Improvement: Tier 2 #6 — fetch+reset instead of pull (idempotent, no merge conflicts)
 # Improvement: Tier 1 #2 — conditional install (skip if lockfile unchanged)
 # Improvement: Tier 2 #4 — no more `|| npm install` silent fallback
-echo "[4/6] Syncing VPS git state + conditional install..."
+echo "[4/6] VPS git state + conditional install..."
 ssh "$REMOTE" bash -s <<REMOTE_SCRIPT
   set -euo pipefail
-  cd "$REMOTE_DIR"
 
-  echo "  Fetching origin..."
+  # $REMOTE_DIR has historically been an artifact-only directory (zip +
+  # docs + main.py), not a git working tree. Running git commands against
+  # it produces "fatal: not a git repository" and wastes the handshake.
+  # Guard against it: only sync+install if a .git dir exists.
+  if [ ! -d "$REMOTE_DIR/.git" ]; then
+    echo "  ✓ $REMOTE_DIR is artifact-only — no git sync needed."
+    exit 0
+  fi
+
+  cd "$REMOTE_DIR"
   git fetch origin "$BRANCH"
   git reset --hard "origin/$BRANCH"
 
@@ -281,18 +347,28 @@ REMOTE_SCRIPT
 #       i.e. the "stale zip on download page" scenario)
 if [ "$SKIP_CHECK" = false ]; then
   echo "[5/6] Health check against $HEALTH_URL ..."
-  sleep 2
-  if RESPONSE=$(curl -fsS --max-time 10 "$HEALTH_URL" 2>&1); then
-    if echo "$RESPONSE" | grep -q "$VERSION"; then
-      echo "  ✓ API reports v${VERSION}."
-    else
-      echo "  ⚠ Site responding but version mismatch. API returned:"
-      echo "    $RESPONSE"
-      echo "  Expected version: $VERSION"
-      exit 1
+
+  # Active probe: retry every 300ms until the API reports $VERSION or we
+  # give up after ~10s. Beats the old fixed `sleep 2` because the container
+  # is typically ready <1s after `docker restart`, and a fixed sleep wastes
+  # the difference. Also handles occasional slow restarts without flapping.
+  RESPONSE=""
+  for _ in $(seq 1 30); do
+    if RESPONSE=$(curl -fsS --max-time 2 "$HEALTH_URL" 2>/dev/null) \
+      && echo "$RESPONSE" | grep -q "$VERSION"; then
+      break
     fi
+    RESPONSE=""
+    sleep 0.3
+  done
+
+  if [ -n "$RESPONSE" ]; then
+    echo "  ✓ API reports v${VERSION}."
   else
-    echo "  ✗ Site not responding. Check nginx / API."
+    # Final diagnostic probe so we show what we actually got
+    LAST=$(curl -fsS --max-time 5 "$HEALTH_URL" 2>&1 || echo "(no response)")
+    echo "  ✗ API did not return v${VERSION} within 10s."
+    echo "    Last response: $LAST"
     exit 1
   fi
 

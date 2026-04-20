@@ -37,6 +37,7 @@ import { GestureController } from './motor/gestures.js';
 // --- Priority 1: Captions + Actions ---
 import { CaptionsController } from './sensory/captions.js';
 import { ActionItemsExtractor } from './cognitive/action-items.js';
+import { ActionItemsUI } from './cognitive/action-items-ui.js';
 // --- Priority 5: Time-Awareness ---
 import {
   TimeAwarenessController,
@@ -267,15 +268,46 @@ let gestureController: GestureController | null = null;
 // --- Priority 1: Captions + Actions ---
 let captionsController: CaptionsController | null = null;
 let actionItemsExtractor: ActionItemsExtractor | null = null;
+let actionItemsUI: ActionItemsUI | null = null;
 
 function getCaptionsController(): CaptionsController {
-  if (!captionsController) captionsController = new CaptionsController();
+  if (!captionsController) {
+    captionsController = new CaptionsController({
+      translate: (text, from, to) =>
+        chrome.runtime
+          .sendMessage({ type: 'AI_TRANSLATE', payload: { text, from, to } })
+          .then((r: unknown) => {
+            const res = r as { text?: string } | undefined;
+            return res?.text ?? text;
+          })
+          .catch(() => text),
+    });
+  }
   return captionsController;
+}
+
+function captionsOptionsFromSensory(s: {
+  captionsLanguage?: string;
+  captionsTranslateTo?: string | null;
+  captionsFontSize?: number;
+  captionsPosition?: 'top' | 'bottom';
+}) {
+  return {
+    ...(s.captionsLanguage !== undefined ? { language: s.captionsLanguage } : {}),
+    ...(s.captionsTranslateTo !== undefined ? { targetLanguage: s.captionsTranslateTo } : {}),
+    ...(s.captionsFontSize !== undefined ? { fontSize: s.captionsFontSize } : {}),
+    ...(s.captionsPosition !== undefined ? { position: s.captionsPosition } : {}),
+  };
 }
 
 function getActionItemsExtractor(): ActionItemsExtractor {
   if (!actionItemsExtractor) actionItemsExtractor = new ActionItemsExtractor();
   return actionItemsExtractor;
+}
+
+function getActionItemsUI(): ActionItemsUI {
+  if (!actionItemsUI) actionItemsUI = new ActionItemsUI(getActionItemsExtractor());
+  return actionItemsUI;
 }
 
 // --- Priority 5: Time-Awareness ---
@@ -625,6 +657,7 @@ function listenForCommands(adapter: BaseAdapter, sensory: SensoryAdapter): void 
           // --- Priority 1: Captions + Actions ---
           captionsController?.stop();
           actionItemsExtractor?.stop();
+          actionItemsUI?.unmount();
           // --- Priority 5: Time-Awareness ---
           timeAwarenessController?.stop();
           sendResponse({ reverted: true });
@@ -766,18 +799,56 @@ function listenForCommands(adapter: BaseAdapter, sensory: SensoryAdapter): void 
             if (s.lineHeight === 1.5) { document.documentElement.style.removeProperty('--a11y-line-height'); document.body.classList.remove('a11y-line-height'); }
             if (s.letterSpacing === 0) { document.documentElement.style.removeProperty('--a11y-letter-spacing'); document.body.classList.remove('a11y-letter-spacing'); }
             // --- Priority 1: Captions + Actions ---
-            if (typeof (s as { liveCaptionsEnabled?: boolean }).liveCaptionsEnabled === 'boolean') {
-              const captionsEnabled = (s as { liveCaptionsEnabled?: boolean }).liveCaptionsEnabled;
-              if (captionsEnabled) getCaptionsController().start();
+            const sCap = s as {
+              liveCaptionsEnabled?: boolean;
+              captionsLanguage?: string;
+              captionsTranslateTo?: string | null;
+              captionsFontSize?: number;
+              captionsPosition?: 'top' | 'bottom';
+            };
+            const capPatch = captionsOptionsFromSensory(sCap);
+            if (Object.keys(capPatch).length > 0) {
+              getCaptionsController().configure(capPatch);
+            }
+            if (typeof sCap.liveCaptionsEnabled === 'boolean') {
+              if (sCap.liveCaptionsEnabled) getCaptionsController().start();
               else captionsController?.stop();
             }
           }
           // --- Priority 1: Captions + Actions ---
           {
-            const p = updatedProfile as { cognitive?: { actionItemsEnabled?: boolean } };
-            if (typeof p.cognitive?.actionItemsEnabled === 'boolean') {
-              if (p.cognitive.actionItemsEnabled) getActionItemsExtractor().watch();
-              else actionItemsExtractor?.stop();
+            const p = updatedProfile as {
+              cognitive?: {
+                actionItemsEnabled?: boolean;
+                actionItemsAutoScan?: boolean;
+                actionItemsMinConfidence?: number;
+              };
+            };
+            const c = p.cognitive;
+            if (c) {
+              const confPatch: { minConfidence?: number } = {};
+              if (typeof c.actionItemsMinConfidence === 'number') {
+                confPatch.minConfidence = c.actionItemsMinConfidence;
+              }
+              if (Object.keys(confPatch).length > 0) {
+                getActionItemsExtractor().configure(confPatch);
+              }
+              if (typeof c.actionItemsEnabled === 'boolean') {
+                if (c.actionItemsEnabled) {
+                  if (c.actionItemsAutoScan !== false) {
+                    getActionItemsExtractor().watch(confPatch);
+                  } else {
+                    getActionItemsExtractor().scan(confPatch);
+                  }
+                  getActionItemsUI().mount();
+                } else {
+                  actionItemsExtractor?.stop();
+                  actionItemsUI?.unmount();
+                }
+              } else if (typeof c.actionItemsMinConfidence === 'number') {
+                // min-confidence changed while UI mounted — refresh
+                actionItemsUI?.refresh();
+              }
             }
           }
           // --- Priority 5: Time-Awareness ---
@@ -998,17 +1069,35 @@ function init(): void {
         gestureShowHints?: boolean;
         gestureMouseModeRequiresShift?: boolean;
       };
-      sensory?: { liveCaptionsEnabled?: boolean };
+      sensory?: {
+        liveCaptionsEnabled?: boolean;
+        captionsLanguage?: string;
+        captionsTranslateTo?: string | null;
+        captionsFontSize?: number;
+        captionsPosition?: 'top' | 'bottom';
+      };
       cognitive?: {
         actionItemsEnabled?: boolean;
+        actionItemsAutoScan?: boolean;
+        actionItemsMinConfidence?: number;
         // --- Priority 5: Time-Awareness ---
         timeAwarenessEnabled?: boolean;
       };
     };
     // --- Priority 1: Captions + Actions ---
     if (p.cognitive?.actionItemsEnabled !== false) {
-      // Default on: start watching unless explicitly disabled
-      getActionItemsExtractor().watch();
+      const minConfidence = p.cognitive?.actionItemsMinConfidence;
+      const opts = typeof minConfidence === 'number' ? { minConfidence } : {};
+      if (p.cognitive?.actionItemsAutoScan !== false) {
+        getActionItemsExtractor().watch(opts);
+      } else {
+        getActionItemsExtractor().scan(opts);
+      }
+      getActionItemsUI().mount();
+    }
+    if (p.sensory) {
+      const capPatch = captionsOptionsFromSensory(p.sensory);
+      if (Object.keys(capPatch).length > 0) getCaptionsController().configure(capPatch);
     }
     if (p.sensory?.liveCaptionsEnabled === true) {
       getCaptionsController().start();

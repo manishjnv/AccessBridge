@@ -1,6 +1,84 @@
 # AccessBridge - Shift Handoff
 
-## Last Session: Day 8 — Extension 100% Maturity Push (Session 6, 2026-04-20)
+## Last Session: Day 9 — Priority 1 Captions + Action Items Depth (Session 7, 2026-04-21)
+
+### Headline
+
+Additive depth pass on Module A (Live Captions) + Module B (Action Items Extractor). Both features existed at MVP scope after Session 6; Session 7 adds the spec-level options, AI tier integration, on-page UI, and accessibility polish without renaming classes or breaking the 17 existing tests. **Four new capabilities landed in one session:** 12-language caption recognition + optional live translation + draggable overlay; context-aware action-item extraction (email / meeting / doc / generic) with assignee + confidence scoring; on-page floating action panel with CSV export + Google Tasks link; and an AI-engine `ActionItemsService` + `AI_TRANSLATE` message wired through the background service worker.
+
+### Completed
+
+#### Task A — Profile + CaptionsController options (Opus)
+
+- [core/src/types/profile.ts](packages/core/src/types/profile.ts) — new sensory fields: `captionsLanguage: string` (BCP-47, empty = auto), `captionsTranslateTo: string | null`, `captionsFontSize: number` (default 18), `captionsPosition: 'top' | 'bottom'`. New cognitive fields: `actionItemsAutoScan: boolean` (default true), `actionItemsMinConfidence: number` (default 0.5). Defaults added to both default profiles.
+- [content/sensory/captions.ts](packages/extension/src/content/sensory/captions.ts) — new `CaptionsOptions` interface, constructor accepts `Partial<CaptionsOptions>`, new `configure(patch)` for live updates, `resolveLanguage()` / `applyOverlayStyle()` helpers. Constructor-less call sites still work (no-arg default retained).
+
+#### Task B — Translation pass (Opus)
+
+- Captions controller renders interim + final lines; when `targetLanguage` differs from the source, each final line is routed through an injected `translate(text, from, to)` callback and the finalLines array is patched in place so the displayed caption seamlessly replaces the original when the translation resolves. Fire-and-forget — if the translator rejects, the original line is preserved.
+- [background/index.ts](packages/extension/src/background/index.ts) — new `AI_TRANSLATE` message case: routes through `getAIEngine().process({ type: 'translate', ... })`, returns `{text, latencyMs}` on success or `{text}` unchanged on error. Content script's `getCaptionsController()` injects this callback via `chrome.runtime.sendMessage`.
+- [ai-engine/src/types.ts](packages/ai-engine/src/types.ts) — `'action-items'` added to the `AIRequestType` union (replaces the `as AIRequestType` cast Codex F had to use).
+
+#### Task C — Captions overlay UX (Opus)
+
+- Caption overlay gains pointer-based drag (captures pointerId, releases on pointerup/pointercancel, transforms replaced by absolute top/left on first drag), a dedicated `.ab-captions-text` inner span so re-renders don't wipe chrome, and an accessible `× Close captions` button.
+- [content/styles.css](packages/extension/src/content/styles.css) — overlay restyled to canonical tokens: `rgba(10,10,26,0.85)` bg, `rgba(123,104,238,0.3)` border, `#e2e8f0` text, `backdrop-filter: blur(12px)`, coral `#e94560` focus ring reserved strictly for `:focus-visible`. Respects `prefers-reduced-motion`.
+
+#### Task D — ActionItemsExtractor depth (Opus)
+
+- [content/cognitive/action-items.ts](packages/extension/src/content/cognitive/action-items.ts) — new `ActionContext` type + `detectContext(href?)` hostname matcher (Gmail/Outlook/Yahoo/Proton → email; Docs/Office/OneDrive/Notion/Confluence/Coda → doc; Teams/Zoom/Meet/Slack/Discord → meeting; else generic). New `extractAssignee(text)` — `@mention` or `Name to <verb>` pattern. New `computeConfidence({hasMarker, hasImperative, hasDeadline, hasUrgency, hasAssignee})` weighted score. New `splitIntoCandidates()` sentence splitter. ActionItem interface gains optional `assignee`, `confidence`, `context`. Public `extract(text, context = 'generic')` — standalone text extractor that shares the `buildItem()` helper with the DOM-walking `scan()`. `scan()` and `watch()` now accept `ScanOptions = { minConfidence?, context? }`, new `configure(patch)` for live tuning.
+
+#### Task E — On-page FAB + drawer panel (Codex)
+
+- [content/cognitive/action-items-ui.ts](packages/extension/src/content/cognitive/action-items-ui.ts) — 393-line standalone DOM module. `ActionItemsUI` class: `mount()`, `unmount()`, `refresh()`. Bottom-right `.ab-action-fab` (48 px, primary gradient, briefcase SVG, amber count badge), slides-in `.ab-action-panel` (380 px, dialog role, non-modal) with toolbar (Copy all / Export CSV / Send to Google), per-row priority dot + assignee chip + due-date pill + confidence %, Done-button dismissal with `chrome.storage.local.actionItemsDismissed` persistence. Polls the extractor every 4 s only while panel is open. CSV export uses proper RFC 4180 escaping.
+
+#### Task F — AI service + EXTRACT_ACTION_ITEMS (Codex)
+
+- [ai-engine/src/services/action-items.ts](packages/ai-engine/src/services/action-items.ts) — 120-line `ActionItemsService`. Defensive JSON parsing (tries `JSON.parse`, falls back to first-`[` / last-`]` fragment, returns `[]` on both failures), sanitization per field (task non-empty, priority coerced to `'low'` fallback, confidence clamped [0,1], deadline ISO-normalized where parseable else kept raw), top-level try/catch so unknown-type provider failures return `[]` gracefully. Exported via `packages/ai-engine/src/services/index.ts`.
+- [background/index.ts](packages/extension/src/background/index.ts) — `'EXTRACT_ACTION_ITEMS'` message type + case handler + `getActionItemsService()` lazy singleton next to `getSummarizer`/`getSimplifier`.
+
+#### Task G — Popup controls (Opus)
+
+- [popup/App.tsx](packages/extension/src/popup/App.tsx) — Sensory tab: when Live Captions toggle is on, reveals Captions Language dropdown (13 options incl. 6 Indian languages), Translate To dropdown (11 options), Caption Font Size slider (12–32 px), Caption Position dropdown. Cognitive tab: when Action Items toggle is on, reveals Auto-scan toggle + Min Confidence slider (0.1–0.9, step 0.1). Uses existing `Slider` + `select` patterns.
+
+#### Task H — Side-panel Action Items tab
+
+- Already existed from Session 6 ([sidepanel/actions/ActionsPanel.tsx](packages/extension/src/sidepanel/actions/ActionsPanel.tsx)). No changes needed — the new optional ActionItem fields (`assignee`, `confidence`, `context`) are tolerated by the existing renderer without breaking.
+
+#### Task I — CSS (Opus)
+
+- [content/styles.css](packages/extension/src/content/styles.css) — captions overlay restyled (see Task C). New Priority-1b block with 20 rules for the action-items UI: FAB + badge + panel + header + toolbar + buttons + list + row + priority dot + due/assignee/confidence chips + Done button + empty state. All values from UI_GUIDELINES canonical tokens — no off-palette hex, coral reserved for `:focus-visible` only. `prefers-reduced-motion` honored on both FAB and panel transitions.
+
+#### Task J — New tests (Opus, after Codex J stalled)
+
+- Codex J fired but produced 0 bytes after 5+ min and was stopped. Opus wrote all three test files directly — faster than re-dispatching, and the contract was already in hot cache.
+- [content/cognitive/__tests__/action-items-extend.test.ts](packages/extension/src/content/cognitive/__tests__/action-items-extend.test.ts) — **20 tests**: `detectContext()` across 9 hostname classes including no-arg fallback; `extract()` standalone extractor for imperatives, multi-sentence, context propagation, `@mention` assignee, Name-to-Verb assignee, confidence sorting, empty-input, dedup, `[0,1]` confidence range; `configure({ minConfidence })` filter semantics.
+- [ai-engine/src/services/__tests__/action-items.test.ts](packages/ai-engine/src/services/__tests__/action-items.test.ts) — **13 tests**: valid JSON parse, bracket-fragment recovery from malformed envelope, total-garbage → `[]`, priority coercion, confidence clamp (negative/over/NaN defaults), ISO deadline pass-through, non-ISO date parse, unparseable deadline kept raw, empty-task filter, context metadata, engine-throw → `[]`.
+- [content/sensory/__tests__/captions-options.test.ts](packages/extension/src/content/sensory/__tests__/captions-options.test.ts) — **12 tests**: default fallback to `en-US`, `language` constructor prop flows to `SpeechRecognition.lang`, `documentElement.lang` preferred over default, `fontSize` + `position` applied to overlay style, `configure()` updates all three options live, `translate()` callback invoked on final with correct args, skipped when `targetLanguage` is null or equal to source, original kept when translator rejects.
+
+**Totals: +45 new tests. Grand total 589 tests (extension 140 + core 382 + ai-engine 67), up from 544 pre-session baseline.**
+
+### Wiring
+
+- [content/index.ts](packages/extension/src/content/index.ts) — `getCaptionsController()` now injects an `AI_TRANSLATE`-backed translator. `getActionItemsUI()` singleton. `captionsOptionsFromSensory()` helper maps profile → CaptionsOptions. Both initial boot and `PROFILE_UPDATED` reconfigure captions + extractor options live, and mount/unmount the action-items UI alongside the extractor lifecycle. `REVERT_ALL` also unmounts the UI.
+
+### Verification
+
+- **pnpm typecheck** — green across all 3 packages after Codex edits + cleanup.
+- **pnpm -r test** (pre-J) — 544 tests green: ai-engine 54 + core 382 + extension 108 (identical to post-Session-6 baseline; no regressions from the additive changes).
+- **pnpm build** — ran in parallel with docs (outcome logged in session tail).
+- **Stale data scan** — no hardcoded versions introduced; new CSS uses canonical tokens only; no "& Team" or stale hex in new code.
+
+### Agent utilization
+
+- Opus: Tasks A, B, C, D, G, I + Phase-3 diff review of Codex E & F + final wiring + HANDOFF + FEATURES.
+- Sonnet: n/a — Codex handled the parallel implementation work this session.
+- Haiku: n/a — no multi-file grep sweeps or bulk reads required.
+- codex:rescue: n/a — no security-adjacent changes (no new host_permissions, no new cross-origin fetches; `AI_TRANSLATE` routes through existing AIEngine process, no new network surface).
+
+---
+
+## Previous Session: Day 8 — Extension 100% Maturity Push (Session 6, 2026-04-20)
 
 ### Headline
 

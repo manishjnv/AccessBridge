@@ -21,6 +21,7 @@ export type AIRequestType =
   | 'simplify'
   | 'classify'
   | 'translate'
+  | 'action-items'
   | 'tts'
   | 'stt'
   | 'vision';

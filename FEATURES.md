@@ -17,7 +17,7 @@ Visual / perceptual adaptations. All live in [packages/extension/src/content/sen
 | S-03 | Color-blindness correction | P | Shipped | SVG filters for protanopia / deuteranopia / tritanopia |
 | S-04 | Line-height + letter-spacing | P | Shipped | Typography sliders |
 | S-05 | Reduced motion | P | Shipped | Disables animations + transitions site-wide |
-| S-06 | Live Captions (Web Speech API overlay on &lt;video&gt;) | P | Shipped | [content/sensory/captions.ts](packages/extension/src/content/sensory/captions.ts) |
+| S-06 | Live Captions + Translation (Web Speech API overlay on &lt;video&gt;, 12 languages, optional live translation, draggable overlay, font-size + position controls) | P | Shipped | [content/sensory/captions.ts](packages/extension/src/content/sensory/captions.ts) |
 
 Tests: indirect via `packages/core/src/__tests__/decision-engine.test.ts`.
 
@@ -36,7 +36,7 @@ Focus, simplification, and distraction control.
 | C-05 | Auto-Summarize (AI) | [content/ai/bridge.ts](packages/extension/src/content/ai/bridge.ts) | P, V | Shipped |
 | C-06 | Text Simplification (off / mild / strong) | [content/ai/bridge.ts](packages/extension/src/content/ai/bridge.ts) | P, V | Shipped |
 | C-07 | Fatigue-Adaptive UI (4-level progressive) | [content/fatigue/adaptive-ui.ts](packages/extension/src/content/fatigue/adaptive-ui.ts) | A | Shipped |
-| C-08 | Action Items Extractor (TODOs from emails/docs) | [content/cognitive/action-items.ts](packages/extension/src/content/cognitive/action-items.ts) | SP | Shipped |
+| C-08 | Action Items Extractor (TODOs from emails/docs, context detection, assignee + confidence, on-page FAB + drawer panel, CSV export, Google Tasks link) | [content/cognitive/action-items.ts](packages/extension/src/content/cognitive/action-items.ts) + [content/cognitive/action-items-ui.ts](packages/extension/src/content/cognitive/action-items-ui.ts) | P, SP, on-page | Shipped |
 
 AI-backed features (C-05, C-06) route through the AI engine — see Architecture §5.
 
@@ -93,6 +93,7 @@ Three-tier orchestrator. Local tier is default and free; higher tiers unlocked b
 | Claude provider | [packages/ai-engine/src/providers/claude.ts](packages/ai-engine/src/providers/claude.ts) | Premium remote (Claude Sonnet) |
 | Summarizer service | `packages/ai-engine/src/services/summarizer.ts` | `summarizeDocument`, `summarizeEmail`, `summarizeMeeting` |
 | Simplifier service | `packages/ai-engine/src/services/simplifier.ts` | `simplifyText(level)`, `getReadabilityScore()` (Flesch-Kincaid) |
+| ActionItems service | `packages/ai-engine/src/services/action-items.ts` | `extractActionItems(text, context)` — LLM second-pass that complements the DOM-regex extractor; returns `{task, assignee, deadline, priority, confidence}[]` with defensive JSON parsing and deadline normalization |
 
 Fallback chain: **premium → low-cost → local**. Configured in `engine.ts` `TIER_ORDER`.
 

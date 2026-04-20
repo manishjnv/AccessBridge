@@ -10,6 +10,14 @@ export interface SensoryProfile {
   // --- Priority 1: Captions + Actions ---
   /** When true, overlay Web Speech API live captions on visible <video> elements. Opt-in. */
   liveCaptionsEnabled: boolean;
+  /** BCP-47 language tag for caption recognition (e.g. 'en-US', 'hi-IN'). Empty = auto-detect. */
+  captionsLanguage: string;
+  /** Optional BCP-47 target language for live translation; null disables translation. */
+  captionsTranslateTo: string | null;
+  /** Overlay font size in px (12-32). */
+  captionsFontSize: number;
+  /** Overlay vertical position. */
+  captionsPosition: 'top' | 'bottom';
 }
 
 export interface CognitiveProfile {
@@ -22,6 +30,10 @@ export interface CognitiveProfile {
   // --- Priority 1: Captions + Actions ---
   /** When true, passively scan page text for action items (TODOs, deadlines, imperative sentences). On by default. */
   actionItemsEnabled: boolean;
+  /** When true, re-scan as the DOM changes via MutationObserver. Off means on-demand only. */
+  actionItemsAutoScan: boolean;
+  /** Minimum confidence (0-1) for surfacing an extracted item. Lower = noisier. */
+  actionItemsMinConfidence: number;
   // --- Priority 5: Time-Awareness + Distraction Shield deepening ---
   /** When true, detect hyperfocus (45+ min continuous activity) and show a gentle break reminder. On by default. */
   timeAwarenessEnabled: boolean;
@@ -92,6 +104,10 @@ export const DEFAULT_SENSORY_PROFILE: SensoryProfile = {
   highContrast: false,
   // --- Priority 1: Captions + Actions ---
   liveCaptionsEnabled: false,
+  captionsLanguage: '',
+  captionsTranslateTo: null,
+  captionsFontSize: 18,
+  captionsPosition: 'bottom',
 };
 
 export const DEFAULT_COGNITIVE_PROFILE: CognitiveProfile = {
@@ -103,6 +119,8 @@ export const DEFAULT_COGNITIVE_PROFILE: CognitiveProfile = {
   distractionShield: false,
   // --- Priority 1: Captions + Actions ---
   actionItemsEnabled: true,
+  actionItemsAutoScan: true,
+  actionItemsMinConfidence: 0.5,
   // --- Priority 5: Time-Awareness + flow-aware notifications ---
   timeAwarenessEnabled: true,
   flowAwareNotifications: false,

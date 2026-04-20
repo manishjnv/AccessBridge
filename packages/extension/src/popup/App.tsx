@@ -425,6 +425,75 @@ function SensoryTab({
         value={sensory.liveCaptionsEnabled}
         onChange={(v) => onChange({ liveCaptionsEnabled: v })}
       />
+      {sensory.liveCaptionsEnabled && (
+        <>
+          <div className="space-y-1">
+            <label className="text-xs text-a11y-muted">Captions Language</label>
+            <select
+              className="w-full bg-a11y-surface text-a11y-text border border-a11y-primary/30 rounded px-2 py-1.5 text-sm"
+              value={sensory.captionsLanguage}
+              onChange={(e) => onChange({ captionsLanguage: e.target.value })}
+            >
+              <option value="">Auto-detect</option>
+              <option value="en-US">English (US)</option>
+              <option value="en-GB">English (UK)</option>
+              <option value="hi-IN">Hindi</option>
+              <option value="ta-IN">Tamil</option>
+              <option value="te-IN">Telugu</option>
+              <option value="bn-IN">Bengali</option>
+              <option value="mr-IN">Marathi</option>
+              <option value="es-ES">Spanish</option>
+              <option value="fr-FR">French</option>
+              <option value="de-DE">German</option>
+              <option value="ja-JP">Japanese</option>
+              <option value="zh-CN">Chinese</option>
+              <option value="ar-SA">Arabic</option>
+            </select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs text-a11y-muted">Translate To</label>
+            <select
+              className="w-full bg-a11y-surface text-a11y-text border border-a11y-primary/30 rounded px-2 py-1.5 text-sm"
+              value={sensory.captionsTranslateTo ?? ''}
+              onChange={(e) => onChange({ captionsTranslateTo: e.target.value || null })}
+            >
+              <option value="">None</option>
+              <option value="en-US">English</option>
+              <option value="hi-IN">Hindi</option>
+              <option value="ta-IN">Tamil</option>
+              <option value="te-IN">Telugu</option>
+              <option value="bn-IN">Bengali</option>
+              <option value="es-ES">Spanish</option>
+              <option value="fr-FR">French</option>
+              <option value="de-DE">German</option>
+              <option value="ja-JP">Japanese</option>
+              <option value="zh-CN">Chinese</option>
+            </select>
+          </div>
+          <Slider
+            label="Caption Font Size"
+            value={sensory.captionsFontSize}
+            min={12}
+            max={32}
+            step={1}
+            onChange={(v) => onChange({ captionsFontSize: v })}
+            unit="px"
+          />
+          <div className="space-y-1">
+            <label className="text-xs text-a11y-muted">Caption Position</label>
+            <select
+              className="w-full bg-a11y-surface text-a11y-text border border-a11y-primary/30 rounded px-2 py-1.5 text-sm"
+              value={sensory.captionsPosition}
+              onChange={(e) =>
+                onChange({ captionsPosition: e.target.value as 'top' | 'bottom' })
+              }
+            >
+              <option value="bottom">Bottom</option>
+              <option value="top">Top</option>
+            </select>
+          </div>
+        </>
+      )}
     </>
   );
 }
@@ -534,6 +603,23 @@ function CognitiveTab({
         value={cognitive.actionItemsEnabled}
         onChange={(v) => onChange({ actionItemsEnabled: v })}
       />
+      {cognitive.actionItemsEnabled && (
+        <>
+          <Toggle
+            label="Auto-scan on change"
+            value={cognitive.actionItemsAutoScan}
+            onChange={(v) => onChange({ actionItemsAutoScan: v })}
+          />
+          <Slider
+            label="Min Confidence"
+            value={cognitive.actionItemsMinConfidence}
+            min={0.1}
+            max={0.9}
+            step={0.1}
+            onChange={(v) => onChange({ actionItemsMinConfidence: v })}
+          />
+        </>
+      )}
     </>
   );
 }

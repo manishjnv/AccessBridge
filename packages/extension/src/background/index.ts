@@ -19,6 +19,7 @@ import type {
 
 // AI Engine — lazy-initialized to keep startup fast
 import { AIEngine, SummarizerService, SimplifierService } from '@accessbridge/ai-engine';
+import { ActionItemsService } from '@accessbridge/ai-engine/services/index.js';
 
 // Compliance Observatory — anonymous, DP-noised daily metrics (Feature #10)
 import {
@@ -33,6 +34,7 @@ installDailyAlarm(observatoryCollector, () => currentProfile?.shareAnonymousMetr
 let aiEngine: AIEngine | null = null;
 let summarizer: SummarizerService | null = null;
 let simplifier: SimplifierService | null = null;
+let actionItemsService: ActionItemsService | undefined;
 
 function getAIEngine(): AIEngine {
   if (!aiEngine) {
@@ -53,6 +55,13 @@ function getSimplifier(): SimplifierService {
     simplifier = new SimplifierService(getAIEngine());
   }
   return simplifier;
+}
+
+function getActionItemsService(): ActionItemsService {
+  if (!actionItemsService) {
+    actionItemsService = new ActionItemsService(getAIEngine());
+  }
+  return actionItemsService;
 }
 
 // ---------- State ----------
@@ -183,6 +192,7 @@ type MessageType =
   | 'SUMMARIZE_EMAIL'
   | 'SIMPLIFY_TEXT'
   | 'AI_READABILITY'
+  | 'AI_TRANSLATE'
   | 'AI_SET_KEY'
   | 'AI_GET_STATS'
   | 'CHECK_UPDATE'
@@ -190,6 +200,7 @@ type MessageType =
   | 'AUDIT_SCAN_REQUEST'
   | 'HIGHLIGHT_ELEMENT'
   // --- Priority 1: Captions + Actions ---
+  | 'EXTRACT_ACTION_ITEMS'
   | 'ACTION_ITEMS_UPDATE';
 
 interface Message {
@@ -340,6 +351,24 @@ async function handleMessage(message: Message): Promise<unknown> {
       return { score, grade };
     }
 
+    case 'AI_TRANSLATE': {
+      const { text, from, to } = message.payload as { text: string; from: string; to: string };
+      if (!text || !to || from === to) return { text };
+      try {
+        const start = performance.now();
+        const resp = await getAIEngine().process({
+          id: `translate-${Date.now().toString(36)}`,
+          type: 'translate',
+          input: text,
+          metadata: { from, to },
+        });
+        const latencyMs = Math.round(performance.now() - start);
+        return { text: resp.output || text, latencyMs };
+      } catch {
+        return { text };
+      }
+    }
+
     case 'AI_SET_KEY': {
       const { provider, apiKey } = message.payload as { provider: 'gemini' | 'claude'; apiKey: string };
       getAIEngine().setApiKey(provider, apiKey);
@@ -407,6 +436,18 @@ async function handleMessage(message: Message): Promise<unknown> {
     }
 
     // --- Priority 1: Captions + Actions ---
+    case 'EXTRACT_ACTION_ITEMS': {
+      const { text, context } = message.payload as { text: string; context?: 'email' | 'meeting' | 'doc' | 'generic' };
+      const start = performance.now();
+      try {
+        const items = await getActionItemsService().extractActionItems(text, context ?? 'generic');
+        const latencyMs = Math.round(performance.now() - start);
+        return { items, latencyMs };
+      } catch (err) {
+        return { items: [], error: String(err) };
+      }
+    }
+
     case 'ACTION_ITEMS_UPDATE': {
       const { items: newItems } = message.payload as { items: Array<{ id: string; [key: string]: unknown }> };
       const stored = await chrome.storage.local.get('actionItemsHistory');

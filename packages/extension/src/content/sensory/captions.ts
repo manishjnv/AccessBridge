@@ -76,6 +76,28 @@ function isVideoVisible(video: HTMLVideoElement): boolean {
   return true;
 }
 
+// ── Options ───────────────────────────────────────────────────────────────────
+
+export interface CaptionsOptions {
+  /** BCP-47 tag passed to SpeechRecognition.lang. Empty falls back to documentElement.lang then 'en-US'. */
+  language: string;
+  /** When non-null and ≠ language, live-translate finals through the AI engine before rendering. */
+  targetLanguage: string | null;
+  /** Overlay vertical position. */
+  position: 'top' | 'bottom';
+  /** Overlay font size in px (12-32 sensible range, not clamped here). */
+  fontSize: number;
+  /** Optional translator (text, from, to) → Promise<text>. Injected by content/index.ts via AI bridge. */
+  translate?: (text: string, from: string, to: string) => Promise<string>;
+}
+
+const DEFAULT_OPTIONS: CaptionsOptions = {
+  language: '',
+  targetLanguage: null,
+  position: 'bottom',
+  fontSize: 18,
+};
+
 // ── Controller ────────────────────────────────────────────────────────────────
 
 export class CaptionsController {
@@ -84,11 +106,44 @@ export class CaptionsController {
   private observer: MutationObserver | null = null;
   private active = false;
   private finalLines: string[] = [];
+  private options: CaptionsOptions;
 
   // Bound listener refs for cleanup
   private boundOnResult: ((e: Event) => void) | null = null;
   private boundOnEnd: (() => void) | null = null;
   private boundOnError: ((e: Event) => void) | null = null;
+
+  constructor(options: Partial<CaptionsOptions> = {}) {
+    this.options = { ...DEFAULT_OPTIONS, ...options };
+  }
+
+  /** Update options live. Applies font/position to the current overlay and language to the running recognizer. */
+  configure(patch: Partial<CaptionsOptions>): void {
+    this.options = { ...this.options, ...patch };
+    if (this.overlay) this.applyOverlayStyle();
+    if (this.recognition && patch.language !== undefined) {
+      this.recognition.lang = this.resolveLanguage();
+      // SpeechRecognition won't re-read lang mid-session — bounce to apply
+      try { this.recognition.stop(); } catch { /* ignore */ }
+      // onend handler restarts when this.active
+    }
+  }
+
+  private resolveLanguage(): string {
+    return this.options.language || document.documentElement.lang || 'en-US';
+  }
+
+  private applyOverlayStyle(): void {
+    if (!this.overlay) return;
+    this.overlay.style.fontSize = `${this.options.fontSize}px`;
+    if (this.options.position === 'top') {
+      this.overlay.style.top = '10%';
+      this.overlay.style.bottom = 'auto';
+    } else {
+      this.overlay.style.top = 'auto';
+      this.overlay.style.bottom = '15%';
+    }
+  }
 
   start(): void {
     if (this.active) return; // guard double-start
@@ -109,23 +164,37 @@ export class CaptionsController {
     this.recognition = new SpeechAPI();
     this.recognition.continuous = true;
     this.recognition.interimResults = true;
-    this.recognition.lang = document.documentElement.lang || 'en-US';
+    this.recognition.lang = this.resolveLanguage();
 
     this.boundOnResult = (e: Event) => {
       const evt = e as unknown as AbSpeechRecognitionEvent;
       let interim = '';
+      let newFinal: string | null = null;
       for (let i = evt.resultIndex; i < evt.results.length; i++) {
         const result = evt.results[i];
         if (result.isFinal) {
-          this.finalLines.push(result[0].transcript.trim());
+          newFinal = result[0].transcript.trim();
+          this.finalLines.push(newFinal);
         } else {
           interim = result[0].transcript.trim();
         }
       }
-      // Show last 2 lines of final + current interim
-      const displayLines = [...this.finalLines, interim].filter(Boolean);
-      const display = displayLines.slice(-2).join('\n');
-      if (this.overlay) this.overlay.textContent = display;
+      this.renderCurrent(interim);
+
+      // Fire-and-forget translation of finals — replaces the last rendered line on resolve
+      const { targetLanguage, translate } = this.options;
+      const sourceLang = this.resolveLanguage();
+      if (newFinal && translate && targetLanguage && targetLanguage !== sourceLang) {
+        const originalIdx = this.finalLines.length - 1;
+        translate(newFinal, sourceLang, targetLanguage)
+          .then((translated) => {
+            if (this.finalLines[originalIdx] === newFinal) {
+              this.finalLines[originalIdx] = translated;
+              this.renderCurrent('');
+            }
+          })
+          .catch(() => { /* swallow — keep original */ });
+      }
     };
 
     this.boundOnEnd = () => {
@@ -209,11 +278,79 @@ export class CaptionsController {
       div.className = 'ab-captions-overlay';
       div.setAttribute('aria-live', 'polite');
       div.setAttribute('role', 'status');
+
+      const textEl = document.createElement('span');
+      textEl.className = 'ab-captions-text';
+      div.appendChild(textEl);
+
+      const close = document.createElement('button');
+      close.className = 'ab-captions-close';
+      close.textContent = '×';
+      close.setAttribute('aria-label', 'Close captions');
+      close.addEventListener('click', (e: Event) => {
+        e.stopPropagation();
+        this.stop();
+      });
+      div.appendChild(close);
+
+      this.attachDragHandlers(div);
+
       document.body.appendChild(div);
       this.overlay = div;
+      this.applyOverlayStyle();
     }
 
     return this.overlay;
+  }
+
+  private attachDragHandlers(el: HTMLDivElement): void {
+    let drag: { startX: number; startY: number; origLeft: number; origTop: number; id: number } | null = null;
+
+    el.addEventListener('pointerdown', (ev: Event) => {
+      const e = ev as PointerEvent;
+      const target = e.target as HTMLElement | null;
+      if (target?.closest('.ab-captions-close')) return;
+      const rect = el.getBoundingClientRect();
+      drag = {
+        startX: e.clientX,
+        startY: e.clientY,
+        origLeft: rect.left,
+        origTop: rect.top,
+        id: e.pointerId,
+      };
+      try { el.setPointerCapture?.(e.pointerId); } catch { /* no-op in tests */ }
+      e.preventDefault();
+    });
+
+    el.addEventListener('pointermove', (ev: Event) => {
+      const e = ev as PointerEvent;
+      if (!drag || e.pointerId !== drag.id) return;
+      const dx = e.clientX - drag.startX;
+      const dy = e.clientY - drag.startY;
+      el.style.left = `${drag.origLeft + dx}px`;
+      el.style.top = `${drag.origTop + dy}px`;
+      el.style.right = 'auto';
+      el.style.bottom = 'auto';
+      el.style.transform = 'none';
+    });
+
+    const end = (ev: Event) => {
+      const e = ev as PointerEvent;
+      if (drag && e.pointerId === drag.id) {
+        try { el.releasePointerCapture?.(e.pointerId); } catch { /* no-op */ }
+        drag = null;
+      }
+    };
+    el.addEventListener('pointerup', end);
+    el.addEventListener('pointercancel', end);
+  }
+
+  private renderCurrent(interim: string): void {
+    if (!this.overlay) return;
+    const textEl =
+      (this.overlay.querySelector('.ab-captions-text') as HTMLElement | null) ?? this.overlay;
+    const displayLines = [...this.finalLines, interim].filter(Boolean);
+    textEl.textContent = displayLines.slice(-2).join('\n');
   }
 
   private startMutationObserver(): void {

@@ -8,6 +8,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="apple-touch-icon" href="favicon.svg">
   <style>
     :root {
       --bg: #0a0a1a;
@@ -59,12 +61,34 @@
       height: 56px;
     }
     .navbar-brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
       font-weight: 800;
       font-size: 1.15rem;
+      text-decoration: none;
+      color: var(--text);
+      cursor: pointer;
+      transition: transform 0.15s;
+    }
+    .navbar-brand:hover { transform: translateY(-1px); }
+    .navbar-brand .brand-mark {
+      width: 28px;
+      height: 28px;
+      border-radius: 7px;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 12px var(--glow);
+      flex-shrink: 0;
+    }
+    .navbar-brand .brand-mark svg { width: 18px; height: 18px; }
+    .navbar-brand .brand-text {
       background: linear-gradient(135deg, var(--primary), var(--accent));
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
-      text-decoration: none;
+      background-clip: text;
     }
     .navbar-links { display: flex; gap: 28px; align-items: center; }
     .navbar-links a {
@@ -636,9 +660,69 @@
       justify-content: center;
       font-size: 22px;
       margin-bottom: 14px;
+      flex-shrink: 0;
     }
+    /* Inline head: icon + title on the same row to save vertical space */
+    .feature-head {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .feature-head .feature-icon {
+      width: 40px;
+      height: 40px;
+      margin-bottom: 0;
+      border-radius: 10px;
+    }
+    .feature-head .feature-icon svg { width: 20px; height: 20px; }
+    .feature-head h3 { margin: 0; line-height: 1.2; }
     .feature h3 { font-size: 1rem; margin-bottom: 8px; font-weight: 700; }
     .feature p { color: var(--muted); font-size: 13px; line-height: 1.6; }
+
+    /* Bullet list for feature descriptions */
+    .feature-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+    .feature-list li {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+      padding-left: 16px;
+      position: relative;
+    }
+    .feature-list li::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 8px;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      box-shadow: 0 0 6px rgba(123,104,238,0.5);
+    }
+    .feature-list li strong {
+      color: var(--text);
+      font-weight: 700;
+    }
+    .feature-list li code {
+      background: rgba(123,104,238,0.15);
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 12px;
+      color: var(--accent);
+      font-family: 'Consolas', 'Monaco', monospace;
+    }
+    .feature-list li .script {
+      color: var(--accent);
+      font-weight: 700;
+    }
 
     /* --- Architecture --- */
     .arch-section { padding: 72px 0; }
@@ -892,7 +976,15 @@
   <nav class="navbar" id="navbar">
     <div class="navbar-inner">
       <div style="display: flex; align-items: center;">
-        <a href="#top" class="navbar-brand">AccessBridge</a>
+        <a href="#top" class="navbar-brand" aria-label="AccessBridge — back to top">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 64 64" fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 46 L32 18 L44 46" stroke-width="7"/>
+              <path d="M24 36 L40 36" stroke-width="5.5"/>
+            </svg>
+          </span>
+          <span class="brand-text">AccessBridge</span>
+        </a>
         <div class="navbar-stats" aria-label="Coverage quick stats">
           <a href="#global-reach" class="nav-stat" title="17 languages supported — first-class native script"><span class="nav-stat-value">17</span>Languages</a>
           <a href="#global-reach" class="nav-stat" title="~5.655 billion speakers across 17 languages"><span class="nav-stat-value">5.6 B</span>Speakers</a>
@@ -1112,67 +1204,121 @@
       <p class="section-sub fade-in">Ambient, invisible accessibility that adapts in real time to user struggles</p>
       <div class="features">
         <div class="feature fade-in">
-          <div class="feature-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M12 2a10 10 0 110 20 10 10 0 010-20z"/><path d="M12 6v6l4 2"/></svg>
+          <div class="feature-head">
+            <div class="feature-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M12 2a10 10 0 110 20 10 10 0 010-20z"/><path d="M12 6v6l4 2"/></svg>
+            </div>
+            <h3>Struggle Detection</h3>
           </div>
-          <h3>Struggle Detection</h3>
-          <p>Quietly notices when you're fighting a page — scrolling too fast, clicking off-target, typing in fits and starts, hovering without deciding. The extension watches your rhythm, not your content, and builds a "struggle score" that updates every few seconds.</p>
+          <ul class="feature-list">
+            <li>Watches <strong>how you interact</strong> — scroll speed, click accuracy, typing rhythm</li>
+            <li>Spots <strong>frustration patterns</strong> in seconds, not minutes</li>
+            <li>Updates a live <strong>"struggle score"</strong> every few seconds</li>
+          </ul>
         </div>
         <div class="feature fade-in">
-          <div class="feature-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+          <div class="feature-head">
+            <div class="feature-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+            </div>
+            <h3>Auto Adaptations</h3>
           </div>
-          <h3>Auto Adaptations</h3>
-          <p>When the struggle score rises, the page quietly adjusts itself: text grows larger, contrast deepens, busy layouts simplify. You never set anything up — the changes fade in when you need them and fade out when you don't.</p>
+          <ul class="feature-list">
+            <li>Text grows <strong>larger</strong>, contrast <strong>deepens</strong>, busy layouts <strong>simplify</strong></li>
+            <li><strong>Zero setup</strong> — you never configure anything</li>
+            <li>Changes <strong>fade in</strong> when struggle rises, <strong>fade out</strong> when comfort returns</li>
+          </ul>
         </div>
         <div class="feature fade-in">
-          <div class="feature-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+          <div class="feature-head">
+            <div class="feature-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+            </div>
+            <h3>Focus &amp; Reading Mode</h3>
           </div>
-          <h3>Focus &amp; Reading Mode</h3>
-          <p>Trouble concentrating? A soft spotlight highlights the paragraph you're reading and dims everything around it. Ads, sidebars, and popups hide so your eyes stay on the words — flip it on from the popup or say "focus mode".</p>
+          <ul class="feature-list">
+            <li>A <strong>soft spotlight</strong> follows the paragraph you're reading</li>
+            <li>Ads, sidebars, and popups <strong>hide automatically</strong></li>
+            <li>Toggle from the popup or say <code>focus mode</code></li>
+          </ul>
         </div>
         <div class="feature fade-in">
-          <div class="feature-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8"/></svg>
+          <div class="feature-head">
+            <div class="feature-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8"/></svg>
+            </div>
+            <h3>Voice Commands</h3>
           </div>
-          <h3>Voice Commands</h3>
-          <p>Run the browser by talking to it — say "scroll down", "click Submit", "go back", "summarize this", "find contact". Works in 17 languages including all 10 major Indian ones (Hindi, Tamil, Telugu, Kannada, Bengali, Marathi, Gujarati, Malayalam, Punjabi, Urdu), so you can speak the way you actually speak.</p>
+          <ul class="feature-list">
+            <li>Talk to the browser: <code>scroll down</code>, <code>click Submit</code>, <code>go back</code>, <code>summarize this</code></li>
+            <li><strong>17 languages</strong> — all 10 major Indian + English, Spanish, French, German, Chinese, Japanese, Arabic</li>
+            <li>Speak <strong>naturally</strong> — common phrases, not rigid syntax</li>
+          </ul>
         </div>
         <div class="feature fade-in">
-          <div class="feature-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          <div class="feature-head">
+            <div class="feature-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </div>
+            <h3>Eye Tracking</h3>
           </div>
-          <h3>Eye Tracking</h3>
-          <p>Move the cursor just by looking at the screen. Your webcam watches where your face is pointing and glides the pointer along with you — no hands, no special hardware. One 30-second calibration and you're in control.</p>
+          <ul class="feature-list">
+            <li>Move the cursor <strong>just by looking</strong> at the screen</li>
+            <li>Powered by your <strong>webcam</strong> — no extra hardware needed</li>
+            <li><strong>30-second calibration</strong> and you're in control</li>
+          </ul>
         </div>
         <div class="feature fade-in">
-          <div class="feature-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3zM13 13l6 6"/></svg>
+          <div class="feature-head">
+            <div class="feature-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3zM13 13l6 6"/></svg>
+            </div>
+            <h3>Dwell Click</h3>
           </div>
-          <h3>Dwell Click</h3>
-          <p>Can't press a mouse button? Just rest the pointer on any button or link and it clicks itself. A small ring fills up while you hover, so you always see the click coming — move the pointer away to cancel.</p>
+          <ul class="feature-list">
+            <li>Hover over any button — <strong>it clicks itself</strong></li>
+            <li>A <strong>ring fills up</strong> while you dwell — always see the click coming</li>
+            <li><strong>Move away to cancel</strong> — no accidental clicks</li>
+          </ul>
         </div>
         <div class="feature fade-in">
-          <div class="feature-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+          <div class="feature-head">
+            <div class="feature-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+            </div>
+            <h3>Fatigue-Adaptive UI</h3>
           </div>
-          <h3>Fatigue-Adaptive UI</h3>
-          <p>Late at night or after hours at the screen, pages get calmer — extra panels hide, spacing opens up, colors soften. The extension tracks time of day and how long you've been working, then eases the interface through 4 gentler levels as the day wears on.</p>
+          <ul class="feature-list">
+            <li>Extra panels <strong>hide</strong>, spacing <strong>opens up</strong>, colors <strong>soften</strong></li>
+            <li>Tracks <strong>time of day</strong> + session duration</li>
+            <li>Eases through <strong>4 gentler levels</strong> as the day wears on</li>
+          </ul>
         </div>
         <div class="feature fade-in">
-          <div class="feature-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+          <div class="feature-head">
+            <div class="feature-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+            </div>
+            <h3>AI-Powered Insights</h3>
           </div>
-          <h3>AI-Powered Insights</h3>
-          <p>Turns dense pages into plain-English summaries, rewrites jargon into simpler words, and collapses long emails into bullet points. Fast on-device AI handles most requests for free; only the hard ones reach out to Gemini or Claude — so it stays quick and cheap.</p>
+          <ul class="feature-list">
+            <li>Dense pages → <strong>plain-English summaries</strong></li>
+            <li>Jargon → <strong>simpler words</strong>; long emails → <strong>bullet points</strong></li>
+            <li><strong>On-device AI first</strong> (free); Gemini or Claude only for hard requests</li>
+          </ul>
         </div>
         <div class="feature fade-in">
-          <div class="feature-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
+          <div class="feature-head">
+            <div class="feature-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
+            </div>
+            <h3>Multi-Language</h3>
           </div>
-          <h3>Multi-Language</h3>
-          <p>Every feature speaks your language. Type <code style="background:rgba(123,104,238,0.15);padding:1px 5px;border-radius:4px;color:var(--accent)">namaste</code> in any input and watch it become <strong>नमस्ते</strong> (press Alt+T to toggle). Visit a Hindi or Tamil page and voice recognition switches locale automatically — no settings to hunt through. 17 languages ≈ 71% of the world.</p>
+          <ul class="feature-list">
+            <li>Type <code>namaste</code> → <span class="script">नमस्ते</span> (press <strong>Alt+T</strong> to toggle)</li>
+            <li>Voice recognition <strong>auto-switches</strong> based on page language</li>
+            <li><strong>17 languages ≈ 71%</strong> of the world population</li>
+          </ul>
         </div>
       </div>
     </div>

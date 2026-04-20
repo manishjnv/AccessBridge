@@ -539,7 +539,7 @@ def slide_13_demo(slide, prs):
     p3 = tf2.paragraphs[0]; p3.alignment = PP_ALIGN.CENTER
     r3 = p3.add_run(); r3.text = "GitHub: github.com/manishjnv/AccessBridge"; style(r3, 14, ACCENT, bold=True)
     p4 = tf2.add_paragraph(); p4.alignment = PP_ALIGN.CENTER; p4.space_before = Pt(12)
-    r4 = p4.add_run(); r4.text = "Team AccessBridge  |  Wipro TopGear Ideathon 2026"; style(r4, 13, LIGHT)
+    r4 = p4.add_run(); r4.text = "Manish Kumar  |  Wipro TopGear Ideathon 2026"; style(r4, 13, LIGHT)
     p5 = tf2.add_paragraph(); p5.alignment = PP_ALIGN.CENTER; p5.space_before = Pt(16)
     r5 = p5.add_run(); r5.text = "Thank You!"; style(r5, 28, ACCENT2, bold=True)
 

@@ -113,12 +113,25 @@ if [ ! -f accessbridge-extension.zip ]; then
   exit 1
 fi
 
-rsync -az --progress accessbridge-extension.zip \
-  "$REMOTE:$REMOTE_DIR/docs/downloads/"
-echo "  ✓ Extension zip synced (${VERSION})."
+if command -v rsync >/dev/null 2>&1; then
+  rsync -az --progress accessbridge-extension.zip \
+    "$REMOTE:$REMOTE_DIR/docs/downloads/"
+  echo "  ✓ Extension zip synced (${VERSION})."
 
-rsync -az --delete deploy/ "$REMOTE:$WWW_DIR/"
-echo "  ✓ Landing page synced."
+  rsync -az --delete deploy/ "$REMOTE:$WWW_DIR/"
+  echo "  ✓ Landing page synced."
+else
+  echo "  ℹ rsync not found — using scp + tar-over-ssh fallback."
+  scp -q accessbridge-extension.zip "$REMOTE:$REMOTE_DIR/docs/downloads/"
+  echo "  ✓ Extension zip synced (${VERSION})."
+
+  # In-place extract over $WWW_DIR. Overwrites matching files; doesn't remove
+  # stale ones (no --delete semantic). Safe for this use-case since the
+  # landing page rarely removes files.
+  ssh "$REMOTE" "mkdir -p '$WWW_DIR'"
+  tar -C deploy -czf - . | ssh "$REMOTE" "tar -xzf - -C '$WWW_DIR'"
+  echo "  ✓ Landing page synced (in-place, no delete)."
+fi
 
 # ─────────────────────────────────────────────────────────
 # [4/6] Sync code on VPS (for API / version file / etc.)

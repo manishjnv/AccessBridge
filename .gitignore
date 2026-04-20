@@ -14,3 +14,4 @@ coverage/
 *.bin
 models/
 src-tauri/target/
+*.tsbuildinfo

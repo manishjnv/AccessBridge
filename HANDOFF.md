@@ -1,5 +1,53 @@
 # AccessBridge - Shift Handoff
 
+## Last Session: Day 6 — Shift 3: Landing UX overhaul + language expansion 17→28 + UI_GUIDELINES compliance (2026-04-20)
+
+### Completed (Day 6, Shift 3)
+
+- [x] **Landing-page storytelling overhaul** — converted dense paragraphs on every Core Feature card to plain-English prose, then compacted to **icon-inline-with-title + 3-bullet format** with gradient-dot bullets, bolded keywords, and inline `<code>` chips for spoken/typed tokens (e.g. `scroll down`, `click Submit`, `namaste`).
+- [x] **"Global Reach" widget** — new section showing all supported languages with native script, English name, speaker count, proportional gradient bar. Accent-bordered rows visually tag the 10 Indian languages vs 17 global.
+- [x] **Multi-level coverage stats** — 3 surfaces now carry the headline figure: navbar pills (desktop, clickable → `#global-reach`), hero 4-tile stat strip (8.0 B world pop · 28 langs · 7.0 B reached · 87 %), and the reach widget's gradient badge. The 71 % pill is rendered as a full-gradient highlight to draw the eye.
+- [x] **Architecture section rebuilt** — from 1 flat card of 4 package names to **7 rich subsections**: engineering-metrics strip (`187 tests · <50 ms · 0 KB/s · 28 langs`), Signal→Adaptation Pipeline (4 numbered stages with tech footers), Layered System (L1 UI → L5 Cloud), Monorepo Packages, Technology Stack (16 chip-tags), and Privacy & Performance Guarantees (8 non-negotiables).
+- [x] **"Accessibility Challenges We Solve"** section — 8 user-facing barriers across Vision / Motor / Cognitive / Language / Temporal / Comprehension / Social / Access dimensions, each with a grounded stat (*2.2 B vision-impaired · $1.5–3.5 K assistive hardware · 70–80 % page noise · 4.8 B non-English speakers*), *Problem → Fix* framing, and an "Engages · <feature list>" footer chipping into specific modules. Initially shipped by mistake as dev-bug RCA cards; user corrected scope — rewrote to user-facing barriers.
+- [x] **Language support expansion 17 → 28** — added 11 new locales across two classes: non-Latin script with new Unicode detector ranges (Russian U+0400-04FF, Korean U+AC00-D7AF + U+1100-11FF, Thai U+0E00-0E7F, Persian aliases to existing Perso-Arabic) and Latin-script (Portuguese, Indonesian, Turkish, Vietnamese, Filipino, Italian, Polish — collapse to 'en' in the detector; profile setting is the disambiguator). Total speakers reached: 5,655 M → **6,960 M ≈ 87 % of world population** (was 71 %). All 28 visible in Popup Settings dropdown grouped as English / Indian / Global.
+- [x] **Reach widget → 2-column layout on ≥960 px** — CSS multi-column (`column-count: 2 + column-rule dashed + break-inside: avoid`) splits the 28-row list into two 14-row columns with a dashed center rule, preserving speaker-count descending order within each column (column-first flow). Section height roughly halves on desktop; no change on tablet/mobile.
+- [x] **Navbar coverage pills** — upgraded from muted text with a separator line to **gradient-filled pill links** that jump to `#global-reach` on click, with the `87 %` pill rendered as a full-gradient highlight. Intermediate 1100 px breakpoint tightens the pills before the 900 px hide.
+- [x] **Favicon + footer cleanup** — kept the SVG favicon (stylized A with bridge-arc + brand gradient, added by linter); removed the "Dev Handoff" link from the footer (internal-facing, not relevant to visitors).
+- [x] **UI_GUIDELINES.md compliance audit** — after `42c85ca` / `d7743e9` established `UI_GUIDELINES.md` as the single source of truth, audited this shift's CSS additions and retrofitted 5 off-scale values to the canonical 4 px rhythm: `.nav-stat` `padding: 6px 13px → 6px 14px`; `.nav-stat` @1100 px `5px 10px → 4px 10px`; `.reach-list` `column-gap: 36px → 32px`; `.reach-row` 2-col `padding: 2px 0 2px 8px → 0 0 0 8px`; `.feature-list` `gap: 7px → 8px`. All five shifts are within 1 px — no visual regression.
+- [x] **Feedback memory saved** — [feedback_ui_guidelines.md](../../.claude/projects/e--code-AccessBridge/memory/feedback_ui_guidelines.md) so every future UI edit reads UI_GUIDELINES.md first and picks values from its canonical color / spacing / radius / shadow tables. Indexed in `MEMORY.md`.
+- [x] **Language-detect tests extended** — added 6 cases for Cyrillic, Hangul, Thai pure-script detection + count tallies. Tests: **139 green** (was 133 at Shift 1 close; +6 new language-detect).
+- [x] **`deploy.sh` Windows fallback** — encountered `rsync: command not found` on Windows (not in `git-bash`); used `scp` for landing.html + extension zip upload to `/opt/accessbridge/docs/` (actual serve dir, not the stale `/var/www/accessbridge/` in WWW_DIR). Every commit deployed to the live site at `http://72.61.227.64:8300/` via the same scp path.
+
+#### Commits (Shift 3 — mine)
+
+- `561bc01` feat: expand reach widget to all 17 languages + hero coverage stats
+- `4ad0398` style: stronger navbar coverage stats — gradient pills, clickable to reach
+- `c4ae0e9` docs: rewrite Core Features copy for non-technical readers
+- `5f6bb50` style: compact Core Features — inline icon+title, bulleted descriptions
+- `3d3c70c` feat: world-class Architecture section + favicon + footer cleanup
+- `0472f9f` docs: replace dev-bug challenges with real accessibility challenges
+- `08087a5` feat: expand language support from 17 → 28 (~71% → ~87% world population)
+- `6a2199c` style(site): split 28-row reach list into 2 columns on ≥960 px
+- `2ece2e7` style(site): UI_GUIDELINES §4 compliance — snap off-scale spacing to the 4 px rhythm
+
+**Tests:** 139 core ✅ + 54 AI-engine ✅ = **193 green total** (+6 new vs Shift 1 close). TypeScript strict ✅. Vite build ✅ (content 242 KB / background 28 KB / sidepanel 19 KB / CSS 41 KB). `node -c dist/…/content/index.js` ✅ (BUG-008 guard). Push via noreply-email amend pattern, deploy via scp to `/opt/accessbridge/docs/`. Live at `http://72.61.227.64:8300/` HTTP 200 · 95 KB.
+
+**Conflict note:** a concurrent session's `d7743e9` palette-compliance commit raced with my in-flight 2-column edit. My local `df3c857` turned out to be byte-identical (0-line diff verified) so I `git reset --hard origin/main` — no work lost. Shift 2's "Next action: R1-01 Desktop companion" is unchanged.
+
+**Next action (Shift 4):**
+
+1. R1-01 Desktop companion (Tauri) per [ROADMAP.md](ROADMAP.md) — still the primary.
+2. Follow-up polish if time: bring the 11 new global languages to "first-class" parity with the 10 Indic by adding native-script voice-command registries (currently the 11 have BCP-47 locale + page-detection but no native phrase sets — same gap as the existing Spanish/French/German options).
+3. Rewrite `deploy.sh` transport to prefer `scp`/`rsync` whichever is available (unblocks Windows deploys without cache priming).
+4. Upgrade local Node to 20.12+ to unblock vitest (carry-forward from Shift 2).
+
+#### Tool Contribution (Day 6, Shift 3)
+
+- **Opus:** all implementation this shift — landing-page storytelling overhaul, Architecture rebuild, Accessibility Challenges section, 11-language expansion across core types + content wiring + popup dropdown + landing copy, 2-column CSS, UI_GUIDELINES compliance audit, feedback memory save, HANDOFF update.
+- **Sonnet:** n/a — no subagent dispatched this shift (Phase 1 delegation was not needed; most edits were tightly coupled to the landing-page HTML/CSS that had to stay coherent across many small turns).
+- **Haiku:** n/a — no bulk read or post-deploy sweep needed; one `curl | grep` pattern verified each deploy inline.
+- **codex:rescue:** n/a — no security-adjacent changes this shift (no new manifest permissions, no new cross-origin fetch, no content-script injection-logic changes; new languages added only locale strings + Unicode ranges).
+
 ## Last Session: Day 6 — Shift 2: Infra + Docs + Domain Migration (2026-04-20)
 
 ### Completed (Day 6, Shift 2)

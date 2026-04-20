@@ -16,7 +16,11 @@
     "./profile": "./src/profile/index.ts",
     "./profile/*": "./src/profile/*",
     "./i18n": "./src/i18n/index.ts",
-    "./i18n/*": "./src/i18n/*"
+    "./i18n/*": "./src/i18n/*",
+    "./gestures": "./src/gestures/index.ts",
+    "./gestures/*": "./src/gestures/*",
+    "./audit": "./src/audit/index.ts",
+    "./audit/*": "./src/audit/*"
   },
   "scripts": {
     "test": "vitest run",

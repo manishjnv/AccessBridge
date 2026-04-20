@@ -3,6 +3,10 @@ import { createRoot } from 'react-dom/client';
 import type { AccessibilityProfile, Adaptation } from '@accessbridge/core/types';
 import { DEFAULT_PROFILE, AdaptationType } from '@accessbridge/core/types';
 import '../content/styles.css';
+import './audit/audit.css';
+import { AuditPanel } from './audit/AuditPanel.js';
+
+type SidePanelTab = 'dashboard' | 'audit';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -301,6 +305,7 @@ function SidePanel() {
   const [activeAdaptations, setActiveAdaptations] = useState<Adaptation[]>([]);
   const [enabled, setEnabled] = useState(true);
   const [currentApp, setCurrentApp] = useState('—');
+  const [tab, setTab] = useState<SidePanelTab>('dashboard');
 
   // Session timer
   const [sessionSeconds, setSessionSeconds] = useState(0);
@@ -668,8 +673,22 @@ function SidePanel() {
         </div>
       </header>
 
+      {/* ── Tab bar ────────────────────────────────────────────────────────── */}
+      <nav
+        className="flex border-b border-a11y-primary/20 bg-a11y-surface px-3"
+        role="tablist"
+        aria-label="Side panel sections"
+      >
+        <TabButton label="Dashboard" active={tab === 'dashboard'} onClick={() => setTab('dashboard')} />
+        <TabButton label="Audit" active={tab === 'audit'} onClick={() => setTab('audit')} />
+      </nav>
+
       {/* ── Body ───────────────────────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3">
+        {tab === 'audit' ? (
+          <AuditPanel />
+        ) : (
+        <>
         {/* Disabled banner */}
         {!enabled && (
           <div
@@ -838,6 +857,8 @@ function SidePanel() {
             </div>
           )}
         </Section>
+        </>
+        )}
       </div>
 
       {/* ── Footer ─────────────────────────────────────────────────────────── */}
@@ -850,6 +871,33 @@ function SidePanel() {
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
+
+function TabButton({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className={`
+        px-3 py-2 text-xs font-semibold uppercase tracking-widest transition-colors
+        border-b-2 -mb-px
+        ${active
+          ? 'text-a11y-accent border-a11y-accent'
+          : 'text-a11y-muted border-transparent hover:text-a11y-text'}
+      `}
+    >
+      {label}
+    </button>
+  );
+}
 
 function MasterToggle({ enabled, onChange }: { enabled: boolean; onChange: () => void }) {
   return (

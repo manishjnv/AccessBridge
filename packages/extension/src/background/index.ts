@@ -20,6 +20,16 @@ import type {
 // AI Engine — lazy-initialized to keep startup fast
 import { AIEngine, SummarizerService, SimplifierService } from '@accessbridge/ai-engine';
 
+// Compliance Observatory — anonymous, DP-noised daily metrics (Feature #10)
+import {
+  ObservatoryCollector,
+  installDailyAlarm,
+} from './observatory-collector.js';
+
+const observatoryCollector = new ObservatoryCollector();
+observatoryCollector.hydrateFromStorage().catch(() => {});
+installDailyAlarm(observatoryCollector, () => currentProfile?.shareAnonymousMetrics === true);
+
 let aiEngine: AIEngine | null = null;
 let summarizer: SummarizerService | null = null;
 let simplifier: SimplifierService | null = null;
@@ -72,6 +82,11 @@ async function saveProfile(profile: AccessibilityProfile): Promise<void> {
   await chrome.storage.local.set({ profile });
   // Update the decision engine with the new profile
   getOrCreateEngine().updateProfile(profile);
+  // Observatory: record the language in use today (opt-in only)
+  if (profile.shareAnonymousMetrics && profile.language) {
+    observatoryCollector.recordLanguageUsed(profile.language);
+    observatoryCollector.persistToStorage().catch(() => {});
+  }
 }
 
 // ---------- Auto-adaptation pipeline ----------
@@ -86,6 +101,13 @@ async function processSignalBatch(signals: BehaviorSignal[]): Promise<void> {
   const score = struggleDetector.getStruggleScore();
   latestStruggleScore = score;
 
+  // Observatory: tap struggle events (only when opted in — counters are reset each day
+  // when not sent; no leakage without explicit opt-in).
+  if (score.score >= 50 && currentProfile?.shareAnonymousMetrics) {
+    observatoryCollector.recordStruggleEvent();
+    observatoryCollector.setScoreImprovement(score.score);
+  }
+
   // Run decision engine to determine adaptations
   const engine = getOrCreateEngine();
   const newAdaptations = engine.evaluate(score);
@@ -98,6 +120,9 @@ async function processSignalBatch(signals: BehaviorSignal[]): Promise<void> {
 
   for (const adaptation of newAdaptations) {
     activeAdaptations.set(adaptation.id, adaptation);
+    if (currentProfile?.shareAnonymousMetrics) {
+      observatoryCollector.recordAdaptation(String(adaptation.type));
+    }
     try {
       await chrome.tabs.sendMessage(activeTab.id, {
         type: 'APPLY_ADAPTATION',
@@ -161,7 +186,9 @@ type MessageType =
   | 'AI_SET_KEY'
   | 'AI_GET_STATS'
   | 'CHECK_UPDATE'
-  | 'APPLY_UPDATE';
+  | 'APPLY_UPDATE'
+  | 'AUDIT_SCAN_REQUEST'
+  | 'HIGHLIGHT_ELEMENT';
 
 interface Message {
   type: MessageType;
@@ -347,6 +374,36 @@ async function handleMessage(message: Message): Promise<unknown> {
       return { success: true };
     }
 
+    // ---------- Accessibility audit passthrough ----------
+
+    case 'AUDIT_SCAN_REQUEST': {
+      const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!activeTab?.id) return { error: 'No active tab' };
+      if (activeTab.url?.startsWith('chrome://') || activeTab.url?.startsWith('edge://')) {
+        return { error: 'Audit unavailable on browser internal pages' };
+      }
+      try {
+        const response = await chrome.tabs.sendMessage(activeTab.id, { type: 'AUDIT_SCAN_REQUEST' });
+        return response ?? { error: 'No response from content script' };
+      } catch (err) {
+        return { error: `Content script unreachable: ${String(err)}` };
+      }
+    }
+
+    case 'HIGHLIGHT_ELEMENT': {
+      const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!activeTab?.id) return { error: 'No active tab' };
+      try {
+        const response = await chrome.tabs.sendMessage(activeTab.id, {
+          type: 'HIGHLIGHT_ELEMENT',
+          payload: message.payload,
+        });
+        return response ?? { found: false };
+      } catch (err) {
+        return { error: `Content script unreachable: ${String(err)}` };
+      }
+    }
+
     default: {
       // Handle voice command messages (format: { action: 'nextTab' })
       const msg = message as unknown as Record<string, string>;
@@ -400,6 +457,10 @@ async function handleToggleFeature(feature: string, enabled: boolean): Promise<u
       reversible: true,
     };
     activeAdaptations.set(adaptation.id, adaptation);
+    if (currentProfile?.shareAnonymousMetrics) {
+      observatoryCollector.recordFeatureEnabled(feature);
+      observatoryCollector.persistToStorage().catch(() => {});
+    }
     await chrome.tabs.sendMessage(activeTab.id, {
       type: 'APPLY_ADAPTATION',
       payload: adaptation,

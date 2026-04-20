@@ -20,6 +20,7 @@
 | [AI Engine](./features/ai-engine.md) | In Progress | 3-tier AI (local, Gemini Flash, Claude), caching, cost tracking |
 | [Cognitive Simplifier](./features/cognitive-simplifier.md) | Planned | Focus mode, summarization, distraction shield |
 | [Motor Assistor](./features/motor-assistor.md) | Planned | Voice navigation, eye tracking, dwell click |
+| [Accessibility Audit](./features/accessibility-audit.md) | In Progress | Automated WCAG 2.1 scanning, 20 rules, scored report, PDF export |
 
 ### Project Management
 - [Shift Handoff](../HANDOFF.md) -- current sprint status, blockers, and next steps

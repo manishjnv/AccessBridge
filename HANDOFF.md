@@ -1,5 +1,41 @@
 # AccessBridge - Shift Handoff
 
+## Last Session: Day 6 — Shift 4 (parallel — Session F): Task F — Accessibility Audit PDF Export (Layer 9 completion) (2026-04-20)
+
+### Completed (Day 6, Shift 4 — Session F)
+
+- [x] **`@accessbridge/core/audit` module** — new pure-TypeScript audit engine with zero DOM deps. 20 WCAG 2.1 heuristic rules (img-alt, empty-link, empty-button, form-label, heading-order, contrast-aa, contrast-aaa, target-size-aa/aaa, document-lang, duplicate-id, table-headers, keyboard-trap, autoplay-media, flashing-content, skip-link, frame-title, focus-order, link-purpose, redundant-title) plus `AuditEngine` class that aggregates findings, computes overallScore (weighted deductions: critical=25, serious=10, moderate=5, minor=2, info=0), per-principle scoreByCategory, and A/AA/AAA compliance percentages.
+- [x] **96 new audit tests** — `rules.test.ts` (86 tests, 2+ per rule covering positive/negative/edge cases) + `engine.test.ts` (10 tests covering scoring, clamping, determinism, report shape). Run via `cd packages/core && npx vitest run` — **273 / 273 green** (177 pre-existing + 96 new).
+- [x] **Content-script audit collector** — [audit-collector.ts](packages/extension/src/content/audit-collector.ts) walks the DOM once (cap 5000 elements, `totalElements` always accurate), produces a serialized `AuditInput` with bbox/computedStyle/aria per node, plus aggregated headings/landmarks/tables/frames/forms/skipLinks/duplicateIds/focusOrder/autoplayMedia/animatedElements. No DOM references leave the content script.
+- [x] **Message wiring** — new `AUDIT_SCAN_REQUEST` handler in [content/index.ts](packages/extension/src/content/index.ts) returning `{input}`, matching passthrough in [background/index.ts](packages/extension/src/background/index.ts). New `HIGHLIGHT_ELEMENT` handler applies a coral focus-ring outline + 6 px halo via inline styles (reverts after 3 s) to avoid touching content/styles.css.
+- [x] **Side-panel Audit tab** — [AuditPanel.tsx](packages/extension/src/sidepanel/audit/AuditPanel.tsx) with score ring, 3 WCAG compliance badges, 4 category bars (perceivable/operable/understandable/robust), findings list grouped by severity with chip filters, re-scan + Export-PDF buttons. [ScoreRing.tsx](packages/extension/src/sidepanel/audit/ScoreRing.tsx), [WCAGBadge.tsx](packages/extension/src/sidepanel/audit/WCAGBadge.tsx), [CategoryBar.tsx](packages/extension/src/sidepanel/audit/CategoryBar.tsx), [FindingItem.tsx](packages/extension/src/sidepanel/audit/FindingItem.tsx). Dashboard/Audit tab switcher at top of [sidepanel/index.tsx](packages/extension/src/sidepanel/index.tsx).
+- [x] **PDF export** — [pdf-generator.ts](packages/extension/src/sidepanel/audit/pdf-generator.ts) using `jspdf` ^2.5.2. Multi-page: cover (URL + date + big score + WCAG strip), executive summary + 4 bars, findings grouped by WCAG principle sorted by severity, compliance statement. Download via Blob URL + hidden anchor click with filename `accessbridge-audit-{host}-{YYYYMMDD}.pdf`.
+- [x] **Audit CSS** — [audit.css](packages/extension/src/sidepanel/audit/audit.css) imported only by sidepanel (never by content script). Severity color ramp critical→info, finding card + filter chip + category bar styles — all tokens aligned with [UI_GUIDELINES.md](UI_GUIDELINES.md) canonical palette and 4 px rhythm.
+- [x] **Feature doc** — [docs/features/accessibility-audit.md](docs/features/accessibility-audit.md) with full 20-rule table, scoring methodology, PDF format, use cases, integration map. Linked from [docs/README.md](docs/README.md).
+
+#### Commits (Shift 4 — Session F)
+
+- (single commit) `feat: Task F — Accessibility Audit PDF Export with 20 WCAG rules (Layer 9 completion)`
+
+**Tests:** `cd packages/core && npx vitest run` → **273 pass** (96 new + 177 pre-existing, all green). Cross-session `pnpm typecheck` currently fails on **other sessions' in-flight files** (`observatory-publisher.test.ts` needs `node:crypto`, `observatory-publisher.ts` has a `Uint8Array` ArrayBufferLike mismatch, `GestureLibrary.tsx` imports the unfinished `@accessbridge/core/gestures` export). None of the audit files (`core/audit/**`, `audit-collector.ts`, `pdf-generator.ts`, sidepanel audit components) emit any typecheck errors. Full-project `pnpm build` therefore blocked until Session C (gestures) and Session G (observatory) land their core modules — noted for shift-5 integrator.
+
+**Tool / Codex fallback:** codex:rescue was dispatched first per the project rule but **hit the sandbox policy** — `apply_patch` rejected every write to `E:/code/AccessBridge/...` with "writing outside of the project; rejected by user approval settings". Codex returned after 6 min having created zero files. Fell back to two parallel Sonnet subagents (core-engine vs collector+PDF+docs) which together wrote all 10 required files and got tests green. Documented in the agent-utilization footer below.
+
+**Next action (Shift 5):**
+
+1. Once Session C ships `packages/core/src/gestures/` and Session G fixes observatory-publisher's `node:crypto` + `Uint8Array` issues, `pnpm build && pnpm typecheck` will go green and the extension zip can be rebuilt with all three new features at once.
+2. Integrator should then regenerate `accessbridge-extension.zip` + `deploy/downloads/accessbridge-extension.zip` and run `./deploy.sh` for a combined Shift-4 deploy.
+3. Consider promoting the audit from heuristic to ground-truth by integrating axe-core rules in a future shift (deferred — see Deferred #20 for the original scope).
+
+#### Tool Contribution (Day 6, Shift 4 — Session F)
+
+Opus: Task F orchestration (Phase 0 warm-start reads, Codex dispatch, Sonnet fallback dispatch, sidepanel React components — AuditPanel / ScoreRing / WCAGBadge / CategoryBar / FindingItem — + audit.css, content/background/sidepanel wiring, HANDOFF update, commit orchestration).
+Sonnet: 2 parallel subagents after Codex sandbox block — Sonnet-A wrote `packages/core/src/audit/{types,rules,engine,index}.ts` + 96 tests (all passing); Sonnet-B wrote `audit-collector.ts` + `pdf-generator.ts` + `docs/features/accessibility-audit.md` + `docs/README.md` index update.
+Haiku: n/a — no bulk-read or post-deploy sweep this shift (live deploy blocked by cross-session typecheck anyway).
+codex:rescue: **rejected** — codex hit sandbox write-policy on all `E:/code/AccessBridge/...` apply_patch calls ("writing outside of the project; rejected by user approval settings"); zero files created. Per project rule, fell back to parallel Sonnet subagents (recorded above). No security-adjacent diffs in Task F (audit is read-only DOM walk + pure scoring; no new manifest permissions, no new cross-origin fetch, no content-script injection changes).
+
+---
+
 ## Last Session: Day 6 — Shift 4 (parallel — Session E): Task E — Environment Sensing (Layer 3 completion) (2026-04-20)
 
 ### Completed (Day 6, Shift 4 — Session E)

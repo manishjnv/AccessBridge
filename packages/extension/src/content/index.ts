@@ -25,6 +25,7 @@ import { PredictiveInputSystem } from './motor/predictive-input.js';
 import { DomainConnectorRegistry } from './domains/index.js';
 import { TransliterationController } from './i18n/transliteration.js';
 import { detectPageLanguage, detectedLangToVoiceLocale } from './i18n/language-detect.js';
+import { collectAuditInput } from './audit-collector.js';
 import {
   EnvironmentSensor,
   EnvironmentIndicator,
@@ -592,6 +593,44 @@ function listenForCommands(adapter: BaseAdapter, sensory: SensoryAdapter): void 
           if (piEnabled) getPredictive().start();
           else getPredictive().stop();
           sendResponse({ success: true });
+          break;
+        }
+        case 'AUDIT_SCAN_REQUEST': {
+          try {
+            const input = collectAuditInput();
+            sendResponse({ input });
+          } catch (err) {
+            sendResponse({ error: String(err) });
+          }
+          break;
+        }
+        case 'HIGHLIGHT_ELEMENT': {
+          const { selector } = message.payload as { selector: string };
+          try {
+            const target = selector ? document.querySelector(selector) : null;
+            if (target instanceof HTMLElement) {
+              const prevOutline = target.style.outline;
+              const prevOffset = target.style.outlineOffset;
+              const prevShadow = target.style.boxShadow;
+              const prevTransition = target.style.transition;
+              target.style.outline = '3px solid #e94560';
+              target.style.outlineOffset = '2px';
+              target.style.boxShadow = '0 0 0 6px rgba(233, 69, 96, 0.25)';
+              target.style.transition = 'outline 0.2s ease, box-shadow 0.2s ease';
+              target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              setTimeout(() => {
+                target.style.outline = prevOutline;
+                target.style.outlineOffset = prevOffset;
+                target.style.boxShadow = prevShadow;
+                target.style.transition = prevTransition;
+              }, 3000);
+              sendResponse({ found: true });
+            } else {
+              sendResponse({ found: false });
+            }
+          } catch (err) {
+            sendResponse({ error: String(err) });
+          }
           break;
         }
         case 'PROFILE_UPDATED': {

@@ -726,13 +726,163 @@
 
     /* --- Architecture --- */
     .arch-section { padding: 72px 0; }
-    .arch {
+    .arch-intro {
+      text-align: center;
+      max-width: 760px;
+      margin: 0 auto 32px;
+      color: var(--muted);
+      font-size: clamp(0.9rem, 2vw, 1.05rem);
+      padding: 0 16px;
+    }
+
+    /* Top metrics strip */
+    .arch-metrics {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      max-width: 900px;
+      margin: 0 auto 40px;
+    }
+    .metric {
+      background: linear-gradient(135deg, rgba(123,104,238,0.12), rgba(187,134,252,0.05));
+      border: 1px solid rgba(123,104,238,0.25);
+      border-radius: 14px;
+      padding: 20px 14px;
+      text-align: center;
+    }
+    .metric-val {
+      font-size: clamp(1.2rem, 3.5vw, 1.8rem);
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      line-height: 1.1;
+    }
+    .metric-label {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      font-weight: 600;
+    }
+    @media (max-width: 640px) {
+      .arch-metrics { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    /* Subsection card */
+    .arch-card {
       background: var(--surface);
       border-radius: 18px;
-      padding: 36px;
+      padding: clamp(24px, 3vw, 36px);
       border: 1px solid rgba(123,104,238,0.12);
+      margin-bottom: 20px;
     }
-    .arch h2 { margin-bottom: 24px; }
+    .arch-card h3 {
+      font-size: clamp(1.1rem, 2.4vw, 1.35rem);
+      font-weight: 700;
+      margin-bottom: 6px;
+      color: var(--text);
+    }
+    .arch-card .card-sub {
+      color: var(--muted);
+      font-size: 14px;
+      margin-bottom: 22px;
+      line-height: 1.6;
+    }
+
+    /* Signal → adaptation pipeline */
+    .pipeline {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      align-items: stretch;
+    }
+    .pipe-step {
+      background: rgba(123,104,238,0.08);
+      border: 1px solid rgba(123,104,238,0.22);
+      border-radius: 12px;
+      padding: 18px 16px;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .pipe-num {
+      position: absolute;
+      top: -12px;
+      left: 14px;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      color: white;
+      font-size: 12px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 3px 10px rgba(123,104,238,0.4);
+    }
+    .pipe-step h4 {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--accent);
+      margin-top: 6px;
+    }
+    .pipe-step p {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+    .pipe-step .pipe-tech {
+      margin-top: auto;
+      padding-top: 6px;
+      font-size: 11px;
+      color: var(--text);
+      font-weight: 600;
+      opacity: 0.85;
+      border-top: 1px dashed rgba(123,104,238,0.25);
+    }
+    @media (max-width: 880px) {
+      .pipeline { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 480px) {
+      .pipeline { grid-template-columns: 1fr; }
+    }
+
+    /* Layered system */
+    .stack {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .stack-layer {
+      display: grid;
+      grid-template-columns: 100px 1fr;
+      align-items: center;
+      gap: 14px;
+      padding: 14px 16px;
+      background: rgba(123,104,238,0.05);
+      border-left: 4px solid var(--primary);
+      border-radius: 8px;
+      transition: background 0.2s, border-color 0.2s;
+    }
+    .stack-layer:hover { background: rgba(123,104,238,0.12); border-left-color: var(--accent); }
+    .stack-layer-name {
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .stack-layer-body { font-size: 13px; color: var(--text); line-height: 1.5; }
+    .stack-layer-body strong { color: var(--accent); font-weight: 700; }
+    @media (max-width: 560px) {
+      .stack-layer { grid-template-columns: 1fr; gap: 4px; }
+    }
+
+    /* Monorepo packages */
     .arch-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -743,11 +893,127 @@
       border-radius: 10px;
       padding: 18px;
       border-left: 3px solid var(--primary);
-      transition: background 0.2s;
+      transition: background 0.2s, transform 0.2s;
     }
-    .arch-item:hover { background: rgba(123,104,238,0.1); }
+    .arch-item:hover { background: rgba(123,104,238,0.12); transform: translateY(-2px); }
     .arch-item h4 { color: var(--accent); margin-bottom: 6px; font-size: 13px; font-weight: 700; }
     .arch-item p { color: var(--muted); font-size: 12px; line-height: 1.6; }
+
+    /* Tech stack chips */
+    .tech-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .tech-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      background: rgba(123,104,238,0.1);
+      border: 1px solid rgba(123,104,238,0.25);
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text);
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .tech-chip:hover { border-color: var(--accent); background: rgba(123,104,238,0.2); }
+    .tech-chip .tech-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+    }
+
+    /* Critical challenges */
+    .challenges {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 14px;
+    }
+    .challenge {
+      background: rgba(10, 10, 26, 0.5);
+      border: 1px solid rgba(123,104,238,0.18);
+      border-radius: 12px;
+      padding: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+    .challenge::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 3px;
+      height: 100%;
+      background: linear-gradient(180deg, var(--primary), var(--accent));
+    }
+    .challenge h4 {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 8px;
+    }
+    .challenge .chal-tag {
+      display: inline-block;
+      padding: 2px 8px;
+      background: rgba(245, 158, 11, 0.12);
+      color: var(--warning);
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      margin-bottom: 8px;
+    }
+    .challenge p {
+      font-size: 12px;
+      line-height: 1.65;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    .challenge p.fix {
+      color: var(--text);
+      padding-left: 10px;
+      border-left: 2px solid var(--success);
+    }
+    .challenge p.fix strong { color: var(--success); }
+    @media (max-width: 760px) {
+      .challenges { grid-template-columns: 1fr; }
+    }
+
+    /* Guarantee list */
+    .guarantees {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px 24px;
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .guarantees li {
+      padding-left: 22px;
+      position: relative;
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+    .guarantees li::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 6px;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--success), #34d399);
+      box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
+    }
+    .guarantees li strong { color: var(--text); font-weight: 700; }
+    @media (max-width: 640px) {
+      .guarantees { grid-template-columns: 1fr; }
+    }
 
     /* --- Install CTA --- */
     .install-section { padding: 0 0 72px; }
@@ -968,6 +1234,141 @@
       .demo-body { padding: 20px; }
       .demo-visual { padding: 24px; min-height: 180px; }
     }
+
+    /* --- Back-to-Top Button --- */
+    .back-to-top {
+      position: fixed;
+      left: 28px;
+      bottom: 28px;
+      z-index: 200;
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      border: none;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      color: #fff;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 10px 30px var(--glow), 0 0 0 6px rgba(123, 104, 238, 0.18);
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(12px) scale(0.9);
+      transition: opacity 0.25s, transform 0.25s, visibility 0.25s, box-shadow 0.25s;
+      animation: btt-pulse 2.4s ease-in-out infinite;
+    }
+    .back-to-top.visible { opacity: 1; visibility: visible; transform: translateY(0) scale(1); }
+    .back-to-top:hover {
+      box-shadow: 0 14px 40px var(--glow), 0 0 0 10px rgba(123, 104, 238, 0.25);
+      transform: translateY(-3px) scale(1.04);
+    }
+    .back-to-top:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
+    .back-to-top svg { width: 26px; height: 26px; }
+    .back-to-top::after {
+      content: "TOP";
+      position: absolute;
+      bottom: -22px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 1.5px;
+      color: var(--accent);
+      text-shadow: 0 1px 4px rgba(0,0,0,0.6);
+      pointer-events: none;
+    }
+    @keyframes btt-pulse {
+      0%, 100% { box-shadow: 0 10px 30px var(--glow), 0 0 0 6px rgba(123, 104, 238, 0.18); }
+      50%      { box-shadow: 0 10px 30px var(--glow), 0 0 0 14px rgba(123, 104, 238, 0.08); }
+    }
+    @media (max-width: 768px) {
+      .back-to-top { left: 16px; bottom: 16px; width: 54px; height: 54px; }
+      .back-to-top svg { width: 22px; height: 22px; }
+    }
+
+    /* --- Roadmap --- */
+    .roadmap-section {
+      padding: 90px 0;
+      background: linear-gradient(180deg, var(--bg) 0%, var(--bg-alt) 100%);
+      border-top: 1px solid rgba(123, 104, 238, 0.12);
+    }
+    .roadmap-section .section-label {
+      display: inline-block;
+      padding: 6px 14px;
+      border-radius: 999px;
+      background: rgba(123, 104, 238, 0.15);
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+    .roadmap-section h2 {
+      font-size: clamp(1.8rem, 4vw, 2.5rem);
+      font-weight: 800;
+      margin-bottom: 14px;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .roadmap-section .section-subtitle { color: var(--muted); font-size: 1.05rem; max-width: 760px; margin-bottom: 44px; }
+    .roadmap-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 22px; }
+    .roadmap-tier {
+      background: var(--surface);
+      border: 1px solid rgba(123, 104, 238, 0.18);
+      border-radius: 16px;
+      padding: 28px;
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.25s, border-color 0.25s, box-shadow 0.25s;
+    }
+    .roadmap-tier:hover { transform: translateY(-4px); border-color: var(--primary); box-shadow: 0 12px 40px rgba(123, 104, 238, 0.18); }
+    .roadmap-tier::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, var(--primary), var(--accent));
+    }
+    .tier-badge {
+      display: inline-block;
+      padding: 4px 10px;
+      background: rgba(187, 134, 252, 0.15);
+      color: var(--accent);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1.2px;
+      border-radius: 6px;
+      margin-bottom: 12px;
+    }
+    .roadmap-tier h3 { font-size: 1.15rem; font-weight: 700; margin-bottom: 8px; color: var(--text); }
+    .tier-headline { color: var(--muted); font-size: 13px; margin-bottom: 18px; line-height: 1.55; }
+    .tier-items { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+    .tier-items li { font-size: 13.5px; color: var(--muted); padding-left: 20px; position: relative; line-height: 1.5; }
+    .tier-items li::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 8px;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      box-shadow: 0 0 0 3px rgba(123, 104, 238, 0.15);
+    }
+    .tier-items li strong { color: var(--text); font-weight: 600; }
+    .roadmap-closing {
+      margin-top: 48px;
+      padding: 28px 32px;
+      background: linear-gradient(135deg, rgba(123, 104, 238, 0.08), rgba(187, 134, 252, 0.08));
+      border: 1px solid rgba(123, 104, 238, 0.18);
+      border-radius: 16px;
+      color: var(--text);
+    }
+    .roadmap-closing strong { color: var(--accent); }
   </style>
 </head>
 <body>
@@ -996,6 +1397,7 @@
         <a href="#how-it-works">How It Works</a>
         <a href="#features">Features</a>
         <a href="#architecture">Architecture</a>
+        <a href="#roadmap">Roadmap</a>
         <a href="https://github.com/manishjnv/AccessBridge" target="_blank">GitHub</a>
         <a href="#install" class="navbar-cta">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
@@ -1327,26 +1729,183 @@
   <!-- Architecture -->
   <section class="arch-section" id="architecture">
     <div class="container">
-      <div class="arch fade-in">
-        <h2 class="section-title" style="text-align:left">Architecture</h2>
+      <h2 class="section-title fade-in">Architecture</h2>
+      <p class="arch-intro fade-in">A privacy-first, on-device accessibility operating layer. Behavioral signals are captured in the DOM, scored locally, and a targeted adaptation lands inside <strong style="color:var(--accent)">50 ms</strong> — no network round-trip, no user configuration, no disclosure required.</p>
+
+      <!-- Engineering metrics -->
+      <div class="arch-metrics fade-in">
+        <div class="metric"><div class="metric-val">187</div><div class="metric-label">Unit Tests Green</div></div>
+        <div class="metric"><div class="metric-val">&lt; 50 ms</div><div class="metric-label">Adaptation Latency</div></div>
+        <div class="metric"><div class="metric-val">0 KB/s</div><div class="metric-label">Network for Signals</div></div>
+        <div class="metric"><div class="metric-val">17</div><div class="metric-label">Languages Shipped</div></div>
+      </div>
+
+      <!-- Signal → adaptation pipeline -->
+      <div class="arch-card fade-in">
+        <h3>Signal → Adaptation Pipeline</h3>
+        <p class="card-sub">Four stages from raw mouse event to applied DOM mutation. Runs entirely inside the Chrome process — the background service worker handles scoring, content scripts do collection and mutation. Nothing leaves the browser for adaptation decisions.</p>
+        <div class="pipeline">
+          <div class="pipe-step">
+            <div class="pipe-num">1</div>
+            <h4>Collect</h4>
+            <p>Five passive DOM listeners sample scroll velocity, click accuracy, typing rhythm, cursor path, and dwell time without blocking input.</p>
+            <div class="pipe-tech">addEventListener · passive · 5 s buffer</div>
+          </div>
+          <div class="pipe-step">
+            <div class="pipe-num">2</div>
+            <h4>Score</h4>
+            <p>Each signal is normalized to 0–1, batched, and fed into an EMA-smoothed weighted composite that produces a live struggle score.</p>
+            <div class="pipe-tech">StruggleDetector · 3 s tick · EMA α = 0.3</div>
+          </div>
+          <div class="pipe-step">
+            <div class="pipe-num">3</div>
+            <h4>Decide</h4>
+            <p>A rule-based classifier evaluates the score against the user profile and emits one of 16 adaptation types when a confidence threshold is crossed.</p>
+            <div class="pipe-tech">DecisionEngine · 16 rules · profile-gated</div>
+          </div>
+          <div class="pipe-step">
+            <div class="pipe-num">4</div>
+            <h4>Adapt</h4>
+            <p>The adaptation is routed to SensoryAdapter, CognitiveSimplifier, VoiceCommand, or DomainConnector, which mutates the DOM with a reversible handle.</p>
+            <div class="pipe-tech">sendMessage · shadow-CSS vars · reversible</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Layered system -->
+      <div class="arch-card fade-in">
+        <h3>Layered System</h3>
+        <p class="card-sub">Each layer owns a single concern and communicates through a typed message bus. Swap any layer (UI framework, AI provider, signal source) without rewiring the rest.</p>
+        <div class="stack">
+          <div class="stack-layer">
+            <div class="stack-layer-name">L1 · UI</div>
+            <div class="stack-layer-body"><strong>React 18 popup + side panel</strong> — struggle gauge, toggle grid, profile editor, self-hosted update banner. State mirrored to <code style="background:rgba(123,104,238,0.15);padding:1px 5px;border-radius:4px">chrome.storage.local</code> so it survives popup close.</div>
+          </div>
+          <div class="stack-layer">
+            <div class="stack-layer-name">L2 · Content</div>
+            <div class="stack-layer-body"><strong>10+ feature modules</strong> injected per tab: SensoryAdapter, CognitiveSimplifier, VoiceCommandSystem, EyeTracker, DwellClick, KeyboardOnlyMode, PredictiveInput, TransliterationController, AIBridge, 6 DomainConnectors.</div>
+          </div>
+          <div class="stack-layer">
+            <div class="stack-layer-name">L3 · Worker</div>
+            <div class="stack-layer-body"><strong>Background service worker</strong> hosts StruggleDetector, DecisionEngine, ProfileStore, and the 3-tier AI engine. Persists profile, broadcasts <code style="background:rgba(123,104,238,0.15);padding:1px 5px;border-radius:4px">PROFILE_UPDATED</code> to every open tab.</div>
+          </div>
+          <div class="stack-layer">
+            <div class="stack-layer-name">L4 · Browser</div>
+            <div class="stack-layer-body"><strong>Native Chrome APIs</strong> only — Web Speech (voice I/O), Shape Detection (FaceDetector for gaze), MutationObserver (dynamic content), chrome.storage / tabs / runtime / downloads. No polyfills, no shims.</div>
+          </div>
+          <div class="stack-layer">
+            <div class="stack-layer-name">L5 · Cloud</div>
+            <div class="stack-layer-body"><strong>Optional and rare</strong> — the local AI tier handles ~90% of summarization and simplification. Only long-form or novel prompts reach Gemini Flash or Claude Sonnet, gated by a per-day cost budget.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Monorepo packages -->
+      <div class="arch-card fade-in">
+        <h3>Monorepo Packages</h3>
+        <p class="card-sub">Three typed packages wired through pnpm workspaces. Every cross-package import goes through an <code style="background:rgba(123,104,238,0.15);padding:1px 5px;border-radius:4px">exports</code> map so refactors land atomically.</p>
         <div class="arch-grid">
           <div class="arch-item">
             <h4>@accessbridge/core</h4>
-            <p>Types, ProfileStore, StruggleDetector, DecisionEngine. Zero external dependencies.</p>
+            <p>Types, ProfileStore, StruggleDetector, DecisionEngine, i18n (transliteration rules + language ranges). <strong>Zero external runtime dependencies.</strong></p>
           </div>
           <div class="arch-item">
             <h4>@accessbridge/extension</h4>
-            <p>Manifest V3 Chrome extension. React popup, side panel, content scripts, sensory adapter.</p>
+            <p>Manifest V3 Chrome extension. React popup + side panel, content scripts, 6 domain connectors, SensoryAdapter, TransliterationController, LanguageDetector.</p>
           </div>
           <div class="arch-item">
             <h4>@accessbridge/ai-engine</h4>
-            <p>3-tier AI with caching and cost tracking. Summarizer, simplifier, classifier, translator.</p>
+            <p>3-tier AI with cache, cost tracker, and provider router. Summarizer, Simplifier, Classifier, Translator services — all tier-aware.</p>
           </div>
           <div class="arch-item">
-            <h4>Content Modules</h4>
-            <p>Cognitive Simplifier, Voice Commands, Fatigue Adaptive UI, Dwell Click, Eye Tracker, AI Bridge.</p>
+            <h4>Deploy Stack</h4>
+            <p>Dockerized nginx + FastAPI on Hostinger KVM2. Self-hosted update server (<code style="background:rgba(123,104,238,0.15);padding:1px 5px;border-radius:4px">/api/version</code>), landing page, extension download.</p>
           </div>
         </div>
+      </div>
+
+      <!-- Tech stack -->
+      <div class="arch-card fade-in">
+        <h3>Technology Stack</h3>
+        <p class="card-sub">Picked for longevity and zero-runtime-dependency where possible. Strict TypeScript end-to-end; no <code style="background:rgba(123,104,238,0.15);padding:1px 5px;border-radius:4px">any</code> in production code.</p>
+        <div class="tech-grid">
+          <span class="tech-chip"><span class="tech-dot"></span>TypeScript 5.5 (strict)</span>
+          <span class="tech-chip"><span class="tech-dot"></span>Chrome Manifest V3</span>
+          <span class="tech-chip"><span class="tech-dot"></span>React 18</span>
+          <span class="tech-chip"><span class="tech-dot"></span>Tailwind CSS</span>
+          <span class="tech-chip"><span class="tech-dot"></span>Vite 5</span>
+          <span class="tech-chip"><span class="tech-dot"></span>vitest 2</span>
+          <span class="tech-chip"><span class="tech-dot"></span>pnpm workspaces</span>
+          <span class="tech-chip"><span class="tech-dot"></span>Web Speech API</span>
+          <span class="tech-chip"><span class="tech-dot"></span>FaceDetector (Shape Detection)</span>
+          <span class="tech-chip"><span class="tech-dot"></span>SpeechSynthesis</span>
+          <span class="tech-chip"><span class="tech-dot"></span>MutationObserver</span>
+          <span class="tech-chip"><span class="tech-dot"></span>Gemini Flash</span>
+          <span class="tech-chip"><span class="tech-dot"></span>Claude Sonnet</span>
+          <span class="tech-chip"><span class="tech-dot"></span>FastAPI</span>
+          <span class="tech-chip"><span class="tech-dot"></span>Docker Compose</span>
+          <span class="tech-chip"><span class="tech-dot"></span>nginx</span>
+        </div>
+      </div>
+
+      <!-- Critical challenges -->
+      <div class="arch-card fade-in">
+        <h3>Critical Challenges, Solved</h3>
+        <p class="card-sub">Hard problems encountered during the build, and the engineering decisions that closed them. Each one is documented in <a href="https://github.com/manishjnv/AccessBridge/blob/main/RCA.md" target="_blank" style="color:var(--accent);text-decoration:none;border-bottom:1px dashed var(--accent)">RCA.md</a>.</p>
+        <div class="challenges">
+          <div class="challenge">
+            <span class="chal-tag">BUG-008 · Critical</span>
+            <h4>Content-script chunk collisions</h4>
+            <p>Vite minifies shared chunks into short var names (<code style="background:rgba(123,104,238,0.15);padding:1px 5px;border-radius:4px">R</code>, <code style="background:rgba(123,104,238,0.15);padding:1px 5px;border-radius:4px">I</code>). When the build-time plugin inlined every chunk into a single IIFE, two chunks declared <code style="background:rgba(123,104,238,0.15);padding:1px 5px;border-radius:4px">var R</code> — a <em>SyntaxError</em> killed every feature on every page.</p>
+            <p class="fix"><strong>Fix:</strong> wrap each chunk in its own IIFE that returns a namespace object; import bindings are aliased from the namespace. No identifier leaks between chunks.</p>
+          </div>
+          <div class="challenge">
+            <span class="chal-tag">BUG-007 · High</span>
+            <h4>Site-agnostic font scaling</h4>
+            <p>Wikipedia's deeply specific selectors defeated <code style="background:rgba(123,104,238,0.15);padding:1px 5px;border-radius:4px">font-size: inherit !important</code> on a universal <code style="background:rgba(123,104,238,0.15);padding:1px 5px;border-radius:4px">*</code> rule — the font slider did nothing on complex sites.</p>
+            <p class="fix"><strong>Fix:</strong> switched to the CSS <code style="background:rgba(123,104,238,0.15);padding:1px 5px;border-radius:4px">zoom</code> property, which works above the cascade and scales layout uniformly across every site tested.</p>
+          </div>
+          <div class="challenge">
+            <span class="chal-tag">BUG-005 · High</span>
+            <h4>Popup state that survives close</h4>
+            <p>React <code style="background:rgba(123,104,238,0.15);padding:1px 5px;border-radius:4px">useState</code> resets every time the popup closes. The master on/off toggle silently flipped back to "on" on reopen, making the disable control feel broken.</p>
+            <p class="fix"><strong>Fix:</strong> a chrome.storage.local bridge hydrates the React tree on mount and mirrors writes back. <code style="background:rgba(123,104,238,0.15);padding:1px 5px;border-radius:4px">chrome.storage.onChanged</code> broadcasts updates to content scripts so changes are applied live.</p>
+          </div>
+          <div class="challenge">
+            <span class="chal-tag">BUG-001 · Critical</span>
+            <h4>Chrome sideload blank-page trap</h4>
+            <p>Vite's default <code style="background:rgba(123,104,238,0.15);padding:1px 5px;border-radius:4px">base: '/'</code> produces absolute asset paths — which resolve to nothing inside the <code style="background:rgba(123,104,238,0.15);padding:1px 5px;border-radius:4px">chrome-extension://</code> origin. Popup and side panel rendered blank white.</p>
+            <p class="fix"><strong>Fix:</strong> set <code style="background:rgba(123,104,238,0.15);padding:1px 5px;border-radius:4px">base: ''</code> so HTML uses relative paths. Pinned as an invariant in CLAUDE.md; any HTML entry point is checked at build for relative asset URLs.</p>
+          </div>
+          <div class="challenge">
+            <span class="chal-tag">Research · Hard</span>
+            <h4>ITRANS transliteration without a server</h4>
+            <p>10 Indian languages need on-device Latin→script conversion. Simple char maps don't handle matras (vowels become diacritics after a consonant) or halant (consonant clusters need a joiner).</p>
+            <p class="fix"><strong>Fix:</strong> a greedy longest-match scanner with a 2-state machine (<em>initial</em> / <em>after-consonant</em>). ~200 rules per script, 49 unit tests, ships in under 10 KB.</p>
+          </div>
+          <div class="challenge">
+            <span class="chal-tag">Scale · Subtle</span>
+            <h4>Routing 10 Indic languages to one dispatcher</h4>
+            <p>Every language needs its own native-script phrase set, but duplicating the English command switch 10× is a maintenance trap — one rename would drift across all of them.</p>
+            <p class="fix"><strong>Fix:</strong> a unified <code style="background:rgba(123,104,238,0.15);padding:1px 5px;border-radius:4px">INDIC_COMMANDS</code> registry where each phrase maps to the same English <code style="background:rgba(123,104,238,0.15);padding:1px 5px;border-radius:4px">action</code> string. One dispatcher handles all 17 locales; adding a language is a pure-data change.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Privacy & performance -->
+      <div class="arch-card fade-in">
+        <h3>Privacy &amp; Performance Guarantees</h3>
+        <p class="card-sub">Non-negotiables the architecture was designed around from day one.</p>
+        <ul class="guarantees">
+          <li><strong>100% on-device</strong> for behavioral data — zero network I/O for struggle scoring or adaptation decisions.</li>
+          <li><strong>Zero disclosure</strong> — the user never tells a website they need help; the website never knows an adaptation fired.</li>
+          <li><strong>Reversible by default</strong> — every adaptation carries a revert handle. Master toggle off = every mutation undone in one message.</li>
+          <li><strong>AI cascade</strong> — free local tier first; paid tiers gated by a daily cost budget tracked in-browser.</li>
+          <li><strong>Strict TypeScript</strong> end-to-end; no <code style="background:rgba(123,104,238,0.15);padding:1px 5px;border-radius:4px">any</code>, no <code style="background:rgba(123,104,238,0.15);padding:1px 5px;border-radius:4px">// @ts-ignore</code> in production code.</li>
+          <li><strong>Adaptation latency &lt; 50 ms</strong> from signal threshold crossing to DOM change.</li>
+          <li><strong>Content-script syntax-check</strong> runs on every build (<code style="background:rgba(123,104,238,0.15);padding:1px 5px;border-radius:4px">node -c dist/…/content/index.js</code>) to catch the chunk-collision trap before it ships.</li>
+          <li><strong>187 unit tests</strong> cover struggle scoring, decision rules, profile persistence, transliteration, language detection, and the AI cache / cost tracker.</li>
+        </ul>
       </div>
     </div>
   </section>
@@ -1382,6 +1941,86 @@
     </div>
   </section>
 
+  <!-- Strategic Roadmap -->
+  <section class="roadmap-section" id="roadmap">
+    <div class="container">
+      <div class="section-label">Beyond the extension</div>
+      <h2>The Full AccessBridge Vision</h2>
+      <p class="section-subtitle">
+        The browser extension is the wedge. The real platform is the core + AI engine —
+        every surface where accessibility gaps exist is a candidate deliverable.
+      </p>
+
+      <div class="roadmap-grid">
+        <div class="roadmap-tier">
+          <span class="tier-badge">Tier 1</span>
+          <h3>Same Core, New Surfaces</h3>
+          <p class="tier-headline">Everywhere accessibility matters — not just browsers.</p>
+          <ul class="tier-items">
+            <li><strong>Desktop companion (Tauri)</strong> — ambient adaptation for Word, Excel, Teams, Slack, VS Code</li>
+            <li><strong>Android accessibility service</strong> — system-wide for native apps</li>
+            <li><strong>iOS app</strong> — Safari extension + in-app SDK</li>
+            <li><strong>CLI / Terminal mode</strong> — jargon decoder, error-message simplifier</li>
+          </ul>
+        </div>
+
+        <div class="roadmap-tier">
+          <span class="tier-badge">Tier 2</span>
+          <h3>Enterprise Layer</h3>
+          <p class="tier-headline">Deploy + monitor accessibility across an organization.</p>
+          <ul class="tier-items">
+            <li><strong>Admin console</strong> — org-wide profile defaults, aggregate struggle heatmaps</li>
+            <li><strong>Compliance scanner</strong> — WCAG / Section 508 audits with reports</li>
+            <li><strong>Profile sync + SSO</strong> — SAML/OIDC, profile follows the user</li>
+            <li><strong>Audit log + ROI reporting</strong> — which apps cause most struggle</li>
+          </ul>
+        </div>
+
+        <div class="roadmap-tier">
+          <span class="tier-badge">Tier 3</span>
+          <h3>Ecosystem (Developer)</h3>
+          <p class="tier-headline">Turn the AI engine into a platform, not just a product.</p>
+          <ul class="tier-items">
+            <li><strong>JS/TS SDK</strong> — embed AccessBridge in any web app, no user install</li>
+            <li><strong>Public API</strong> — summarize + simplify endpoints for integrations</li>
+            <li><strong>Figma plugin</strong> — audit designs for accessibility before build</li>
+            <li><strong>VS Code extension</strong> — warn devs writing inaccessible markup</li>
+            <li><strong>Domain connector framework</strong> — community contribs per industry</li>
+          </ul>
+        </div>
+
+        <div class="roadmap-tier">
+          <span class="tier-badge">Tier 4</span>
+          <h3>Research / Moonshot</h3>
+          <p class="tier-headline">Where accessibility intersects with ambient computing.</p>
+          <ul class="tier-items">
+            <li><strong>Real-time meeting captions + translation</strong> — Teams, Zoom, Meet</li>
+            <li><strong>AR overlay for smart glasses</strong> — menu reading, sign translation</li>
+            <li><strong>Voice-first OS layer</strong> — full voice navigation for Windows</li>
+            <li><strong>On-device ML models</strong> — WASM + WebGPU, zero cloud dependency</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="roadmap-closing">
+        <strong>Strategic take:</strong>
+        for the ideathon, the extension alone demonstrates the full architecture.
+        For post-ideathon: <strong>Desktop app (Tauri)</strong> unlocks 80% of work computing outside the browser;
+        <strong>Enterprise admin console</strong> opens B2B revenue;
+        <strong>Public SDK + API</strong> turns the AI engine into a platform.
+        The existing monorepo (core + ai-engine + extension) is already structured so every new surface is
+        just another consumer of the same packages.
+      </div>
+    </div>
+  </section>
+
+  <!-- Back to Top -->
+  <button id="back-to-top" class="back-to-top" aria-label="Back to top" title="Back to top">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M12 19V5M5 12l7-7 7 7"/>
+    </svg>
+  </button>
+
   <!-- Footer -->
   <footer>
     <div class="container">
@@ -1402,7 +2041,6 @@
             <h4>Links</h4>
             <a href="https://github.com/manishjnv/AccessBridge" target="_blank">GitHub Repository</a>
             <a href="https://github.com/manishjnv/AccessBridge/issues" target="_blank">Report Issues</a>
-            <a href="https://github.com/manishjnv/AccessBridge/blob/main/HANDOFF.md" target="_blank">Dev Handoff</a>
           </div>
         </div>
       </div>
@@ -1417,11 +2055,16 @@
   </footer>
 
   <script>
-    // Navbar scroll effect
+    // Navbar scroll effect + back-to-top visibility
     const navbar = document.getElementById('navbar');
+    const backToTop = document.getElementById('back-to-top');
     window.addEventListener('scroll', () => {
       navbar.classList.toggle('scrolled', window.scrollY > 20);
+      backToTop.classList.toggle('visible', window.scrollY > 400);
     }, { passive: true });
+    backToTop.addEventListener('click', () => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
 
     // Mobile nav toggle
     const navToggle = document.getElementById('nav-toggle');

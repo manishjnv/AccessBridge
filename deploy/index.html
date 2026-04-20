@@ -432,10 +432,31 @@
     .reach-row-global { border-left: 2px solid rgba(123,104,238,0.25); padding-left: 8px; }
     @media (min-width: 720px) {
       .reach-row {
-        grid-template-columns: 140px 180px 1fr;
+        grid-template-columns: 130px 150px 1fr;
       }
       .reach-bar-track { grid-column: auto; height: 12px; }
       .reach-list { max-height: none; overflow: visible; }
+    }
+    /* Two-column layout on wide screens — cuts the 28-row list roughly in half
+       vertically. CSS multi-column naturally flows top-to-bottom in the left
+       column, then continues in the right column, preserving speaker-count
+       descending order within each column. */
+    @media (min-width: 960px) {
+      .reach-list {
+        display: block;
+        column-count: 2;
+        column-gap: 36px;
+        column-rule: 1px dashed rgba(123,104,238,0.18);
+      }
+      .reach-row {
+        break-inside: avoid;
+        -webkit-column-break-inside: avoid;
+        page-break-inside: avoid;
+        margin-bottom: 8px;
+        padding: 2px 0 2px 8px;
+      }
+      .reach-row:last-child { margin-bottom: 0; }
+      .reach-bar-track { height: 10px; }
     }
     .stat {
       text-align: center;

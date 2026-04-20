@@ -27,6 +27,9 @@ function makeProfile(
     cognitive: { ...DEFAULT_COGNITIVE_PROFILE },
     motor: { ...DEFAULT_MOTOR_PROFILE },
     language: 'en',
+    autoDetectLanguage: false,
+    transliterationEnabled: false,
+    transliterationScript: 'devanagari',
     adaptationMode: 'auto',
     confidenceThreshold: 0.0, // accept all confidence levels by default in tests
     ...overrides,

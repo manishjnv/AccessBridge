@@ -17,12 +17,14 @@ import { VoiceCommandSystem } from './motor/voice-commands.js';
 import { FatigueAdaptiveUI } from './fatigue/adaptive-ui.js';
 import { AIBridge } from './ai/bridge.js';
 import { EmailSummarizationUI } from './ai/email-ui.js';
-import { matchHindiCommand } from './motor/hindi-commands.js';
+import { matchAnyIndicCommand } from './motor/indic-commands.js';
 import { DwellClickSystem } from './motor/dwell-click.js';
 import { EyeTracker } from './motor/eye-tracker.js';
 import { KeyboardOnlyMode } from './motor/keyboard-mode.js';
 import { PredictiveInputSystem } from './motor/predictive-input.js';
 import { DomainConnectorRegistry } from './domains/index.js';
+import { TransliterationController } from './i18n/transliteration.js';
+import { detectPageLanguage, detectedLangToVoiceLocale } from './i18n/language-detect.js';
 
 // ---------- App Detection ----------
 
@@ -238,6 +240,14 @@ let keyboardMode: KeyboardOnlyMode | null = null;
 let predictiveInput: PredictiveInputSystem | null = null;
 let emailUI: EmailSummarizationUI | null = null;
 let domainRegistry: DomainConnectorRegistry | null = null;
+let transliterationCtl: TransliterationController | null = null;
+
+function getTransliteration(): TransliterationController {
+  if (!transliterationCtl) {
+    transliterationCtl = new TransliterationController('devanagari');
+  }
+  return transliterationCtl;
+}
 
 function getAI(): AIBridge {
   if (!aiBridge) {
@@ -316,10 +326,11 @@ function getFatigue(): FatigueAdaptiveUI {
 // ---------- Voice command handler ----------
 
 function handleVoiceCommand(command: string, args: string): void {
-  // Try Hindi command matching if the command doesn't match English commands
-  const hindiMatch = matchHindiCommand(command + (args ? ' ' + args : ''));
-  if (hindiMatch) {
-    handleVoiceCommand(hindiMatch.action, hindiMatch.args);
+  // Try native-script matching across all 10 Indic languages first.
+  // If the transcript is an Indic phrase, it routes to the same English action.
+  const indicMatch = matchAnyIndicCommand(command + (args ? ' ' + args : ''));
+  if (indicMatch) {
+    handleVoiceCommand(indicMatch.result.action, indicMatch.result.args);
     return;
   }
 
@@ -471,6 +482,7 @@ function listenForCommands(adapter: BaseAdapter, sensory: SensoryAdapter): void 
           getEmailUI().stop();
           getAI().dismiss();
           getDomainRegistry().deactivateAll();
+          getTransliteration().stop();
           sendResponse({ reverted: true });
           break;
         }
@@ -498,7 +510,17 @@ function listenForCommands(adapter: BaseAdapter, sensory: SensoryAdapter): void 
         case 'PROFILE_UPDATED': {
           const updatedProfile = message.payload as {
             sensory?: { fontScale?: number; contrastLevel?: number; lineHeight?: number; letterSpacing?: number; colorCorrectionMode?: string; reducedMotion?: boolean; highContrast?: boolean };
+            transliterationEnabled?: boolean;
+            transliterationScript?: 'devanagari' | 'tamil' | 'telugu' | 'kannada';
           };
+          if (updatedProfile?.transliterationEnabled !== undefined) {
+            const ctl = getTransliteration();
+            if (updatedProfile.transliterationScript) ctl.setScript(updatedProfile.transliterationScript);
+            if (updatedProfile.transliterationEnabled) ctl.start();
+            else ctl.stop();
+          } else if (updatedProfile?.transliterationScript) {
+            getTransliteration().setScript(updatedProfile.transliterationScript);
+          }
           if (updatedProfile?.sensory) {
             const s = updatedProfile.sensory;
             if (s.fontScale !== undefined && s.fontScale !== 1.0) sensory.applyFontScale(s.fontScale);
@@ -712,23 +734,52 @@ function init(): void {
   // Detect and activate domain-specific connector (banking, insurance, etc.)
   getDomainRegistry().detectAndActivate();
 
-  // Load profile for language setting only — features are toggled on demand via popup
+  // Load profile for language / transliteration settings.
   chrome.runtime.sendMessage({ type: 'GET_PROFILE' }).then((profile) => {
     if (!profile || typeof profile !== 'object') return;
-    const p = profile as { language?: string };
-    // Set voice command language based on profile
-    const langMap: Record<string, string> = {
-      'en': 'en-US', 'hi': 'hi-IN', 'es': 'es-ES',
-      'fr': 'fr-FR', 'de': 'de-DE', 'zh': 'zh-CN',
-      'ja': 'ja-JP', 'ar': 'ar-SA',
+    const p = profile as {
+      language?: string;
+      autoDetectLanguage?: boolean;
+      transliterationEnabled?: boolean;
+      transliterationScript?: 'devanagari' | 'tamil' | 'telugu' | 'kannada';
     };
-    if (p.language && langMap[p.language]) {
+
+    // BCP-47 mapping covering English + 10 Indian languages + other supported languages.
+    const langMap: Record<string, string> = {
+      en: 'en-US',
+      hi: 'hi-IN', bn: 'bn-IN', ur: 'ur-IN', pa: 'pa-IN', mr: 'mr-IN',
+      te: 'te-IN', ta: 'ta-IN', gu: 'gu-IN', kn: 'kn-IN', ml: 'ml-IN',
+      es: 'es-ES', fr: 'fr-FR', de: 'de-DE', zh: 'zh-CN',
+      ja: 'ja-JP', ar: 'ar-SA',
+    };
+
+    let voiceLocale: string | undefined = p.language ? langMap[p.language] : undefined;
+
+    // Auto-detection overrides explicit setting when a non-English page is found.
+    if (p.autoDetectLanguage) {
+      try {
+        const detection = detectPageLanguage();
+        const auto = detectedLangToVoiceLocale(detection.detected);
+        if (auto) voiceLocale = auto;
+        console.log(`[AccessBridge] Page language auto-detected: ${detection.detected} (sample=${detection.sampleSize})`);
+      } catch (err) {
+        console.warn('[AccessBridge] Page language detection failed', err);
+      }
+    }
+
+    if (voiceLocale) {
       voiceCommands = new VoiceCommandSystem({
-        lang: langMap[p.language],
+        lang: voiceLocale,
         onCommand: (command: string, args: string) => {
           handleVoiceCommand(command, args);
         },
       });
+    }
+
+    if (p.transliterationEnabled) {
+      const ctl = getTransliteration();
+      ctl.setScript(p.transliterationScript ?? 'devanagari');
+      ctl.start();
     }
   }).catch(() => {});
 

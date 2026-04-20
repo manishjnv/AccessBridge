@@ -14,7 +14,9 @@
     "./decision": "./src/decision/index.ts",
     "./decision/*": "./src/decision/*",
     "./profile": "./src/profile/index.ts",
-    "./profile/*": "./src/profile/*"
+    "./profile/*": "./src/profile/*",
+    "./i18n": "./src/i18n/index.ts",
+    "./i18n/*": "./src/i18n/*"
   },
   "scripts": {
     "test": "vitest run",

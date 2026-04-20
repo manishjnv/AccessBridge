@@ -197,6 +197,92 @@
       grid-template-columns: repeat(4, 1fr);
       gap: 16px;
     }
+
+    /* --- Global Reach (Indian-language widget) --- */
+    .reach-section {
+      padding: 56px 0 24px;
+    }
+    .reach-card {
+      background: var(--surface);
+      border-radius: 16px;
+      padding: 28px clamp(18px, 3vw, 32px);
+      border: 1px solid rgba(123,104,238,0.15);
+      box-shadow: 0 4px 24px rgba(0,0,0,0.2);
+    }
+    .reach-coverage {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 18px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid rgba(123,104,238,0.12);
+    }
+    .reach-big {
+      font-size: clamp(1.6rem, 4vw, 2.2rem);
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      line-height: 1.1;
+    }
+    .reach-big-sub { color: var(--muted); font-size: 13px; }
+    .reach-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .reach-row {
+      display: grid;
+      grid-template-columns: 120px 1fr auto;
+      align-items: center;
+      gap: 12px;
+    }
+    .reach-native {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .reach-name {
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 500;
+      white-space: nowrap;
+    }
+    .reach-bar-track {
+      background: rgba(123,104,238,0.08);
+      border-radius: 999px;
+      overflow: hidden;
+      height: 10px;
+      position: relative;
+      grid-column: 1 / -1;
+    }
+    .reach-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--primary), var(--accent));
+      border-radius: 999px;
+      transition: width 0.6s ease;
+    }
+    .reach-summary {
+      margin-top: 20px;
+      padding: 12px 16px;
+      background: rgba(123,104,238,0.08);
+      border-radius: 10px;
+      font-size: 13px;
+      color: var(--text);
+      text-align: center;
+    }
+    .reach-summary strong {
+      color: var(--accent);
+      font-weight: 700;
+    }
+    @media (min-width: 720px) {
+      .reach-row {
+        grid-template-columns: 140px 180px 1fr;
+      }
+      .reach-bar-track { grid-column: auto; height: 12px; }
+    }
     .stat {
       text-align: center;
       background: var(--surface);
@@ -683,6 +769,7 @@
     <div class="navbar-inner">
       <a href="#top" class="navbar-brand">AccessBridge</a>
       <div class="navbar-links" id="nav-links">
+        <a href="#global-reach">Reach</a>
         <a href="#how-it-works">How It Works</a>
         <a href="#features">Features</a>
         <a href="#architecture">Architecture</a>
@@ -731,12 +818,47 @@
           <div class="stat-label">Voice Commands</div>
         </div>
         <div class="stat fade-in">
-          <div class="stat-value">8</div>
+          <div class="stat-value">18</div>
           <div class="stat-label">Languages Supported</div>
         </div>
         <div class="stat fade-in">
           <div class="stat-value">0</div>
           <div class="stat-label">Server Dependency</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Global Reach -->
+  <section class="reach-section" id="global-reach">
+    <div class="container">
+      <h2 class="section-title fade-in">Global Reach</h2>
+      <p class="section-sub fade-in">First-class voice commands in 11 languages — reaching about 39% of the world's population in their native script.</p>
+      <div class="reach-card fade-in">
+        <div class="reach-coverage">
+          <div>
+            <div class="reach-big">~3.1 billion speakers</div>
+            <div class="reach-big-sub">10 Indian languages + English, native script on every one</div>
+          </div>
+          <div class="reach-big-sub">Total world population: ~8.0 billion</div>
+        </div>
+        <div class="reach-list">
+          <div class="reach-row"><span class="reach-native">English</span><span class="reach-name">1,456M speakers</span><div class="reach-bar-track"><div class="reach-bar" style="width: 100%"></div></div></div>
+          <div class="reach-row"><span class="reach-native">हिन्दी</span><span class="reach-name">Hindi — 602M</span><div class="reach-bar-track"><div class="reach-bar" style="width: 41%"></div></div></div>
+          <div class="reach-row"><span class="reach-native">বাংলা</span><span class="reach-name">Bengali — 273M</span><div class="reach-bar-track"><div class="reach-bar" style="width: 19%"></div></div></div>
+          <div class="reach-row"><span class="reach-native">اردو</span><span class="reach-name">Urdu — 232M</span><div class="reach-bar-track"><div class="reach-bar" style="width: 16%"></div></div></div>
+          <div class="reach-row"><span class="reach-native">ਪੰਜਾਬੀ</span><span class="reach-name">Punjabi — 113M</span><div class="reach-bar-track"><div class="reach-bar" style="width: 8%"></div></div></div>
+          <div class="reach-row"><span class="reach-native">मराठी</span><span class="reach-name">Marathi — 99M</span><div class="reach-bar-track"><div class="reach-bar" style="width: 7%"></div></div></div>
+          <div class="reach-row"><span class="reach-native">తెలుగు</span><span class="reach-name">Telugu — 96M</span><div class="reach-bar-track"><div class="reach-bar" style="width: 7%"></div></div></div>
+          <div class="reach-row"><span class="reach-native">தமிழ்</span><span class="reach-name">Tamil — 86M</span><div class="reach-bar-track"><div class="reach-bar" style="width: 6%"></div></div></div>
+          <div class="reach-row"><span class="reach-native">ગુજરાતી</span><span class="reach-name">Gujarati — 62M</span><div class="reach-bar-track"><div class="reach-bar" style="width: 4.3%"></div></div></div>
+          <div class="reach-row"><span class="reach-native">ಕನ್ನಡ</span><span class="reach-name">Kannada — 59M</span><div class="reach-bar-track"><div class="reach-bar" style="width: 4%"></div></div></div>
+          <div class="reach-row"><span class="reach-native">മലയാളം</span><span class="reach-name">Malayalam — 38M</span><div class="reach-bar-track"><div class="reach-bar" style="width: 2.6%"></div></div></div>
+        </div>
+        <div class="reach-summary">
+          <strong>10 Indian languages + English ≈ 3.116 B speakers</strong>
+          &nbsp;·&nbsp; covering roughly <strong>39%</strong> of the world population.
+          Latin → Devanagari / Tamil / Telugu / Kannada transliteration is built in (press Alt+T in any input).
         </div>
       </div>
     </div>
@@ -864,7 +986,7 @@
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8"/></svg>
           </div>
           <h3>Voice Commands</h3>
-          <p>25+ hands-free commands via Web Speech API: scroll, click, type, navigate tabs, zoom, find text, and more. Hindi and 7 other languages supported.</p>
+          <p>25+ hands-free commands via Web Speech API: scroll, click, type, navigate tabs, zoom, find text, and more. 10 Indian languages (Hindi, Tamil, Telugu, Kannada, Bengali, Marathi, Gujarati, Malayalam, Punjabi, Urdu) plus English, Spanish, French, German, Japanese, Chinese, Arabic.</p>
         </div>
         <div class="feature fade-in">
           <div class="feature-icon">
@@ -899,7 +1021,7 @@
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
           </div>
           <h3>Multi-Language</h3>
-          <p>Voice commands in Hindi, English, Spanish, French, German, Chinese, Japanese, and Arabic. Profile-based language selection.</p>
+          <p>10 Indian languages first-class: Hindi, Tamil, Telugu, Kannada, Bengali, Marathi, Gujarati, Malayalam, Punjabi, Urdu — plus English and 6 global languages. Latin → Devanagari / Tamil / Telugu / Kannada transliteration built in. Unicode-range page detection auto-selects voice recognition locale.</p>
         </div>
       </div>
     </div>

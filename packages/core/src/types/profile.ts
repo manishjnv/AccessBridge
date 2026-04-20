@@ -36,7 +36,14 @@ export interface AccessibilityProfile {
   sensory: SensoryProfile;
   cognitive: CognitiveProfile;
   motor: MotorProfile;
+  /** Primary spoken language (ISO 639-1 or BCP-47 short form). */
   language: string;
+  /** When true, detect page language from unicode ranges and override voice recognition locale. */
+  autoDetectLanguage: boolean;
+  /** When true, enable Latin → Indic transliteration in input fields (Alt+T to toggle). */
+  transliterationEnabled: boolean;
+  /** Target script for transliteration. */
+  transliterationScript: 'devanagari' | 'tamil' | 'telugu' | 'kannada';
   adaptationMode: 'auto' | 'manual' | 'suggest';
   /** Minimum confidence threshold (0-1) for applying adaptations */
   confidenceThreshold: number;
@@ -81,6 +88,9 @@ export const DEFAULT_PROFILE: AccessibilityProfile = {
   cognitive: { ...DEFAULT_COGNITIVE_PROFILE },
   motor: { ...DEFAULT_MOTOR_PROFILE },
   language: 'en',
+  autoDetectLanguage: false,
+  transliterationEnabled: false,
+  transliterationScript: 'devanagari',
   adaptationMode: 'suggest',
   confidenceThreshold: 0.6,
 };

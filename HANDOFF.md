@@ -1,5 +1,31 @@
 # AccessBridge - Shift Handoff
 
+## Last Session: Day 6 — Indian Language Expansion (April 20, 2026)
+
+### Completed (Day 6)
+
+- [x] **10 Indian languages first-class** — unified voice-command registry in `packages/extension/src/content/motor/indic-commands.ts` with native-script phrases for Hindi, Bengali, Urdu, Punjabi, Marathi, Telugu, Tamil, Gujarati, Kannada, Malayalam. ~24 commands each mapping to the same action identifiers (scroll-up, summarize, click, etc.) as the English dispatcher.
+- [x] **`hindi-commands.ts` refactored to a thin shim** — re-exports the Hindi slice of the new registry so all existing imports keep working.
+- [x] **Latin → Indic transliteration** — `packages/core/src/i18n/transliteration-rules.ts` (pure ITRANS rule tables + greedy longest-match engine for Devanagari, Tamil, Telugu, Kannada) and `packages/extension/src/content/i18n/transliteration.ts` (DOM controller: Alt+T toggle, beforeinput interception, floating pill indicator). Example: typing `namaste` → `नमस्ते`.
+- [x] **Unicode-range page-language auto-detect** — `packages/core/src/i18n/language-ranges.ts` (pure countByLang + detectLanguage with non-Latin tie-break) + `packages/extension/src/content/i18n/language-detect.ts` (page text sampler + voice-locale mapper). Covers 10 Indic languages + English + Arabic/Urdu.
+- [x] **Profile types extended** — added `autoDetectLanguage`, `transliterationEnabled`, `transliterationScript` to `AccessibilityProfile`.
+- [x] **Popup Settings dropdown expanded** — grouped `<optgroup>` for English / Indian / Other; added toggles for auto-detect + transliteration; conditional script selector.
+- [x] **Content script integration** — BCP-47 langMap for all 10 Indic codes; auto-detect path overrides explicit setting when page is non-English; `matchAnyIndicCommand` replaces the Hindi-only matcher so any Indic transcript routes through the English action dispatcher; PROFILE_UPDATED handler reacts to transliteration toggle/script changes at runtime.
+- [x] **Landing-page Global Reach widget** — new section on `http://72.61.227.64:8300/` showing the 11 languages with native script, speaker counts, horizontal bars, and the headline "~3.1 B speakers · ~39% of world population". Responsive (single-column stacked on mobile, 3-col grid on desktop). Stats section "Languages Supported" bumped 8 → 18.
+- [x] **Feature doc** — `docs/features/indian-language.md` covering all 10 languages with example commands, transliteration examples, unicode ranges, and implementation-file map.
+- [x] **187 tests all green** (133 core + 54 AI-engine; +71 new: 49 transliteration + 22 language-detect).
+- [x] **TypeScript zero errors, Vite build succeeds** (content 241KB, background 28KB, sidepanel 19KB, CSS 41KB — content grew +80KB for 10-language registry data).
+- [x] **`node -c` syntax-check of built content + background scripts passes** (RCA BUG-008 guard).
+- [x] **Stale-data scan clean** — no stray references to "& Team" or port 8100 introduced; existing RCA/docs references legitimate.
+- [x] **Extension zips regenerated** — `accessbridge-extension.zip` and `deploy/downloads/accessbridge-extension.zip` (148KB).
+
+#### Tool Contribution (Day 6)
+
+- **Opus (main session):** all implementation — rate limit on Sonnet/Haiku subagents AND the `codex:rescue` skill hit immediately when Phase 1 delegation was dispatched (all 4 parallel launches returned "You've hit your limit · resets 5:30pm"), so per the fallback rule everything was written in the Opus main session.
+- **Sonnet:** n/a — dispatched via 3 parallel Agent calls, every one returned 0 tokens / 0 tool uses due to the rate-limit reject. Feedback loop: when subagents are rate-limited mid-session, main session delivers.
+- **Haiku:** n/a — no bulk-read or post-deploy sweep needed this session.
+- **codex:rescue:** n/a — no security-adjacent changes (no new manifest permissions, no new cross-origin fetch, no content-script injection-logic rewrite). The skill was dispatched once for indic-commands.ts and hit the same rate limit.
+
 ## Last Session: Day 5 — FINAL DAY (April 6, 2026)
 
 ### Completed (Day 5)
@@ -100,23 +126,50 @@
 - [x] VPS infrastructure + optimization
 - [x] Feature documentation
 
-### NOT Done (Carry Forward)
+### Pending Tasks (Before April 11 submission)
 
-- [ ] Chrome sideload test — build is ready, `"type": "module"` fix applied, needs manual test in Chrome
 - [ ] VPS deployment — deploy script ready (`deploy.sh`), not yet executed
-- [x] PPT/presentation created (15 slides, `AccessBridge_Presentation.pptx`)
-- [ ] Demo video recording
+- [ ] Demo video recording (use DEMO_SCRIPT.md)
 - [ ] Real API keys for Gemini/Claude AI tiers (local tier works offline)
-- [x] GitHub push — Day 5 changes committed and pushed
-- [x] Domain connectors — all 6 done (Banking, Insurance, Telecom, Retail, Healthcare, Manufacturing)
+- [ ] PPT polish — add real screenshots from working Chrome extension
+- [ ] Chrome bug fixes — fix any remaining issues found during testing
+- [x] Chrome sideload test — loaded, popup works, struggle detection working
+- [x] PPT/presentation created (15 slides)
+- [x] GitHub push — all changes pushed
+- [x] Domain connectors — all 6 done
+
+### Deferred Features (Roadmap / Post-Submission)
+
+| # | Feature | Planned Section | Why Deferred | PPT Mention |
+|---|---------|----------------|-------------|-------------|
+| 1 | Desktop Agent (Tauri/Rust) — native app accessibility via Windows UIA/macOS APIs | Layer 6 | Weeks of Rust work | Phase 2 roadmap |
+| 2 | Profile Export/Import (.a11yprofile encrypted portable file) | Feature 4 | ~1-2 hrs, deprioritized | Architecture supports it |
+| 3 | Vision Semantic Recovery — infer ARIA labels from screenshots via vision model | Feature 5 | Needs ~200MB vision model | AI advancement slide |
+| 4 | 21 remaining Indian languages (only Hindi STT done) | Feature 6 / Layer 10 | Config work, Web Speech API supports them | "22 languages planned, Hindi proven" |
+| 5 | Zero-Knowledge Attestation — Merkle tree + ring signatures for compliance | Feature 7 | Heavy crypto, enterprise-only | Strong differentiator |
+| 6 | Compliance Observatory Dashboard — differential privacy HR dashboard | Feature 10 | VPS container ready but UI empty | Enterprise deployment |
+| 7 | Multi-Modal Fusion — unified event stream from all input channels | Layer 5 | Complex, signals work independently | Layer 5 in architecture |
+| 8 | Drift Detection — auto-detect when user needs change over time | Layer 7 | Needs long-term usage data | Personalization engine |
+| 9 | Profile Versioning — rollback to previous profiles | Layer 7 | ~1 hr, low demo impact | Mentioned in architecture |
+| 10 | Transliteration — Latin → Devanagari/Tamil keyboard input | Layer 10 | Medium effort | Language layer slide |
+| 11 | On-device ONNX models (Whisper, T5, XGBoost actual ML) | Section 8.3 | 4-5GB downloads, WASM setup | "Rule-based local now, ML roadmap" |
+| 12 | Piper TTS — high-quality local text-to-speech | Section 8.4 | Model download, browser fallback works | Tech stack slide |
+| 13 | Enterprise MDM deployment — SCCM/Intune silent install | Section 9.2 | Enterprise-only, no demo value | Phase 3 scale |
+| 14 | Gesture shortcuts — custom trackpad gestures | Module C | Needs gesture detection lib | Motor assistor slide |
+| 15 | Document simplification UI — plain-language rewrite UI | Module B | AI service built, no UI wired | Partially built |
+| 16 | VPS model CDN — serve ONNX models for lazy download | Section 9 | Models dir empty, local-first approach | Infrastructure slide |
+| 17 | Remaining domain connectors depth — deeper form intelligence, more jargon | Section 10 | 6 connectors built at v0 depth | Domain use cases slide |
+| 18 | Cross-application profile sync — extension ↔ desktop agent | Feature 4 | Needs desktop agent first | Phase 2 |
+| 19 | Environment sensing — ambient light via webcam, noise level | Layer 3 | Medium effort, nice-to-have | Context intelligence |
+| 20 | Accessibility audit reports — per-app WCAG scoring export | Layer 9 | Side panel shows score, no export | Observatory feature |
 
 ### Remaining Priority (Before April 11 submission)
 
-1. **Chrome sideload test**: Load `packages/extension/dist/` in Chrome, verify ALL features
-2. **VPS deploy**: Run `./deploy.sh` or manual SSH deploy
-3. **Bug fixes**: Fix any issues found during Chrome testing
-4. **Demo video**: Record walkthrough using `DEMO_SCRIPT.md`
-5. **PPT polish**: Add real screenshots from working extension
+1. **VPS deploy**: Run `./deploy.sh` or manual SSH deploy
+2. **Bug fixes**: Fix any remaining Chrome issues
+3. **Demo video**: Record walkthrough using `DEMO_SCRIPT.md`
+4. **PPT polish**: Add real screenshots from working extension
+5. **Final package**: Extension zip + PPT + demo video + docs
 
 ### Architecture Notes
 - Monorepo: packages/core, packages/extension, packages/ai-engine

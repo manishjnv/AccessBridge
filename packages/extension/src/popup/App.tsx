@@ -693,16 +693,62 @@ function SettingsTab({
             onSave({ ...profile, language: e.target.value, updatedAt: Date.now() })
           }
         >
-          <option value="en">English</option>
-          <option value="es">Spanish</option>
-          <option value="fr">French</option>
-          <option value="de">German</option>
-          <option value="zh">Chinese</option>
-          <option value="ja">Japanese</option>
-          <option value="ar">Arabic</option>
-          <option value="hi">Hindi</option>
+          <optgroup label="English">
+            <option value="en">English</option>
+          </optgroup>
+          <optgroup label="Indian Languages">
+            <option value="hi">Hindi (हिन्दी)</option>
+            <option value="bn">Bengali (বাংলা)</option>
+            <option value="ur">Urdu (اردو)</option>
+            <option value="pa">Punjabi (ਪੰਜਾਬੀ)</option>
+            <option value="mr">Marathi (मराठी)</option>
+            <option value="te">Telugu (తెలుగు)</option>
+            <option value="ta">Tamil (தமிழ்)</option>
+            <option value="gu">Gujarati (ગુજરાતી)</option>
+            <option value="kn">Kannada (ಕನ್ನಡ)</option>
+            <option value="ml">Malayalam (മലയാളം)</option>
+          </optgroup>
+          <optgroup label="Other">
+            <option value="es">Spanish</option>
+            <option value="fr">French</option>
+            <option value="de">German</option>
+            <option value="zh">Chinese</option>
+            <option value="ja">Japanese</option>
+            <option value="ar">Arabic</option>
+          </optgroup>
         </select>
       </div>
+      <Toggle
+        label="Auto-detect page language"
+        value={profile.autoDetectLanguage}
+        onChange={(v) => onSave({ ...profile, autoDetectLanguage: v, updatedAt: Date.now() })}
+      />
+      <Toggle
+        label="Enable transliteration (Alt+T)"
+        value={profile.transliterationEnabled}
+        onChange={(v) => onSave({ ...profile, transliterationEnabled: v, updatedAt: Date.now() })}
+      />
+      {profile.transliterationEnabled && (
+        <div className="space-y-1">
+          <label className="text-xs text-a11y-muted">Transliteration Script</label>
+          <select
+            className="w-full bg-a11y-surface text-a11y-text border border-a11y-primary/30 rounded px-2 py-1.5 text-sm"
+            value={profile.transliterationScript}
+            onChange={(e) =>
+              onSave({
+                ...profile,
+                transliterationScript: e.target.value as AccessibilityProfile['transliterationScript'],
+                updatedAt: Date.now(),
+              })
+            }
+          >
+            <option value="devanagari">Devanagari (Hindi / Marathi)</option>
+            <option value="tamil">Tamil</option>
+            <option value="telugu">Telugu</option>
+            <option value="kannada">Kannada</option>
+          </select>
+        </div>
+      )}
       <div className="flex gap-2 pt-2">
         <button
           onClick={onExport}

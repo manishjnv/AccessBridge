@@ -1,8 +1,17 @@
 #!/bin/bash
 # AccessBridge VPS Deployment Script
-# Usage: ./deploy.sh [--skip-build] [--skip-push] [--skip-tests] [--no-check]
 #
-# Pipeline: build → test → push → rsync artifacts → VPS sync → health check
+# Usage: ./deploy.sh [flags]
+#   --skip-build  reuse existing dist/ without verification
+#   --skip-push   don't push to GitHub
+#   --skip-tests  skip tests (honored only when tree clean AND HEAD cached as passing)
+#   --skip-bump   don't auto-bump version from conventional commits
+#   --no-check    skip post-deploy health check
+#   --no-cache    bypass all build-cache shortcuts — rebuild, retest from scratch.
+#                 Use when you don't trust the cache or are debugging a suspected
+#                 cache-related issue. Equivalent to the old stateless pipeline.
+#
+# Pipeline: bump → typecheck+build+test → re-zip → push → sync → VPS-verify → health
 # SSH alias: a11yos-vps
 
 set -euo pipefail
@@ -18,6 +27,7 @@ SKIP_PUSH=false
 SKIP_TESTS=false
 SKIP_CHECK=false
 SKIP_BUMP=false
+NO_CACHE=false
 
 for arg in "$@"; do
   case "$arg" in
@@ -26,6 +36,7 @@ for arg in "$@"; do
     --skip-tests)  SKIP_TESTS=true  ;;
     --no-check)    SKIP_CHECK=true  ;;
     --skip-bump)   SKIP_BUMP=true   ;;
+    --no-cache)    NO_CACHE=true    ;;  # restore the old stateless pipeline
     *) echo "Unknown arg: $arg" >&2; exit 2 ;;
   esac
 done
@@ -75,7 +86,9 @@ DIRTY=$(git status --porcelain)
 LAST_TESTED=$(cat "$LAST_TESTED_FILE" 2>/dev/null || echo "")
 
 SHOULD_RUN_TESTS=true
-if [ "$SKIP_TESTS" = true ]; then
+if [ "$NO_CACHE" = true ]; then
+  :  # --no-cache forces tests to run; fall through
+elif [ "$SKIP_TESTS" = true ]; then
   if [ -n "$DIRTY" ]; then
     echo "  ⚠ --skip-tests requested but working tree is dirty — running tests anyway."
   elif [ "$LAST_TESTED" = "$CURRENT_HEAD" ]; then
@@ -85,15 +98,24 @@ if [ "$SKIP_TESTS" = true ]; then
   fi
 fi
 
-# Compute a stable hash of all inputs that can affect the build output.
-# Deliberately EXCLUDES manifest.json and package.json files — those
-# contain version strings that auto-bump rewrites on every deploy, but
-# Vite copies manifest.json to dist/ unchanged and package.json doesn't
-# affect bundle contents. If we included them, a pure version bump would
-# always invalidate the cache, defeating its purpose. When the cache
-# hits, we patch the new manifest.json into dist/ (one `cp`) so the
-# [1.5] zip cross-check still sees the correct version.
-BUILD_INPUTS_HASH=$(
+# Build-cache hash — two halves:
+#
+#   INPUT_HASH  = sha256 of source files, configs, lockfile
+#   OUTPUT_HASH = sha256 of dist/** after successful build
+#
+# We store both, and a cache-hit requires BOTH to match current state.
+# Why both: if a cache entry only verified inputs, a corrupted or
+# partially-deleted dist/ could still look like a cache hit, shipping
+# stale code. The output check is a cryptographic proof that dist/ is
+# byte-identical to the known-good build. ~200ms overhead, closes the
+# statelessness hole we'd otherwise have.
+#
+# INPUT_HASH deliberately EXCLUDES manifest.json and package.json —
+# auto-bump rewrites those on every deploy, but Vite copies manifest.json
+# to dist/ unchanged and package.json doesn't affect bundle contents.
+# On cache hit we `cp` the new manifest into dist/ so [1.5] sees the
+# correct version.
+compute_input_hash() {
   find \
     packages/core/src \
     packages/ai-engine/src \
@@ -109,21 +131,58 @@ BUILD_INPUTS_HASH=$(
   | xargs sha256sum 2>/dev/null \
   | sha256sum \
   | cut -d' ' -f1
-)
-STORED_BUILD_HASH=$(cat "$LAST_BUILD_FILE" 2>/dev/null || echo "")
+}
+
+compute_output_hash() {
+  # dist/ file count is ~30; hashing takes <200ms.
+  [ -d "$DIST_DIR" ] || return 1
+  ( cd "$DIST_DIR" \
+    && find . -type f 2>/dev/null \
+    | sort \
+    | xargs sha256sum 2>/dev/null \
+    | sha256sum \
+    | cut -d' ' -f1 )
+}
+
+BUILD_INPUTS_HASH=$(compute_input_hash)
+# Last-build file now stores two fields, space-separated: <input> <output>
+STORED_IN=""
+STORED_OUT=""
+if [ -f "$LAST_BUILD_FILE" ]; then
+  read -r STORED_IN STORED_OUT < "$LAST_BUILD_FILE" || true
+fi
 
 SHOULD_RUN_BUILD=true
-if [ "$SKIP_BUILD" = true ]; then
+CACHE_SKIP_REASON=""
+
+if [ "$NO_CACHE" = true ]; then
+  CACHE_SKIP_REASON="--no-cache: bypassing build cache"
+elif [ "$SKIP_BUILD" = true ]; then
   SHOULD_RUN_BUILD=false
-elif [ -f "$DIST_DIR/src/content/index.js" ] \
-  && [ -f "$DIST_DIR/manifest.json" ] \
-  && [ -n "$BUILD_INPUTS_HASH" ] \
-  && [ "$BUILD_INPUTS_HASH" = "$STORED_BUILD_HASH" ]; then
-  SHOULD_RUN_BUILD=false
-  # Patch the freshly-bumped manifest into dist so [1.5] sees the new
-  # version. Safe because manifest.json contents aren't consumed by any
-  # built JS (popup reads chrome.runtime.getManifest().version at runtime).
-  cp -f packages/extension/manifest.json "$DIST_DIR/manifest.json"
+  CACHE_SKIP_REASON="--skip-build: reusing dist/ unverified"
+elif [ -z "$BUILD_INPUTS_HASH" ]; then
+  CACHE_SKIP_REASON="no input hash (find/sha256sum missing?) — rebuilding"
+elif [ ! -f "$DIST_DIR/src/content/index.js" ] || [ ! -f "$DIST_DIR/manifest.json" ]; then
+  CACHE_SKIP_REASON="dist/ incomplete — rebuilding"
+elif [ "$BUILD_INPUTS_HASH" != "$STORED_IN" ]; then
+  CACHE_SKIP_REASON="inputs changed (src/config/deps)"
+else
+  # Inputs match. Verify the output is still intact — guards against
+  # corruption, partial deletes, antivirus quarantine, or any post-build
+  # tampering the input-hash alone couldn't see.
+  CURRENT_OUT=$(compute_output_hash 2>/dev/null || echo "")
+  if [ -z "$CURRENT_OUT" ]; then
+    CACHE_SKIP_REASON="failed to hash dist/ — rebuilding"
+  elif [ "$CURRENT_OUT" != "$STORED_OUT" ]; then
+    CACHE_SKIP_REASON="dist/ contents diverged from last known-good — rebuilding"
+  else
+    SHOULD_RUN_BUILD=false
+    CACHE_SKIP_REASON="inputs+outputs match last build (${BUILD_INPUTS_HASH:0:7}/${CURRENT_OUT:0:7})"
+    # Patch the freshly-bumped manifest into dist so [1.5] sees the new
+    # version. Safe because manifest.json contents aren't consumed by any
+    # built JS (popup reads chrome.runtime.getManifest().version at runtime).
+    cp -f packages/extension/manifest.json "$DIST_DIR/manifest.json"
+  fi
 fi
 
 echo "[1/6] typecheck + build + test (parallel)..."
@@ -134,14 +193,11 @@ LABELS=()
 PIDS+=($!); LABELS+=("typecheck")
 
 if [ "$SHOULD_RUN_BUILD" = true ]; then
+  [ -n "$CACHE_SKIP_REASON" ] && echo "  ℹ build cache: $CACHE_SKIP_REASON"
   ( pnpm build ) > /tmp/accessbridge-build.log 2>&1 &
   PIDS+=($!); LABELS+=("build")
 else
-  if [ "$SKIP_BUILD" = true ]; then
-    echo "  ✓ build — --skip-build, reusing dist/"
-  else
-    echo "  ✓ build — inputs unchanged vs last successful build, reusing dist/ (${BUILD_INPUTS_HASH:0:7})"
-  fi
+  echo "  ✓ build skipped — $CACHE_SKIP_REASON"
 fi
 
 if [ "$SHOULD_RUN_TESTS" = true ]; then
@@ -168,10 +224,14 @@ if [ "$SHOULD_RUN_TESTS" = true ]; then
   echo "$CURRENT_HEAD" > "$LAST_TESTED_FILE"
 fi
 
-# Record successful build so the next invocation can skip it when inputs
-# are unchanged. Only write on an actual build run (not skip path).
+# Record successful build so the next invocation can skip it when both
+# inputs AND outputs are unchanged. Only write on an actual build run.
+# Two-field format: "<input_hash> <output_hash>" (single space separator).
 if [ "$SHOULD_RUN_BUILD" = true ] && [ -n "$BUILD_INPUTS_HASH" ]; then
-  echo "$BUILD_INPUTS_HASH" > "$LAST_BUILD_FILE"
+  FRESH_OUTPUT_HASH=$(compute_output_hash 2>/dev/null || echo "")
+  if [ -n "$FRESH_OUTPUT_HASH" ]; then
+    echo "$BUILD_INPUTS_HASH $FRESH_OUTPUT_HASH" > "$LAST_BUILD_FILE"
+  fi
 fi
 
 # ─────────────────────────────────────────────────────────

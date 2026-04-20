@@ -89,6 +89,33 @@ describe('detectLanguage', () => {
     expect(detectLanguage('اردو زبان بہت خوبصورت ہے')).toBe('ur');
   });
 
+  it('pure Russian (Cyrillic) → ru', () => {
+    expect(detectLanguage('Русский язык красивый и могучий')).toBe('ru');
+  });
+
+  it('pure Korean (Hangul) → ko', () => {
+    expect(detectLanguage('한국어는 아름다운 언어입니다')).toBe('ko');
+  });
+
+  it('pure Thai → th', () => {
+    expect(detectLanguage('ภาษาไทยเป็นภาษาที่สวยงาม')).toBe('th');
+  });
+
+  it('countByLang tallies Cyrillic under ru', () => {
+    const c = countByLang('Привет');
+    expect(c.ru).toBeGreaterThan(0);
+  });
+
+  it('countByLang tallies Hangul under ko', () => {
+    const c = countByLang('안녕하세요');
+    expect(c.ko).toBeGreaterThan(0);
+  });
+
+  it('countByLang tallies Thai under th', () => {
+    const c = countByLang('สวัสดี');
+    expect(c.th).toBeGreaterThan(0);
+  });
+
   it('50/50 English + Hindi at default threshold → hi (non-Latin wins)', () => {
     const text = 'Hello world नमस्ते जी';
     expect(detectLanguage(text, 0.3)).toBe('hi');
@@ -106,6 +133,7 @@ describe('detectLanguage', () => {
 
   it('LANG_RANGES has entries for every detected language', () => {
     const ranges = LANG_RANGES.map((r) => r.name);
+    // Indian
     expect(ranges).toContain('hi');
     expect(ranges).toContain('ta');
     expect(ranges).toContain('te');
@@ -115,6 +143,11 @@ describe('detectLanguage', () => {
     expect(ranges).toContain('pa');
     expect(ranges).toContain('ml');
     expect(ranges).toContain('ur');
+    // Global non-Latin additions
+    expect(ranges).toContain('ru');
+    expect(ranges).toContain('ko');
+    expect(ranges).toContain('th');
+    // Latin fallback
     expect(ranges).toContain('en');
   });
 });

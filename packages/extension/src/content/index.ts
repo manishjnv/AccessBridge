@@ -744,13 +744,19 @@ function init(): void {
       transliterationScript?: 'devanagari' | 'tamil' | 'telugu' | 'kannada';
     };
 
-    // BCP-47 mapping covering English + 10 Indian languages + other supported languages.
+    // BCP-47 mapping covering 28 languages: English + 10 Indian + 17 global.
     const langMap: Record<string, string> = {
       en: 'en-US',
+      // 10 Indian languages (native-script commands in indic-commands.ts)
       hi: 'hi-IN', bn: 'bn-IN', ur: 'ur-IN', pa: 'pa-IN', mr: 'mr-IN',
       te: 'te-IN', ta: 'ta-IN', gu: 'gu-IN', kn: 'kn-IN', ml: 'ml-IN',
+      // 6 existing global languages
       es: 'es-ES', fr: 'fr-FR', de: 'de-DE', zh: 'zh-CN',
       ja: 'ja-JP', ar: 'ar-SA',
+      // 11 new global languages
+      pt: 'pt-BR', ru: 'ru-RU', id: 'id-ID', tr: 'tr-TR', vi: 'vi-VN',
+      ko: 'ko-KR', tl: 'fil-PH', fa: 'fa-IR', it: 'it-IT', th: 'th-TH',
+      pl: 'pl-PL',
     };
 
     let voiceLocale: string | undefined = p.language ? langMap[p.language] : undefined;

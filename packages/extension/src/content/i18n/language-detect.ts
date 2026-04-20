@@ -34,6 +34,7 @@ export function detectPageLanguage(): PageLangResult {
 
 const LOCALE_MAP: Record<DetectedLang, string | null> = {
   en: 'en-US',
+  // Indian languages
   hi: 'hi-IN',
   mr: 'mr-IN',
   ta: 'ta-IN',
@@ -44,6 +45,19 @@ const LOCALE_MAP: Record<DetectedLang, string | null> = {
   pa: 'pa-IN',
   ml: 'ml-IN',
   ur: 'ur-IN',
+  // Non-Latin script additions
+  ru: 'ru-RU',
+  ko: 'ko-KR',
+  th: 'th-TH',
+  fa: 'fa-IR',
+  // Latin-script additions
+  pt: 'pt-BR',
+  id: 'id-ID',
+  tr: 'tr-TR',
+  vi: 'vi-VN',
+  tl: 'fil-PH',
+  it: 'it-IT',
+  pl: 'pl-PL',
   unknown: null,
 };
 

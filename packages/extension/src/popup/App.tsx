@@ -249,7 +249,7 @@ export default function App() {
               <button
                 onClick={handleReloadExtension}
                 style={{
-                  background: 'linear-gradient(135deg, #10b981, #059669)',
+                  background: '#10b981',
                   border: 'none', color: 'white', borderRadius: '6px',
                   padding: '8px 16px', fontSize: '12px', fontWeight: 600,
                   cursor: 'pointer', width: '100%',
@@ -708,13 +708,24 @@ function SettingsTab({
             <option value="kn">Kannada (ಕನ್ನಡ)</option>
             <option value="ml">Malayalam (മലയാളം)</option>
           </optgroup>
-          <optgroup label="Other">
-            <option value="es">Spanish</option>
-            <option value="fr">French</option>
-            <option value="de">German</option>
-            <option value="zh">Chinese</option>
-            <option value="ja">Japanese</option>
-            <option value="ar">Arabic</option>
+          <optgroup label="Global Languages">
+            <option value="zh">Chinese (中文)</option>
+            <option value="es">Spanish (Español)</option>
+            <option value="pt">Portuguese (Português)</option>
+            <option value="ru">Russian (Русский)</option>
+            <option value="fr">French (Français)</option>
+            <option value="ar">Arabic (العربية)</option>
+            <option value="id">Indonesian (Bahasa Indonesia)</option>
+            <option value="de">German (Deutsch)</option>
+            <option value="ja">Japanese (日本語)</option>
+            <option value="tr">Turkish (Türkçe)</option>
+            <option value="vi">Vietnamese (Tiếng Việt)</option>
+            <option value="ko">Korean (한국어)</option>
+            <option value="tl">Filipino</option>
+            <option value="fa">Persian (فارسی)</option>
+            <option value="it">Italian (Italiano)</option>
+            <option value="th">Thai (ภาษาไทย)</option>
+            <option value="pl">Polish (Polski)</option>
           </optgroup>
         </select>
       </div>

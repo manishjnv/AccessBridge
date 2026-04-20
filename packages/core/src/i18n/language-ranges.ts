@@ -11,7 +11,9 @@
 // ---------------------------------------------------------------------------
 
 export type DetectedLang =
+  // English + Latin fallback
   | 'en'
+  // 10 Indian languages
   | 'hi'
   | 'mr'
   | 'ta'
@@ -22,6 +24,19 @@ export type DetectedLang =
   | 'pa'
   | 'ml'
   | 'ur'
+  // Non-Latin script additions
+  | 'ru'
+  | 'ko'
+  | 'th'
+  | 'fa'
+  // Latin-script additions (share the English range — distinguished only via profile)
+  | 'pt'
+  | 'id'
+  | 'tr'
+  | 'vi'
+  | 'tl'
+  | 'it'
+  | 'pl'
   | 'unknown';
 
 export interface LangRange {
@@ -45,20 +60,28 @@ export const LANG_RANGES: readonly LangRange[] = [
   { name: 'te', start: 0x0C00, end: 0x0C7F },                   // Telugu
   { name: 'kn', start: 0x0C80, end: 0x0CFF },                   // Kannada
   { name: 'ml', start: 0x0D00, end: 0x0D7F },                   // Malayalam
-  { name: 'ur', start: 0x0600, end: 0x06FF },                   // Arabic (Urdu uses Perso-Arabic)
+  { name: 'th', start: 0x0E00, end: 0x0E7F },                   // Thai
+  { name: 'ur', start: 0x0600, end: 0x06FF, aliases: ['fa'] },  // Perso-Arabic (Urdu / Farsi share the block)
+  { name: 'ru', start: 0x0400, end: 0x04FF },                   // Cyrillic
+  { name: 'ko', start: 0xAC00, end: 0xD7AF },                   // Hangul Syllables
+  { name: 'ko', start: 0x1100, end: 0x11FF },                   // Hangul Jamo
   { name: 'en', start: 0x0041, end: 0x007A },                   // Basic Latin letters (A-Z gap a-z)
 ] as const;
 
 // Non-English detection order — if more than one range hits the threshold,
 // this is the tie-break priority (first entry wins).
 const NON_ENGLISH_ORDER: readonly DetectedLang[] = [
-  'hi', 'bn', 'pa', 'gu', 'ta', 'te', 'kn', 'ml', 'ur',
+  'hi', 'bn', 'pa', 'gu', 'ta', 'te', 'kn', 'ml',
+  'th', 'ur', 'ru', 'ko',
 ];
 
 function emptyCounts(): Record<DetectedLang, number> {
   return {
-    en: 0, hi: 0, mr: 0, ta: 0, te: 0, kn: 0,
-    bn: 0, gu: 0, pa: 0, ml: 0, ur: 0, unknown: 0,
+    en: 0,
+    hi: 0, mr: 0, ta: 0, te: 0, kn: 0, bn: 0, gu: 0, pa: 0, ml: 0, ur: 0,
+    ru: 0, ko: 0, th: 0, fa: 0,
+    pt: 0, id: 0, tr: 0, vi: 0, tl: 0, it: 0, pl: 0,
+    unknown: 0,
   };
 }
 
@@ -70,7 +93,10 @@ function emptyCounts(): Record<DetectedLang, number> {
  * Count characters in `text` that fall within each known language range.
  * Characters outside all ranges are tallied under `unknown`. The counts for
  * `mr` remain zero — Devanagari is primarily counted as `hi` (callers can
- * cross-reference alias metadata if needed).
+ * cross-reference alias metadata if needed). Similarly `fa` aliases to `ur`
+ * (both use the Perso-Arabic block), and Latin-script non-English languages
+ * (pt / id / tr / vi / tl / it / pl) aggregate under `en` — the profile
+ * setting is the only way to disambiguate them.
  */
 export function countByLang(text: string): Record<DetectedLang, number> {
   const counts = emptyCounts();

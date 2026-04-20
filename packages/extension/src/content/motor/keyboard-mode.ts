@@ -424,7 +424,7 @@ export class KeyboardOnlyMode {
         dt.innerHTML = keys.map((k) => `<kbd class="${CSS.OVERLAY_KEY}">${k}</kbd>`).join(' + ');
 
         const dd = document.createElement('dd');
-        dd.style.cssText = 'margin: 0; color: #cbd5e1; font-size: 13px;';
+        dd.style.cssText = 'margin: 0; color: #94a3b8; font-size: 13px;';
         dd.textContent = desc;
 
         list.appendChild(dt);

@@ -256,7 +256,7 @@
   top: 0;
   left: 0;
   right: 0;
-  background: linear-gradient(135deg, #1a1a2e, #16213e);
+  background: linear-gradient(135deg, #1a1a2e, #222240);
   color: #e2e8f0;
   padding: 12px 20px;
   display: flex;
@@ -280,7 +280,8 @@
 }
 
 .a11y-break-reminder button:hover {
-  background: #d63851;
+  background: #e94560;
+  filter: brightness(0.88);
 }
 
 /* ============================================
@@ -344,7 +345,7 @@
   outline-offset: 3px !important;
   /* Soft glow to draw attention without being distracting */
   box-shadow: 0 0 0 4px rgba(123, 104, 238, 0.15) !important;
-  border-radius: 3px;
+  border-radius: 4px;
   /* Animate the outline appearing for a polished feel */
   animation: ab-dwell-target-in 0.12s ease forwards;
 }
@@ -575,13 +576,13 @@
 
 .ab-summary-meta {
   font-size: 11px;
-  color: #888;
+  color: #94a3b8;
 }
 
 .ab-summary-close {
   background: none;
   border: none;
-  color: #888;
+  color: #94a3b8;
   font-size: 20px;
   cursor: pointer;
   padding: 0 4px;
@@ -606,7 +607,7 @@
 
 .ab-summary-content li {
   margin-bottom: 6px;
-  color: #cbd5e1;
+  color: #94a3b8;
 }
 
 .ab-summary-actions {
@@ -667,7 +668,7 @@
 .ab-simplified-close {
   background: none;
   border: none;
-  color: #888;
+  color: #94a3b8;
   font-size: 20px;
   cursor: pointer;
 }
@@ -799,7 +800,7 @@
 .ab-kbd-overlay-close {
   background: none;
   border: none;
-  color: #888;
+  color: #94a3b8;
   font-size: 22px;
   cursor: pointer;
   padding: 0 4px;
@@ -947,7 +948,7 @@
 .ab-email-panel-close {
   background: none;
   border: none;
-  color: #888;
+  color: #94a3b8;
   font-size: 22px;
   cursor: pointer;
   padding: 0 4px;
@@ -988,7 +989,7 @@
 
 .ab-email-bullets li {
   margin-bottom: 8px;
-  color: #cbd5e1;
+  color: #94a3b8;
 }
 
 /* ---- Loading / error states ---- */
@@ -1093,7 +1094,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: #cbd5e1;
+  color: #94a3b8;
 }
 
 /* ---- Phrase badge ---- */
@@ -1106,7 +1107,7 @@
   text-transform: uppercase;
   letter-spacing: 0.04em;
   padding: 1px 5px;
-  border-radius: 3px;
+  border-radius: 4px;
   margin-left: 6px;
   vertical-align: middle;
 }
@@ -1127,7 +1128,7 @@
 .ab-domain-jargon:hover,
 .ab-domain-jargon:focus {
   background: rgba(123, 104, 238, 0.12);
-  border-radius: 2px;
+  border-radius: 4px;
 }
 
 .ab-domain-tooltip {
@@ -1216,7 +1217,7 @@
 
 .ab-domain-field-hint {
   font-size: 12px;
-  color: #8b8fa3;
+  color: #94a3b8;
   margin-top: 4px;
   padding: 4px 8px;
   background: rgba(123, 104, 238, 0.06);
@@ -1269,7 +1270,7 @@
   height: 28px;
   border-radius: 50%;
   background: rgba(123, 104, 238, 0.15);
-  color: #8b8fa3;
+  color: #94a3b8;
   font-size: 12px;
   font-weight: 600;
   transition: all 0.2s ease;
@@ -1321,7 +1322,7 @@
 .ab-domain-policy-banner-toggle {
   background: none;
   border: none;
-  color: #8b8fa3;
+  color: #94a3b8;
   font-size: 14px;
   cursor: pointer;
   padding: 0 4px;
@@ -1329,7 +1330,7 @@
 
 .ab-domain-policy-banner-body {
   padding: 10px 14px;
-  color: #cbd5e1;
+  color: #94a3b8;
   line-height: 1.6;
 }
 
@@ -1367,7 +1368,7 @@
 .ab-domain-comparison-list {
   margin: 0;
   padding: 10px 14px 10px 34px;
-  color: #cbd5e1;
+  color: #94a3b8;
   line-height: 1.6;
 }
 

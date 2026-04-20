@@ -154,9 +154,9 @@ function formatTime(ts: number): string {
 }
 
 function scoreColor(score: number): string {
-  if (score < 30) return '#4ade80';   // green-400
-  if (score < 60) return '#facc15';   // yellow-400
-  return '#f87171';                   // red-400
+  if (score < 30) return '#10b981';   // green-400
+  if (score < 60) return '#f59e0b';   // yellow-400
+  return '#ef4444';                   // red-400
 }
 
 function scoreLabel(score: number): string {
@@ -262,7 +262,7 @@ function CircleScore({ score, size = 48 }: { score: number; size?: number }) {
   const r = (size - 8) / 2;
   const circ = 2 * Math.PI * r;
   const fill = (score / 100) * circ;
-  const color = score >= 80 ? '#4ade80' : score >= 50 ? '#facc15' : '#f87171';
+  const color = score >= 80 ? '#10b981' : score >= 50 ? '#f59e0b' : '#ef4444';
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
       <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="4" />

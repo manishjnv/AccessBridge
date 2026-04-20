@@ -122,7 +122,7 @@ function buildShieldCSS(): string {
       right: 16px;
       z-index: ${Z_BASE + 8};
       background: #1a1a2e;
-      color: #e0e0e0;
+      color: #e2e8f0;
       font-family: system-ui, -apple-system, sans-serif;
       font-size: 13px;
       padding: 8px 14px;
@@ -272,7 +272,7 @@ export class CognitiveSimplifier {
     border.setAttribute('rx', '12');
     border.setAttribute('ry', '12');
     border.setAttribute('fill', 'none');
-    border.setAttribute('stroke', '#6434db');
+    border.setAttribute('stroke', '#7b68ee');
     border.setAttribute('stroke-opacity', '0.85');
     border.setAttribute('stroke-width', String(sw));
     svg.appendChild(border);

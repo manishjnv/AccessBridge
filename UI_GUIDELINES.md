@@ -351,28 +351,20 @@ Since the product *is* accessibility, the UI must pass the bar it promotes.
 
 ---
 
-## 12. Known Inconsistencies (to fix)
+## 12. Compliance Log
 
-### ⚠ Popup Tailwind palette mismatch
+### ✅ Fixed 2026-04-20
 
-`packages/extension/tailwind.config.js` currently defines a parallel palette:
+- **Tailwind palette realigned** — `a11y-primary` `#0f3460` → `#7b68ee`, `a11y-accent` `#e94560` → `#bb86fc`, `a11y-surface` `#16213e` → `#1a1a2e`, `a11y-bg` `#1a1a2e` → `#0a0a1a`. Added `success/warning/danger/focus` tokens. Coral `#e94560` preserved as `a11y-focus` token for focus indicators only.
+- **Sidepanel struggle-score gauge** — `#4ade80/#facc15/#f87171` (Tailwind default greens/yellows/reds) → canonical `#10b981/#f59e0b/#ef4444`.
+- **Content-script grays** — all `#888`, `#cbd5e1`, `#8b8fa3` text colors migrated to canonical `#94a3b8` (muted).
+- **Off-palette outliers** — `#6434db` → `#7b68ee`, `#e0e0e0` → `#e2e8f0`, `#059669` dropped (flat `#10b981`), `#16213e` in gradient → `#222240`, landing `#9488ff`/`#cf9efd` hover gradient → `var(--primary)`/`var(--accent)` + `filter: brightness(1.12)`.
+- **Border-radius spec compliance** — `.ab-dwell-target`, `.ab-predict-phrase`, `.ab-domain-jargon:hover` moved from off-scale 2–3px → `4px`.
+- **Semantic coral** — `.a11y-break-reminder button:hover` darkened via `filter: brightness(0.88)` instead of off-palette `#d63851`.
 
-| a11y token | Current | Should be |
-|---|---|---|
-| primary | `#0f3460` (dark blue) | `#7b68ee` |
-| accent | `#e94560` (coral) | `#bb86fc` |
-| surface | `#16213e` | `#1a1a2e` |
-| bg | `#1a1a2e` | `#0a0a1a` |
+### Still Aspirational
 
-Fix: align tailwind.config.js with the canonical brand. Fifteen-minute change; user-visible as a popup re-theme (purple instead of coral/dark-blue).
-
-### ⚠ Coral accent used in places that aren't focus rings
-
-Some content scripts use `#e94560` as a highlight accent (not as a focus indicator). These should migrate to `var(--accent)` purple to keep coral exclusively semantic (focus = coral, everything else = purple).
-
-### ⚠ Hardcoded hex values that should be CSS vars
-
-Popup `App.tsx` has inline `#7b68ee`, `#bb86fc`, `#10b981` repeated in many places. Long-term: move to CSS vars (or Tailwind plugin) so one-line palette updates propagate.
+- **Inline styles → Tailwind classes** — `popup/App.tsx` still has inline `#7b68ee`/`#bb86fc` in a few gradient/color spots. Values are canonical; refactor to classes is a code-quality improvement, not a palette violation. Track with a future `refactor:` commit, not a `fix:`.
 
 ---
 

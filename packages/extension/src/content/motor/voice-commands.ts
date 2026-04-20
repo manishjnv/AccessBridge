@@ -647,7 +647,7 @@ export class VoiceCommandSystem {
       left: '50%',
       transform: 'translate(-50%, -50%)',
       background: '#1a1a2e',
-      color: '#e0e0e0',
+      color: '#e2e8f0',
       borderRadius: '12px',
       padding: '24px 32px',
       zIndex: '2147483647',

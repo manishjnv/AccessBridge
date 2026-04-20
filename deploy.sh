@@ -86,15 +86,18 @@ if [ "$SKIP_TESTS" = true ]; then
 fi
 
 # Compute a stable hash of all inputs that can affect the build output.
-# If this equals the hash of the last successful build AND dist/ still
-# contains a manifest whose version matches the one we're deploying, the
-# build step is a no-op and we skip it.
+# Deliberately EXCLUDES manifest.json and package.json files — those
+# contain version strings that auto-bump rewrites on every deploy, but
+# Vite copies manifest.json to dist/ unchanged and package.json doesn't
+# affect bundle contents. If we included them, a pure version bump would
+# always invalidate the cache, defeating its purpose. When the cache
+# hits, we patch the new manifest.json into dist/ (one `cp`) so the
+# [1.5] zip cross-check still sees the correct version.
 BUILD_INPUTS_HASH=$(
   find \
     packages/core/src \
     packages/ai-engine/src \
     packages/extension/src \
-    packages/extension/manifest.json \
     packages/extension/vite.config.ts \
     packages/extension/tsconfig.json \
     packages/core/tsconfig.json \
@@ -116,10 +119,11 @@ elif [ -f "$DIST_DIR/src/content/index.js" ] \
   && [ -f "$DIST_DIR/manifest.json" ] \
   && [ -n "$BUILD_INPUTS_HASH" ] \
   && [ "$BUILD_INPUTS_HASH" = "$STORED_BUILD_HASH" ]; then
-  DIST_VERSION=$(node -p "require('./$DIST_DIR/manifest.json').version" 2>/dev/null || echo "")
-  if [ "$DIST_VERSION" = "$VERSION" ]; then
-    SHOULD_RUN_BUILD=false
-  fi
+  SHOULD_RUN_BUILD=false
+  # Patch the freshly-bumped manifest into dist so [1.5] sees the new
+  # version. Safe because manifest.json contents aren't consumed by any
+  # built JS (popup reads chrome.runtime.getManifest().version at runtime).
+  cp -f packages/extension/manifest.json "$DIST_DIR/manifest.json"
 fi
 
 echo "[1/6] typecheck + build + test (parallel)..."

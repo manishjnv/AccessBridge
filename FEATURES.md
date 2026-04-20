@@ -134,7 +134,7 @@ Anonymous, differentially-private daily metrics stream from the extension to a V
 | OBS-06 | Dashboard (3 tabs, SVG charts, print-to-PDF) | [ops/observatory/public/](ops/observatory/public/) | `#overview`, `#trends`, `#compliance` |
 | OBS-07 | Tests (14 cases: Laplace, Merkle, aggregate) | [packages/extension/src/background/__tests__/observatory-publisher.test.ts](packages/extension/src/background/__tests__/observatory-publisher.test.ts) | Non-determinism, order sensitivity, empty inputs |
 
-Live dashboard: `http://72.61.227.64:8300/observatory/` (also linked from landing nav). Docs: [docs/features/compliance-observatory.md](docs/features/compliance-observatory.md).
+Live dashboard: `http://72.61.227.64:8300/observatory/`. The landing page exposes an in-page `#observatory` help section (what it is + privacy guarantees + 3 capability cards) that deep-links to the full dashboard via an "Open full dashboard" CTA — nav and footer both anchor-scroll to that section instead of navigating away. Docs: [docs/features/compliance-observatory.md](docs/features/compliance-observatory.md).
 
 Security invariants enforced at multiple layers: (a) opt-in gate on every `record*` call in background; (b) allowlist of metric keys server-side; (c) UNIQUE(date, merkle_root) + server-side merkle verification for replay/forge resistance; (d) k-anonymity floor of 5 devices before a categorical appears in top-N lists; (e) rate limit 60 req/60 s per IP.
 

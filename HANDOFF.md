@@ -53,6 +53,11 @@ Six-priority sprint pushing the Chrome extension from ~95% demo-ready to feature
 - Wired into [content/index.ts](packages/extension/src/content/index.ts) — singleton, REVERT_ALL stop, PROFILE_UPDATED toggle, init-on-boot. `ensureTimeAwarenessStyles()` injects its own `<style>` tag.
 - **6 new tests** (`time-awareness.test.ts`) covering lifecycle, idempotency, custom thresholds.
 
+#### P7 — Landing-page Observatory in-page help (Opus, 2026-04-20 post-polish)
+
+- [deploy/index.html](deploy/index.html) — navbar Observatory link converted from `/observatory/` (new tab) to in-page `#observatory` anchor; new `observatory-section` inserted between Install and Roadmap with a section-label pill, privacy disclaimer, 3-card capability grid (Trends / Language & domain reach / Compliance report), and a secondary "Open full dashboard" CTA that still opens the full dashboard in a new tab for users who want the deep view. Footer Project column gains an Observatory entry. Pure HTML/CSS addition; no extension code touched. `pnpm typecheck` re-run green.
+- **Why:** the old nav behavior pulled visitors off the landing page before they knew what the Observatory was. New flow keeps the main nav visible (fixed navbar, z-index 100), answers "what is this?" in-page, and only sends users to the standalone dashboard after they opt into clicking the explicit CTA.
+
 #### P6 — Typed shortcut DSL + Observatory polish (Opus — core library only)
 
 - [core/src/shortcuts/dsl.ts](packages/core/src/shortcuts/dsl.ts) — `parseShortcut("summarize | translate:hi | speak")` → `ParsedShortcut { steps, errors, valid }`. 16 known actions. Case-insensitive on action names, keeps original-case args. `runShortcut(parsed, executor)` runs steps sequentially; halts on executor error but keeps prior side-effects. `validateSavedShortcut()` checks structural shape + hotkey-modifier + runs `parseShortcut` on the body. Round-trippable via `stringifyShortcut()`.

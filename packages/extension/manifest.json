@@ -1,20 +1,35 @@
 {
   "name": "AccessBridge",
   "description": "Ambient Accessibility Operating Layer - Zero disclosure, cross-application accessibility",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "manifest_version": 3,
   "update_url": "https://accessbridge.space/updates.xml",
-  "permissions": ["activeTab", "storage", "offscreen", "sidePanel", "downloads", "alarms"],
-  "host_permissions": ["<all_urls>"],
+  "permissions": [
+    "activeTab",
+    "storage",
+    "offscreen",
+    "sidePanel",
+    "downloads",
+    "alarms"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
   "background": {
     "service_worker": "src/background/index.ts",
     "type": "module"
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["src/content/index.ts"],
-      "css": ["src/content/styles.css"],
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "src/content/index.ts"
+      ],
+      "css": [
+        "src/content/styles.css"
+      ],
       "run_at": "document_idle"
     }
   ],

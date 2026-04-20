@@ -17,6 +17,7 @@ SKIP_BUILD=false
 SKIP_PUSH=false
 SKIP_TESTS=false
 SKIP_CHECK=false
+SKIP_BUMP=false
 
 for arg in "$@"; do
   case "$arg" in
@@ -24,9 +25,32 @@ for arg in "$@"; do
     --skip-push)   SKIP_PUSH=true   ;;
     --skip-tests)  SKIP_TESTS=true  ;;
     --no-check)    SKIP_CHECK=true  ;;
+    --skip-bump)   SKIP_BUMP=true   ;;
     *) echo "Unknown arg: $arg" >&2; exit 2 ;;
   esac
 done
+
+# ─────────────────────────────────────────────────────────
+# [0/6] Auto-bump version from conventional commits since last v* tag
+# ─────────────────────────────────────────────────────────
+# feat:  -> minor, BREAKING/!: -> major, everything else -> patch.
+# Skipped if no commits since last tag, or --skip-bump.
+# The bumped commit + tag are pushed together via --follow-tags below.
+PRE_BUMP_VERSION=$(node -p "require('./packages/extension/manifest.json').version")
+if [ "$SKIP_BUMP" = false ]; then
+  echo "[0/6] Auto-bump version (from conventional commits)..."
+  set +e
+  bash scripts/bump-version.sh --auto
+  BUMP_RC=$?
+  set -e
+  case "$BUMP_RC" in
+    0)  echo "  ✓ Version bumped" ;;
+    42) echo "  ✓ No commits since last tag — staying on v${PRE_BUMP_VERSION}" ;;
+    *)  echo "  ✗ scripts/bump-version.sh failed with exit $BUMP_RC"; exit "$BUMP_RC" ;;
+  esac
+else
+  echo "[0/6] Skipping auto-bump (--skip-bump)"
+fi
 
 VERSION=$(node -p "require('./packages/extension/manifest.json').version")
 echo "=== AccessBridge Deploy v${VERSION} ==="
@@ -95,8 +119,10 @@ fi
 # ─────────────────────────────────────────────────────────
 if [ "$SKIP_PUSH" = false ]; then
   echo "[2/6] Pushing to GitHub..."
-  git push origin "$BRANCH"
-  echo "  ✓ Pushed to origin/$BRANCH."
+  # --follow-tags pushes annotated tags reachable from HEAD so the v* tag
+  # written by scripts/bump-version.sh lands alongside the release commit.
+  git push --follow-tags origin "$BRANCH"
+  echo "  ✓ Pushed to origin/$BRANCH (with tags)."
 else
   echo "[2/6] Skipping push"
 fi
@@ -131,6 +157,24 @@ else
   ssh "$REMOTE" "mkdir -p '$WWW_DIR'"
   tar -C deploy -czf - . | ssh "$REMOTE" "tar -xzf - -C '$WWW_DIR'"
   echo "  ✓ Landing page synced (in-place, no delete)."
+fi
+
+# Ship CHANGELOG.md to /opt/accessbridge/docs/ so main.py can read the
+# latest release-notes section for /api/version's changelog field.
+if [ -f CHANGELOG.md ]; then
+  scp -q CHANGELOG.md "$REMOTE:$REMOTE_DIR/docs/CHANGELOG.md"
+  echo "  ✓ CHANGELOG.md synced."
+fi
+
+# Ship API source + restart container so version derivation picks up fresh
+# manifest.json inside the freshly-uploaded zip. The container mounts
+# /opt/accessbridge/api → /app and /opt/accessbridge/docs → /docs (read-only)
+# — see scripts/vps/main.py header for the docker-compose requirement.
+if [ -f scripts/vps/main.py ]; then
+  scp -q scripts/vps/main.py "$REMOTE:$REMOTE_DIR/api/main.py"
+  echo "  ✓ API main.py synced — restarting accessbridge-api..."
+  ssh "$REMOTE" "docker restart accessbridge-api" > /dev/null
+  echo "  ✓ accessbridge-api restarted (version will be re-derived from zip)."
 fi
 
 # ─────────────────────────────────────────────────────────

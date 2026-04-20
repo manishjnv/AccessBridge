@@ -86,9 +86,13 @@ def _read_version_info() -> dict:
         if CHANGELOG_PATH.exists():
             changelog = _extract_latest_section(CHANGELOG_PATH.read_text())
 
+        # Append ?v=<version> so every release gets a unique URL. Cloudflare
+        # (and any future CDN) treats distinct query strings as distinct cache
+        # keys, so clients never receive a stale zip after a push — no manual
+        # purge or TTL wait needed. See RCA BUG-010.
         data = {
             "version": version,
-            "download_url": DOWNLOAD_URL,
+            "download_url": f"{DOWNLOAD_URL}?v={version}",
             "changelog": changelog or f"Release v{version}",
         }
         _cache["key"] = key
@@ -126,10 +130,11 @@ def version():
 @app.get("/updates.xml")
 def updates_xml():
     info = _read_version_info()
+    # Match the /version endpoint: cache-bust the codebase URL by version.
     xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <gupdate xmlns="http://www.google.com/update2/response" protocol="2.0">
   <app appid="{{appid}}">
-    <updatecheck codebase="{DOWNLOAD_BASE}{DOWNLOAD_URL}" version="{info['version']}" />
+    <updatecheck codebase="{DOWNLOAD_BASE}{DOWNLOAD_URL}?v={info['version']}" version="{info['version']}" />
   </app>
 </gupdate>"""
     return Response(content=xml, media_type="application/xml")

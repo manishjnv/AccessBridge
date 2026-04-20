@@ -147,6 +147,21 @@ Track every bug fix: what broke, why, how it was fixed, and how to prevent recur
 
 ---
 
+## BUG-010: Cloudflare edge caches the zip URL — users get stale artifact for up to 4 h after every release
+
+| Field | Detail |
+| ------- | -------- |
+| **Date** | 2026-04-21 |
+| **Severity** | High |
+| **Symptom** | After v0.5.0 deploy, `/api/version` correctly reported `0.5.0`, VPS disk had the v0.5.0 zip (423 KB), but `GET /downloads/accessbridge-extension.zip` returned the v0.4.0 zip (417 KB, `Age: 1388`, `Cache-Control: max-age=14400`). The extension's self-update banner showed "0.5.0 available", but clicking Update re-installed v0.4.0. Landing-page download button same problem. |
+| **Root Cause** | Site is fronted by Cloudflare (`Server: cloudflare`, `cf-ray` headers). Static asset responses get a 4-hour edge cache by default. After uploading a new zip to the origin, the Cloudflare edge continues serving the old cached response until its TTL expires — origin-side Caddy reload + container restart can't clear it. Manual Cloudflare dashboard purge works but wasn't part of deploy pipeline. The zip URL was a stable `/downloads/accessbridge-extension.zip` with no per-version query string, so every release collided with its predecessor's cache entry. |
+| **Fix** | [scripts/vps/main.py](scripts/vps/main.py) — `/version` and `/updates.xml` endpoints now append `?v={manifest.version}` to the download URL. Distinct query strings are distinct cache keys for Cloudflare (default behaviour), so every release fetches a fresh object at the edge. Clients that consume `download_url` from `/api/version` (landing page download button, extension self-update check) automatically pick up the new URL with no code change. |
+| **Files Changed** | `scripts/vps/main.py` |
+| **Commit** | (pending — Session 7 post-deploy hotfix) |
+| **Prevention** | Any CDN-fronted artifact URL MUST be version-keyed if the origin filename is stable. Never rely on edge purges as part of the deploy pipeline — assume you can't touch the edge. If a future CDN change disables query-key cache differentiation, fall back to versioned filenames (e.g. `accessbridge-extension-0.5.0.zip`). Deploy sanity check: after every release, curl the download URL (no cache-bust flags) and verify `Content-Length` matches the freshly built zip's size; if they diverge, the URL layout needs cache-busting. |
+
+---
+
 ## Checklist: Version Bump — AUTOMATED (post-commit `a4bd6a1`)
 
 Version bumping is now driven by `./deploy.sh` → `scripts/bump-version.sh --auto` — do **not** hand-edit versions. The checklist is only included here for manual overrides.

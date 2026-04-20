@@ -92,13 +92,18 @@
     }
     .navbar-links { display: flex; gap: 28px; align-items: center; }
     .navbar-links a {
-      color: var(--muted);
-      text-decoration: none;
       font-size: 13px;
-      font-weight: 500;
-      transition: color 0.2s;
+      font-weight: 600;
+      text-decoration: none;
+      letter-spacing: 0.2px;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      opacity: 0.75;
+      transition: opacity 0.2s, transform 0.15s;
     }
-    .navbar-links a:hover { color: var(--text); }
+    .navbar-links a:hover { opacity: 1; transform: translateY(-1px); }
     .navbar-cta {
       display: inline-flex;
       align-items: center;
@@ -957,15 +962,31 @@
     }
     .challenge .chal-tag {
       display: inline-block;
-      padding: 2px 8px;
-      background: rgba(245, 158, 11, 0.12);
-      color: var(--warning);
-      border-radius: 4px;
+      padding: 3px 10px;
+      background: linear-gradient(135deg, rgba(123,104,238,0.25), rgba(187,134,252,0.15));
+      color: var(--accent);
+      border: 1px solid rgba(123,104,238,0.35);
+      border-radius: 999px;
       font-size: 10px;
       font-weight: 700;
       text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 10px;
+    }
+    .challenge .chal-features {
+      margin-top: 12px;
+      padding-top: 10px;
+      border-top: 1px dashed rgba(123,104,238,0.2);
+      font-size: 11px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+    .challenge .chal-features strong {
+      color: var(--accent);
+      font-weight: 700;
+      text-transform: uppercase;
       letter-spacing: 0.4px;
-      margin-bottom: 8px;
+      font-size: 10px;
     }
     .challenge p {
       font-size: 12px;
@@ -2047,7 +2068,6 @@
       <div class="footer-bottom">
         <p>
           <span class="footer-status"><span class="health-dot" id="health-dot"></span> AccessBridge <span id="app-version">v0.1.1</span></span>
-          &nbsp;&mdash;&nbsp; Built for <a href="https://topgear.wipro.com" target="_blank">Wipro TopGear Ideathon 2026</a>
         </p>
         <p>Team: Manish Kumar &nbsp;|&nbsp; <a href="https://github.com/manishjnv/AccessBridge" target="_blank">github.com/manishjnv/AccessBridge</a></p>
       </div>

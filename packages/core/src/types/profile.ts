@@ -7,6 +7,9 @@ export interface SensoryProfile {
   cursorSize: number;
   reducedMotion: boolean;
   highContrast: boolean;
+  // --- Priority 1: Captions + Actions ---
+  /** When true, overlay Web Speech API live captions on visible <video> elements. Opt-in. */
+  liveCaptionsEnabled: boolean;
 }
 
 export interface CognitiveProfile {
@@ -16,6 +19,18 @@ export interface CognitiveProfile {
   notificationLevel: 'all' | 'important' | 'critical' | 'none';
   autoSummarize: boolean;
   distractionShield: boolean;
+  // --- Priority 1: Captions + Actions ---
+  /** When true, passively scan page text for action items (TODOs, deadlines, imperative sentences). On by default. */
+  actionItemsEnabled: boolean;
+  // --- Priority 5: Time-Awareness + Distraction Shield deepening ---
+  /** When true, detect hyperfocus (45+ min continuous activity) and show a gentle break reminder. On by default. */
+  timeAwarenessEnabled: boolean;
+  /**
+   * Deepened distractionShield: when the user is in a detected flow state
+   * (sustained typing + low error rate), queue non-urgent Chrome notifications
+   * until flow ends. Requires `distractionShield` to be enabled first.
+   */
+  flowAwareNotifications: boolean;
 }
 
 export interface MotorProfile {
@@ -75,6 +90,8 @@ export const DEFAULT_SENSORY_PROFILE: SensoryProfile = {
   cursorSize: 1.0,
   reducedMotion: false,
   highContrast: false,
+  // --- Priority 1: Captions + Actions ---
+  liveCaptionsEnabled: false,
 };
 
 export const DEFAULT_COGNITIVE_PROFILE: CognitiveProfile = {
@@ -84,6 +101,11 @@ export const DEFAULT_COGNITIVE_PROFILE: CognitiveProfile = {
   notificationLevel: 'all',
   autoSummarize: false,
   distractionShield: false,
+  // --- Priority 1: Captions + Actions ---
+  actionItemsEnabled: true,
+  // --- Priority 5: Time-Awareness + flow-aware notifications ---
+  timeAwarenessEnabled: true,
+  flowAwareNotifications: false,
 };
 
 export const DEFAULT_MOTOR_PROFILE: MotorProfile = {

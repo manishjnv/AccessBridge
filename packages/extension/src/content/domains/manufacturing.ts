@@ -10,6 +10,7 @@
  */
 
 import type { DomainConnector } from './index.js';
+import { detectHazardKeywords } from './deepenings.js';
 
 // ---------------------------------------------------------------------------
 // Manufacturing / ERP jargon glossary
@@ -246,6 +247,46 @@ export class ManufacturingConnector implements DomainConnector {
     this.enhanceManufacturingForms();
     this.simplifyStatusIndicators();
     this.addQuantityUnitReaders();
+    // --- Priority 4: Manufacturing deepening ---
+    this.highlightHazards();
+  }
+
+  // --- Priority 4: Safety-hazard highlighter --------------------------------
+
+  private highlightHazards(): void {
+    if (document.querySelector('.ab-domain-hazard-banner')) return;
+
+    const bodyText = (document.body?.textContent || '').slice(0, 20_000);
+    const findings = detectHazardKeywords(bodyText);
+    if (findings.length === 0) return;
+
+    const hasDanger = findings.some((f) => f.level === 'danger');
+    const banner = document.createElement('aside');
+    banner.className = hasDanger
+      ? 'ab-domain-hazard-banner ab-domain-hazard-banner-danger'
+      : 'ab-domain-hazard-banner';
+    banner.setAttribute('role', hasDanger ? 'alert' : 'status');
+    banner.setAttribute('aria-label', 'Safety hazard keywords detected on this page');
+
+    const title = document.createElement('div');
+    title.className = 'ab-domain-hazard-title';
+    title.textContent = hasDanger
+      ? 'Danger-level safety keywords detected'
+      : 'Safety / caution language on this page';
+    banner.appendChild(title);
+
+    const list = document.createElement('ul');
+    list.className = 'ab-domain-hazard-list';
+    for (const f of findings.slice(0, 10)) {
+      const li = document.createElement('li');
+      li.dataset.level = f.level;
+      li.textContent = f.keyword.toUpperCase();
+      list.appendChild(li);
+    }
+    banner.appendChild(list);
+
+    document.body.insertBefore(banner, document.body.firstChild);
+    this.overlayElements.push(banner);
   }
 
   // ---- 1. ERP jargon decoder -----------------------------------------------

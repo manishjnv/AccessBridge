@@ -11,6 +11,7 @@ import { InsuranceConnector } from './insurance.js';
 import { RetailConnector } from './retail.js';
 import { TelecomConnector } from './telecom.js';
 import { ManufacturingConnector } from './manufacturing.js';
+import { ensureDeepeningStyles } from './deepenings.js';
 
 // ---------------------------------------------------------------------------
 // DomainConnector interface
@@ -59,6 +60,8 @@ export class DomainConnectorRegistry {
       try {
         if (connector.detect()) {
           console.log(`[AccessBridge] Domain detected: ${connector.label}`);
+          // --- Priority 4: ensure shared deepening styles are injected once ---
+          ensureDeepeningStyles();
           connector.activate();
           this.activeConnector = connector;
           return connector;

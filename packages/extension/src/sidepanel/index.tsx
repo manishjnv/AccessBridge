@@ -5,8 +5,10 @@ import { DEFAULT_PROFILE, AdaptationType } from '@accessbridge/core/types';
 import '../content/styles.css';
 import './audit/audit.css';
 import { AuditPanel } from './audit/AuditPanel.js';
+// --- Priority 1: Captions + Actions ---
+import ActionsPanel from './actions/ActionsPanel.js';
 
-type SidePanelTab = 'dashboard' | 'audit';
+type SidePanelTab = 'dashboard' | 'audit' | 'actions';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -681,11 +683,16 @@ function SidePanel() {
       >
         <TabButton label="Dashboard" active={tab === 'dashboard'} onClick={() => setTab('dashboard')} />
         <TabButton label="Audit" active={tab === 'audit'} onClick={() => setTab('audit')} />
+        {/* --- Priority 1: Captions + Actions --- */}
+        <TabButton label="Actions" active={tab === 'actions'} onClick={() => setTab('actions')} />
       </nav>
 
       {/* ── Body ───────────────────────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3">
-        {tab === 'audit' ? (
+        {/* --- Priority 1: Captions + Actions --- */}
+        {tab === 'actions' ? (
+          <ActionsPanel />
+        ) : tab === 'audit' ? (
           <AuditPanel />
         ) : (
         <>

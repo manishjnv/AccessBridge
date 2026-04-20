@@ -17,6 +17,7 @@ Visual / perceptual adaptations. All live in [packages/extension/src/content/sen
 | S-03 | Color-blindness correction | P | Shipped | SVG filters for protanopia / deuteranopia / tritanopia |
 | S-04 | Line-height + letter-spacing | P | Shipped | Typography sliders |
 | S-05 | Reduced motion | P | Shipped | Disables animations + transitions site-wide |
+| S-06 | Live Captions (Web Speech API overlay on &lt;video&gt;) | P | Shipped | [content/sensory/captions.ts](packages/extension/src/content/sensory/captions.ts) |
 
 Tests: indirect via `packages/core/src/__tests__/decision-engine.test.ts`.
 
@@ -35,6 +36,7 @@ Focus, simplification, and distraction control.
 | C-05 | Auto-Summarize (AI) | [content/ai/bridge.ts](packages/extension/src/content/ai/bridge.ts) | P, V | Shipped |
 | C-06 | Text Simplification (off / mild / strong) | [content/ai/bridge.ts](packages/extension/src/content/ai/bridge.ts) | P, V | Shipped |
 | C-07 | Fatigue-Adaptive UI (4-level progressive) | [content/fatigue/adaptive-ui.ts](packages/extension/src/content/fatigue/adaptive-ui.ts) | A | Shipped |
+| C-08 | Action Items Extractor (TODOs from emails/docs) | [content/cognitive/action-items.ts](packages/extension/src/content/cognitive/action-items.ts) | SP | Shipped |
 
 AI-backed features (C-05, C-06) route through the AI engine — see Architecture §5.
 
@@ -142,13 +144,13 @@ Security invariants enforced at multiple layers: (a) opt-in gate on every `recor
 
 | Module | Count |
 |--------|-------|
-| Sensory | 5 |
-| Cognitive | 7 (5 rule-based + 2 AI) |
-| Motor | 7 |
+| Sensory | 6 |
+| Cognitive | 8 (6 rule-based + 2 AI) |
+| Motor | 8 |
 | Domains | 6 |
 | AI engine features | 1 (+ engine layer) |
 | Core engine components | 3 |
-| **Total user-facing features** | **26** |
+| **Total user-facing features** | **28** |
 
 ---
 

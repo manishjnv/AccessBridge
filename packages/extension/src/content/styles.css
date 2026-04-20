@@ -1825,3 +1825,40 @@
 @media (prefers-reduced-motion: reduce) {
   .a11y-gesture-indicator { transition: none; }
 }
+
+/* ============================================
+   Priority 1: Live Captions + Action Items
+   ============================================ */
+
+.ab-captions-overlay {
+  position: fixed;
+  bottom: 15%;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 80vw;
+  padding: 8px 16px;
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  border-radius: 8px;
+  font-size: 18px;
+  line-height: 1.5;
+  white-space: pre-line;
+  pointer-events: none;
+  z-index: 2147483000;
+  transition: opacity 0.2s;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+.ab-captions-toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(123, 104, 238, 0.95);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  z-index: 2147483001;
+  font-family: system-ui, -apple-system, sans-serif;
+}

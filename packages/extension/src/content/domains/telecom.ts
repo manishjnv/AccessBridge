@@ -10,6 +10,7 @@
  */
 
 import type { DomainConnector } from './index.js';
+import { detectBillShockLanguage } from './deepenings.js';
 
 // ---------------------------------------------------------------------------
 // Telecom jargon glossary
@@ -216,6 +217,52 @@ export class TelecomConnector implements DomainConnector {
     this.enhanceRechargeForms();
     this.addDataUsageReaders();
     this.addFupValidityAlerts();
+    // --- Priority 4: Telecom deepening ---
+    this.addBillShockAlerts();
+  }
+
+  // --- Priority 4: Bill-shock language detector -----------------------------
+
+  private addBillShockAlerts(): void {
+    if (document.querySelector('.ab-domain-bill-shock')) return;
+    const host =
+      document.querySelector<HTMLElement>('main, article, [class*="bill" i], [class*="plan" i], [class*="charges" i]') ??
+      document.body;
+    if (!host) return;
+
+    const text = (host.textContent || '').slice(0, 15_000);
+    const findings = detectBillShockLanguage(text);
+    if (findings.length === 0) return;
+
+    const hasDanger = findings.some((f) => f.severity === 'danger');
+    const panel = document.createElement('aside');
+    panel.className = hasDanger
+      ? 'ab-domain-bill-shock ab-domain-bill-shock-danger'
+      : 'ab-domain-bill-shock';
+    panel.setAttribute('role', hasDanger ? 'alert' : 'status');
+    panel.setAttribute('aria-label', 'Charges worth checking on this page');
+
+    const title = document.createElement('div');
+    title.className = 'ab-domain-bill-shock-title';
+    title.textContent = hasDanger
+      ? 'Extra-charge language with ₹ amount nearby — read the fine print'
+      : 'This page mentions extra charges — review before you proceed';
+    panel.appendChild(title);
+
+    const list = document.createElement('ul');
+    list.className = 'ab-domain-bill-shock-list';
+    const seen = new Set<string>();
+    for (const finding of findings) {
+      if (seen.has(finding.phrase)) continue;
+      seen.add(finding.phrase);
+      const li = document.createElement('li');
+      li.textContent = `“${finding.phrase}”${finding.severity === 'danger' ? ' (with ₹ nearby)' : ''}`;
+      list.appendChild(li);
+    }
+    panel.appendChild(list);
+
+    host.insertBefore(panel, host.firstChild);
+    this.overlayElements.push(panel);
   }
 
   // ---- 1. Jargon decoder ---------------------------------------------------

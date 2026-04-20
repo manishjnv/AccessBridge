@@ -34,7 +34,7 @@ export function detectPageLanguage(): PageLangResult {
 
 const LOCALE_MAP: Record<DetectedLang, string | null> = {
   en: 'en-US',
-  // Indian languages
+  // Indian languages (original 10)
   hi: 'hi-IN',
   mr: 'mr-IN',
   ta: 'ta-IN',
@@ -45,6 +45,23 @@ const LOCALE_MAP: Record<DetectedLang, string | null> = {
   pa: 'pa-IN',
   ml: 'ml-IN',
   ur: 'ur-IN',
+  // 12 new Indian languages (Priority 2)
+  // as: Assamese — Chrome STT routes through bn-IN (same script family)
+  as: 'bn-IN',
+  // Devanagari-script languages without native STT → hi-IN fallback
+  sa: 'hi-IN',
+  kok: 'hi-IN',
+  ne: 'hi-IN',
+  brx: 'hi-IN',
+  mai: 'hi-IN',
+  doi: 'hi-IN',
+  // Ol Chiki (Santali) → hi-IN fallback
+  sat: 'hi-IN',
+  // Meitei Mayek (Manipuri) → bn-IN fallback (same Bengali-script family)
+  mni: 'bn-IN',
+  // Arabic-script languages → ur-IN fallback
+  ks: 'ur-IN',
+  sd: 'ur-IN',
   // Non-Latin script additions
   ru: 'ru-RU',
   ko: 'ko-KR',

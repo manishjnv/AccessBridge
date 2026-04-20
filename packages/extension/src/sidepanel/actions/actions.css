@@ -1,0 +1,49 @@
+/* --- Priority 1: Captions + Actions --- */
+
+.action-priority-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.action-filter-pill {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s;
+  border: 1px solid rgba(123, 104, 238, 0.4);
+  background: transparent;
+  color: inherit;
+}
+
+.action-filter-pill.active {
+  background: #7b68ee;
+  color: white;
+  border-color: transparent;
+}
+
+.action-row {
+  transition: opacity 0.2s;
+}
+
+.action-row.dismissed {
+  opacity: 0.3;
+}
+
+.action-copy-flash {
+  color: #10b981;
+  font-size: 10px;
+  margin-left: 4px;
+}
+
+.action-due-badge {
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  background: rgba(255, 215, 0, 0.15);
+  color: #ffd700;
+  white-space: nowrap;
+  flex-shrink: 0;
+}

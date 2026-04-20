@@ -34,6 +34,14 @@ import {
 } from './context/index.js';
 // --- Task C: Gesture Shortcuts ---
 import { GestureController } from './motor/gestures.js';
+// --- Priority 1: Captions + Actions ---
+import { CaptionsController } from './sensory/captions.js';
+import { ActionItemsExtractor } from './cognitive/action-items.js';
+// --- Priority 5: Time-Awareness ---
+import {
+  TimeAwarenessController,
+  ensureTimeAwarenessStyles,
+} from './cognitive/time-awareness.js';
 
 // ---------- App Detection ----------
 
@@ -256,6 +264,30 @@ let envSensingEnabled = false;
 let envSensingUnsubscribe: (() => void) | null = null;
 // --- Task C: Gesture Shortcuts ---
 let gestureController: GestureController | null = null;
+// --- Priority 1: Captions + Actions ---
+let captionsController: CaptionsController | null = null;
+let actionItemsExtractor: ActionItemsExtractor | null = null;
+
+function getCaptionsController(): CaptionsController {
+  if (!captionsController) captionsController = new CaptionsController();
+  return captionsController;
+}
+
+function getActionItemsExtractor(): ActionItemsExtractor {
+  if (!actionItemsExtractor) actionItemsExtractor = new ActionItemsExtractor();
+  return actionItemsExtractor;
+}
+
+// --- Priority 5: Time-Awareness ---
+let timeAwarenessController: TimeAwarenessController | null = null;
+
+function getTimeAwarenessController(): TimeAwarenessController {
+  if (!timeAwarenessController) {
+    ensureTimeAwarenessStyles();
+    timeAwarenessController = new TimeAwarenessController();
+  }
+  return timeAwarenessController;
+}
 
 function getGestureController(): GestureController {
   if (!gestureController) {
@@ -590,6 +622,11 @@ function listenForCommands(adapter: BaseAdapter, sensory: SensoryAdapter): void 
           envSensingEnabled = false;
           // --- Task C: Gesture Shortcuts ---
           gestureController?.stop();
+          // --- Priority 1: Captions + Actions ---
+          captionsController?.stop();
+          actionItemsExtractor?.stop();
+          // --- Priority 5: Time-Awareness ---
+          timeAwarenessController?.stop();
           sendResponse({ reverted: true });
           break;
         }
@@ -728,6 +765,28 @@ function listenForCommands(adapter: BaseAdapter, sensory: SensoryAdapter): void 
             if (s.contrastLevel === 1.0) { document.documentElement.style.removeProperty('--a11y-contrast'); document.body.classList.remove('a11y-contrast'); }
             if (s.lineHeight === 1.5) { document.documentElement.style.removeProperty('--a11y-line-height'); document.body.classList.remove('a11y-line-height'); }
             if (s.letterSpacing === 0) { document.documentElement.style.removeProperty('--a11y-letter-spacing'); document.body.classList.remove('a11y-letter-spacing'); }
+            // --- Priority 1: Captions + Actions ---
+            if (typeof (s as { liveCaptionsEnabled?: boolean }).liveCaptionsEnabled === 'boolean') {
+              const captionsEnabled = (s as { liveCaptionsEnabled?: boolean }).liveCaptionsEnabled;
+              if (captionsEnabled) getCaptionsController().start();
+              else captionsController?.stop();
+            }
+          }
+          // --- Priority 1: Captions + Actions ---
+          {
+            const p = updatedProfile as { cognitive?: { actionItemsEnabled?: boolean } };
+            if (typeof p.cognitive?.actionItemsEnabled === 'boolean') {
+              if (p.cognitive.actionItemsEnabled) getActionItemsExtractor().watch();
+              else actionItemsExtractor?.stop();
+            }
+          }
+          // --- Priority 5: Time-Awareness ---
+          {
+            const p = updatedProfile as { cognitive?: { timeAwarenessEnabled?: boolean } };
+            if (typeof p.cognitive?.timeAwarenessEnabled === 'boolean') {
+              if (p.cognitive.timeAwarenessEnabled) getTimeAwarenessController().start();
+              else timeAwarenessController?.stop();
+            }
           }
           sendResponse({ received: true });
           break;
@@ -939,7 +998,28 @@ function init(): void {
         gestureShowHints?: boolean;
         gestureMouseModeRequiresShift?: boolean;
       };
+      sensory?: { liveCaptionsEnabled?: boolean };
+      cognitive?: {
+        actionItemsEnabled?: boolean;
+        // --- Priority 5: Time-Awareness ---
+        timeAwarenessEnabled?: boolean;
+      };
     };
+    // --- Priority 1: Captions + Actions ---
+    if (p.cognitive?.actionItemsEnabled !== false) {
+      // Default on: start watching unless explicitly disabled
+      getActionItemsExtractor().watch();
+    }
+    if (p.sensory?.liveCaptionsEnabled === true) {
+      getCaptionsController().start();
+    }
+    // --- Priority 5: Time-Awareness (on by default) ---
+    {
+      const ta = (p.cognitive as { timeAwarenessEnabled?: boolean } | undefined)?.timeAwarenessEnabled;
+      if (ta !== false) {
+        getTimeAwarenessController().start();
+      }
+    }
 
     // --- Task C: Gesture Shortcuts ---
     if (p.motor?.gestureShortcutsEnabled) {

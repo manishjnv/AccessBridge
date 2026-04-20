@@ -188,7 +188,9 @@ type MessageType =
   | 'CHECK_UPDATE'
   | 'APPLY_UPDATE'
   | 'AUDIT_SCAN_REQUEST'
-  | 'HIGHLIGHT_ELEMENT';
+  | 'HIGHLIGHT_ELEMENT'
+  // --- Priority 1: Captions + Actions ---
+  | 'ACTION_ITEMS_UPDATE';
 
 interface Message {
   type: MessageType;
@@ -402,6 +404,32 @@ async function handleMessage(message: Message): Promise<unknown> {
       } catch (err) {
         return { error: `Content script unreachable: ${String(err)}` };
       }
+    }
+
+    // --- Priority 1: Captions + Actions ---
+    case 'ACTION_ITEMS_UPDATE': {
+      const { items: newItems } = message.payload as { items: Array<{ id: string; [key: string]: unknown }> };
+      const stored = await chrome.storage.local.get('actionItemsHistory');
+      const existing = (stored.actionItemsHistory as Array<{ id: string; timestamp?: number }>) ?? [];
+
+      // Merge: dedupe by id, keep newest 50
+      const byId = new Map<string, { id: string; timestamp?: number; [key: string]: unknown }>();
+      for (const item of existing) byId.set(item.id, item);
+      for (const item of newItems) byId.set(item.id, item);
+
+      // Sort by timestamp desc and cap at 50
+      const merged = Array.from(byId.values())
+        .sort((a, b) => ((b.timestamp ?? 0) as number) - ((a.timestamp ?? 0) as number))
+        .slice(0, 50);
+
+      await chrome.storage.local.set({ actionItemsHistory: merged });
+
+      // Forward to all extension views (popup, sidepanel) — swallow errors
+      chrome.runtime
+        .sendMessage({ type: 'ACTION_ITEMS_UPDATE', payload: { items: merged } })
+        .catch(() => {});
+
+      return { received: true };
     }
 
     default: {

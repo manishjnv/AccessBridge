@@ -10,6 +10,7 @@
  */
 
 import type { DomainConnector } from './index.js';
+import { lookupIFSC } from './deepenings.js';
 
 // ---------------------------------------------------------------------------
 // Banking jargon glossary
@@ -229,6 +230,46 @@ export class BankingConnector implements DomainConnector {
     this.enhanceBankingForms();
     this.addSecurityAlerts();
     this.addAmountReaders();
+    // --- Priority 4: Banking deepening ---
+    this.addIFSCBankLookup();
+  }
+
+  // --- Priority 4: IFSC → bank-name lookup ----------------------------------
+
+  private addIFSCBankLookup(): void {
+    const ifscInputs = document.querySelectorAll<HTMLInputElement>(
+      'input[name*="ifsc" i], input[placeholder*="ifsc" i], input[aria-label*="ifsc" i]',
+    );
+    for (const input of Array.from(ifscInputs)) {
+      if (input.dataset.abIfscLookup === 'true') continue;
+      input.dataset.abIfscLookup = 'true';
+
+      const updateBadge = (() => {
+        const parent = input.parentElement;
+        if (!parent) return;
+        let badge = parent.querySelector<HTMLElement>('.ab-domain-ifsc-bank');
+        const { valid, bankName } = lookupIFSC(input.value);
+        if (!valid || !bankName) {
+          badge?.remove();
+          return;
+        }
+        if (!badge) {
+          badge = document.createElement('div');
+          badge.className = 'ab-domain-ifsc-bank';
+          badge.setAttribute('role', 'status');
+          badge.setAttribute('aria-live', 'polite');
+          parent.appendChild(badge);
+          this.overlayElements.push(badge);
+        }
+        badge.textContent = `Bank: ${bankName}`;
+      }) as EventListener;
+
+      input.addEventListener('input', updateBadge);
+      input.addEventListener('blur', updateBadge);
+      this.formListeners.push({ el: input, type: 'input', fn: updateBadge });
+      this.formListeners.push({ el: input, type: 'blur', fn: updateBadge });
+      updateBadge(new Event('init'));
+    }
   }
 
   // ---- 1. Jargon decoder ---------------------------------------------------

@@ -1,13 +1,20 @@
 /**
  * AccessBridge — Indian Language Voice Command Registry
  *
- * Unified native-script voice commands for 10 Indian languages, dispatched via
+ * Unified native-script voice commands for 22 Indian languages, dispatched via
  * the Web Speech API. Action names match the English dispatcher in
  * content/index.ts so that a Tamil, Telugu, Bengali, Urdu, etc. transcript
  * routes through the same switch as "scroll up" / "go back" / etc.
  *
  * Languages: Hindi, Tamil, Telugu, Kannada, Bengali, Marathi, Gujarati,
- * Malayalam, Punjabi, Urdu.
+ * Malayalam, Punjabi, Urdu, Assamese, Sanskrit, Kashmiri, Konkani,
+ * Manipuri, Nepali, Bodo, Santali, Maithili, Dogri, Sindhi.
+ *
+ * STT support matrix:
+ *   Native Chrome STT: hi-IN, ta-IN, te-IN, kn-IN, bn-IN, mr-IN, gu-IN,
+ *                      ml-IN, pa-IN, ur-IN, as-IN (via bn-IN)
+ *   Text-mode only (fallback STT): sa-IN, ks, kok, mni, ne-IN, brx, sat,
+ *                                  mai, doi, sd
  */
 
 // ---------------------------------------------------------------------------
@@ -24,7 +31,19 @@ export type IndicLangCode =
   | 'gu-IN'
   | 'ml-IN'
   | 'pa-IN'
-  | 'ur-IN';
+  | 'ur-IN'
+  // 12 new languages (Priority 2)
+  | 'as-IN'
+  | 'sa-IN'
+  | 'ks'
+  | 'kok'
+  | 'mni'
+  | 'ne-IN'
+  | 'brx'
+  | 'sat'
+  | 'mai'
+  | 'doi'
+  | 'sd';
 
 export interface IndicCommandMapping {
   /** Native-script phrase(s) that trigger this command. */
@@ -63,6 +82,18 @@ export const SUPPORTED_INDIC_LANGUAGES: readonly IndicLanguageInfo[] = [
   { code: 'gu-IN', label: 'Gujarati', nativeName: 'ગુજરાતી', speakersMillions: 62, flag: 'GU' },
   { code: 'kn-IN', label: 'Kannada', nativeName: 'ಕನ್ನಡ', speakersMillions: 59, flag: 'KN' },
   { code: 'ml-IN', label: 'Malayalam', nativeName: 'മലയാളം', speakersMillions: 38, flag: 'ML' },
+  // 12 new languages (Priority 2)
+  { code: 'mai', label: 'Maithili', nativeName: 'मैथिली', speakersMillions: 35, flag: 'MAI' },
+  { code: 'sd', label: 'Sindhi', nativeName: 'سنڌي', speakersMillions: 25, flag: 'SD' },
+  { code: 'ne-IN', label: 'Nepali', nativeName: 'नेपाली', speakersMillions: 16, flag: 'NE' },
+  { code: 'as-IN', label: 'Assamese', nativeName: 'অসমীয়া', speakersMillions: 15, flag: 'AS' },
+  { code: 'sat', label: 'Santali', nativeName: 'ᱥᱟᱱᱛᱟᱲᱤ', speakersMillions: 7, flag: 'SAT' },
+  { code: 'ks', label: 'Kashmiri', nativeName: 'کٲشُر', speakersMillions: 7, flag: 'KS' },
+  { code: 'doi', label: 'Dogri', nativeName: 'डोगरी', speakersMillions: 2.6, flag: 'DOI' },
+  { code: 'kok', label: 'Konkani', nativeName: 'कोंकणी', speakersMillions: 2.5, flag: 'KOK' },
+  { code: 'brx', label: 'Bodo', nativeName: 'बड़ो', speakersMillions: 1.5, flag: 'BRX' },
+  { code: 'mni', label: 'Manipuri', nativeName: 'মৈতৈলোন্', speakersMillions: 1.8, flag: 'MNI' },
+  { code: 'sa-IN', label: 'Sanskrit', nativeName: 'संस्कृत', speakersMillions: 0.014, flag: 'SA' },
 ] as const;
 
 // ---------------------------------------------------------------------------
@@ -376,6 +407,234 @@ const UR_COMMANDS: IndicCommandMapping[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// Assamese (as-IN) — Bengali-Assamese script; STT falls back to bn-IN
+// ---------------------------------------------------------------------------
+
+const AS_COMMANDS: IndicCommandMapping[] = [
+  { phrases: ['ওপৰলৈ স্ক্ৰল', 'ওপৰলৈ যোৱা', 'ওপৰত'], action: 'scroll-up', hasArgs: false },
+  { phrases: ['তললৈ স্ক্ৰল', 'তললৈ যোৱা', 'তলত'], action: 'scroll-down', hasArgs: false },
+  { phrases: ['আৰম্ভণিলৈ যোৱা', 'শীৰ্ষলৈ'], action: 'go-back', hasArgs: false },
+  { phrases: ['আগলৈ যোৱা', 'আগলৈ'], action: 'go-forward', hasArgs: false },
+  { phrases: ['পুনৰ লোড', 'ৰিলোড'], action: 'reload', hasArgs: false },
+  { phrases: ['ডাঙৰ কৰক', 'জুম ইন'], action: 'zoom-in', hasArgs: false },
+  { phrases: ['সৰু কৰক', 'জুম আউট'], action: 'zoom-out', hasArgs: false },
+  { phrases: ['পৰৱৰ্তী টেব'], action: 'next-tab', hasArgs: false },
+  { phrases: ['পূৰ্ববৰ্তী টেব'], action: 'prev-tab', hasArgs: false },
+  { phrases: ['টেব বন্ধ কৰক'], action: 'close-tab', hasArgs: false },
+  { phrases: ['নতুন টেব'], action: 'new-tab', hasArgs: false },
+  { phrases: ['সংক্ষেপ দিয়ক', 'সাৰাংশ'], action: 'summarize', hasArgs: false },
+  { phrases: ['সহজ কৰক'], action: 'simplify', hasArgs: false },
+  { phrases: ['বিচাৰক', 'অনুসন্ধান কৰক'], action: 'find', hasArgs: true },
+  { phrases: ['সহায়', 'হেল্প'], action: 'help', hasArgs: false },
+];
+
+// ---------------------------------------------------------------------------
+// Sanskrit (sa-IN) — Devanagari script; text-mode only, STT fallback hi-IN
+// Note: Classical Sanskrit — commands use standard Sanskrit vocabulary.
+// ---------------------------------------------------------------------------
+
+const SA_COMMANDS: IndicCommandMapping[] = [
+  { phrases: ['उपरि गच्छ', 'ऊर्ध्वं गच्छ'], action: 'scroll-up', hasArgs: false },
+  { phrases: ['अधः गच्छ', 'नीचे गच्छ'], action: 'scroll-down', hasArgs: false },
+  { phrases: ['पुरतः गच्छ', 'अग्रे गच्छ'], action: 'go-back', hasArgs: false },      // transliterated concept
+  { phrases: ['अग्रे गच्छ', 'अग्रगमन'], action: 'go-forward', hasArgs: false },
+  { phrases: ['पुनः लोड कुरु', 'पुनर्लोड'], action: 'reload', hasArgs: false },       // transliterated
+  { phrases: ['वर्धय', 'विस्तारय'], action: 'zoom-in', hasArgs: false },
+  { phrases: ['संकुचय', 'लघुकुरु'], action: 'zoom-out', hasArgs: false },
+  { phrases: ['संग्रहं ददातु', 'सारः'], action: 'summarize', hasArgs: false },
+  { phrases: ['सरलय', 'सरलं कुरु'], action: 'simplify', hasArgs: false },
+  { phrases: ['अन्वेषय', 'खोजय'], action: 'find', hasArgs: true },                   // खोजय is transliterated Hindi
+  { phrases: ['साहाय्यम्', 'सहायता'], action: 'help', hasArgs: false },
+];
+
+// ---------------------------------------------------------------------------
+// Kashmiri (ks) — Arabic (Kashmiri) script; text-mode only, STT fallback ur-IN
+// Note: Some terms transliterated — marked with [T]
+// ---------------------------------------------------------------------------
+
+const KS_COMMANDS: IndicCommandMapping[] = [
+  { phrases: ['میلہ کٔرِو', 'پرٕن گاشی'], action: 'scroll-up', hasArgs: false },     // [T] scroll up approx
+  { phrases: ['تٔلہ کٔرِو', 'نیچ گاشی'], action: 'scroll-down', hasArgs: false },    // [T] scroll down approx
+  { phrases: ['واپس وچھ', 'پتہ وچھ'], action: 'go-back', hasArgs: false },
+  { phrases: ['آگاہ وچھ', 'پیٹھ وچھ'], action: 'go-forward', hasArgs: false },
+  { phrases: ['دوبارہ لوڈ', 'ریلوڈ'], action: 'reload', hasArgs: false },
+  { phrases: ['وڈ کٔرِو', 'زوم اِن'], action: 'zoom-in', hasArgs: false },
+  { phrases: ['ننہ کٔرِو', 'زوم آؤٹ'], action: 'zoom-out', hasArgs: false },
+  { phrases: ['نوو ٹیب'], action: 'new-tab', hasArgs: false },
+  { phrases: ['ٹیب بند کٔرِو'], action: 'close-tab', hasArgs: false },
+  { phrases: ['لبہ', 'تلاش'], action: 'find', hasArgs: true },
+  { phrases: ['مدد', 'ہیلپ'], action: 'help', hasArgs: false },
+];
+
+// ---------------------------------------------------------------------------
+// Konkani (kok) — Devanagari script; text-mode only, STT fallback hi-IN
+// Note: Some terms transliterated from Goa-region Konkani — marked with [T]
+// ---------------------------------------------------------------------------
+
+const KOK_COMMANDS: IndicCommandMapping[] = [
+  { phrases: ['वयर स्क्रोल करा', 'वयर वच'], action: 'scroll-up', hasArgs: false },
+  { phrases: ['सकयल स्क्रोल करा', 'सकयल वच'], action: 'scroll-down', hasArgs: false },
+  { phrases: ['फाटीं वच', 'परत वच'], action: 'go-back', hasArgs: false },
+  { phrases: ['मुखार वच', 'फुडें वच'], action: 'go-forward', hasArgs: false },
+  { phrases: ['परत लोड करा', 'रीलोड'], action: 'reload', hasArgs: false },
+  { phrases: ['वाडय', 'झूम इन'], action: 'zoom-in', hasArgs: false },
+  { phrases: ['उणें करा', 'झूम आउट'], action: 'zoom-out', hasArgs: false },
+  { phrases: ['नव्यो टॅब'], action: 'new-tab', hasArgs: false },
+  { phrases: ['टॅब बंद करा'], action: 'close-tab', hasArgs: false },
+  { phrases: ['सारांश दि', 'सारांश'], action: 'summarize', hasArgs: false },
+  { phrases: ['सोद', 'सोदात'], action: 'find', hasArgs: true },
+  { phrases: ['मदत', 'हेल्प'], action: 'help', hasArgs: false },
+];
+
+// ---------------------------------------------------------------------------
+// Manipuri / Meitei (mni) — Meitei Mayek script; text-mode only, STT fallback bn-IN
+// Note: Meitei Mayek transliterations — marked with [T]
+// ---------------------------------------------------------------------------
+
+const MNI_COMMANDS: IndicCommandMapping[] = [
+  { phrases: ['ꯃꯇꯥ ꯁ꯭ꯀ꯭ꯔꯣꯜ', 'ꯃꯇꯥ ꯌꯥ'], action: 'scroll-up', hasArgs: false },
+  { phrases: ['ꯃꯔꯨ ꯁ꯭ꯀ꯭ꯔꯣꯜ', 'ꯃꯔꯨ ꯌꯥ'], action: 'scroll-down', hasArgs: false },
+  { phrases: ['ꯐꯥꯎꯕꯥ ꯌꯥ', 'ꯊꯧꯕ ꯌꯥ'], action: 'go-back', hasArgs: false },
+  { phrases: ['ꯑꯣꯢꯕꯥ ꯌꯥ', 'ꯃꯇꯥ ꯌꯥ'], action: 'go-forward', hasArgs: false },
+  { phrases: ['ꯑꯔꯤꯕ ꯂꯣꯗ', 'ꯔꯤꯂꯣꯗ'], action: 'reload', hasArgs: false },
+  { phrases: ['ꯆꯥꯎꯕꯥ ꯇꯧꯕ', 'ꯖꯨꯝ ꯏꯟ'], action: 'zoom-in', hasArgs: false },
+  { phrases: ['ꯍꯦꯟꯅꯕꯥ ꯇꯧꯕ', 'ꯖꯨꯝ ꯑꯥꯎꯇ'], action: 'zoom-out', hasArgs: false },
+  { phrases: ['ꯅꯨꯡꯉꯥꯏꯕ ꯇꯦꯕ'], action: 'new-tab', hasArgs: false },
+  { phrases: ['ꯇꯦꯕ ꯁꯥꯕꯦ'], action: 'close-tab', hasArgs: false },
+  { phrases: ['ꯍꯟꯗꯣꯛꯄꯥ ꯄꯤ', 'ꯍꯟꯗꯣꯛꯄꯥ'], action: 'summarize', hasArgs: false },
+  { phrases: ['ꯁꯥꯒꯩ', 'ꯊꯤꯕꯥ'], action: 'find', hasArgs: true },
+  { phrases: ['ꯃꯇꯦꯡ', 'ꯍꯦꯜꯄ'], action: 'help', hasArgs: false },
+];
+
+// ---------------------------------------------------------------------------
+// Nepali (ne-IN) — Devanagari script; text-mode only, STT fallback hi-IN
+// ---------------------------------------------------------------------------
+
+const NE_COMMANDS: IndicCommandMapping[] = [
+  { phrases: ['माथि स्क्रोल', 'माथि जाऊ', 'माथि'], action: 'scroll-up', hasArgs: false },
+  { phrases: ['तल स्क्रोल', 'तल जाऊ', 'तल'], action: 'scroll-down', hasArgs: false },
+  { phrases: ['पछाडि जाऊ', 'फिर्ता जाऊ'], action: 'go-back', hasArgs: false },
+  { phrases: ['अगाडि जाऊ', 'अगाडि'], action: 'go-forward', hasArgs: false },
+  { phrases: ['फेरि लोड', 'रिलोड'], action: 'reload', hasArgs: false },
+  { phrases: ['ठूलो गर', 'जुम इन'], action: 'zoom-in', hasArgs: false },
+  { phrases: ['सानो गर', 'जुम आउट'], action: 'zoom-out', hasArgs: false },
+  { phrases: ['अर्को ट्याब'], action: 'next-tab', hasArgs: false },
+  { phrases: ['अघिल्लो ट्याब'], action: 'prev-tab', hasArgs: false },
+  { phrases: ['ट्याब बन्द गर'], action: 'close-tab', hasArgs: false },
+  { phrases: ['नयाँ ट्याब'], action: 'new-tab', hasArgs: false },
+  { phrases: ['सारांश दिनुस्', 'सारांश'], action: 'summarize', hasArgs: false },
+  { phrases: ['सरल बनाउ', 'सहज बनाउ'], action: 'simplify', hasArgs: false },
+  { phrases: ['खोज', 'खोज्नुस्'], action: 'find', hasArgs: true },
+  { phrases: ['मद्दत', 'सहायता'], action: 'help', hasArgs: false },
+];
+
+// ---------------------------------------------------------------------------
+// Bodo (brx) — Devanagari script; text-mode only, STT fallback hi-IN
+// Note: Bodo uses Devanagari. Some terms transliterated — marked with [T]
+// ---------------------------------------------------------------------------
+
+const BRX_COMMANDS: IndicCommandMapping[] = [
+  { phrases: ['उफ्राव स्क्रोल', 'उफ्राव नाय'], action: 'scroll-up', hasArgs: false },
+  { phrases: ['थाखो स्क्रोल', 'थाखो नाय'], action: 'scroll-down', hasArgs: false },
+  { phrases: ['उबोदे नाय', 'फिरब नाय'], action: 'go-back', hasArgs: false },
+  { phrases: ['आगो नाय', 'मुंहुमा नाय'], action: 'go-forward', hasArgs: false },
+  { phrases: ['सोरसे लोड', 'रिलोड'], action: 'reload', hasArgs: false },
+  { phrases: ['बड़ो खालाम', 'जुम इन'], action: 'zoom-in', hasArgs: false },           // [T] zoom-in
+  { phrases: ['हारिखौ खालाम', 'जुम आउट'], action: 'zoom-out', hasArgs: false },       // [T] zoom-out
+  { phrases: ['नोया टेब'], action: 'new-tab', hasArgs: false },
+  { phrases: ['टेब बंद खालाम'], action: 'close-tab', hasArgs: false },
+  { phrases: ['गेजेरफ्रा दिया', 'सारांश'], action: 'summarize', hasArgs: false },
+  { phrases: ['बाथो', 'खोजो'], action: 'find', hasArgs: true },
+  { phrases: ['मदद', 'हेल्प'], action: 'help', hasArgs: false },
+];
+
+// ---------------------------------------------------------------------------
+// Santali (sat) — Ol Chiki script; text-mode only, STT fallback hi-IN
+// ---------------------------------------------------------------------------
+
+const SAT_COMMANDS: IndicCommandMapping[] = [
+  { phrases: ['ᱤᱠᱤᱨ ᱥᱠᱨᱚᱞ', 'ᱤᱠᱤᱨ ᱦᱚᱨ'], action: 'scroll-up', hasArgs: false },
+  { phrases: ['ᱛᱤᱞᱮ ᱥᱠᱨᱚᱞ', 'ᱛᱤᱞᱮ ᱦᱚᱨ'], action: 'scroll-down', hasArgs: false },
+  { phrases: ['ᱦᱮᱸᱫᱮ ᱦᱚᱨ', 'ᱢᱮᱱᱤᱛ'], action: 'go-back', hasArgs: false },
+  { phrases: ['ᱟᱜᱟ ᱦᱚᱨ', 'ᱟᱜᱟ'], action: 'go-forward', hasArgs: false },
+  { phrases: ['ᱫᱚᱦᱚ ᱞᱚᱰ', 'ᱨᱤᱞᱚᱰ'], action: 'reload', hasArgs: false },
+  { phrases: ['ᱵᱚᱲᱚ ᱠᱟᱱᱟ', 'ᱡᱩᱢ ᱤᱱ'], action: 'zoom-in', hasArgs: false },
+  { phrases: ['ᱦᱩᱲᱩ ᱠᱟᱱᱟ', 'ᱡᱩᱢ ᱟᱣᱴ'], action: 'zoom-out', hasArgs: false },
+  { phrases: ['ᱱᱟᱶᱟ ᱴᱮᱵ'], action: 'new-tab', hasArgs: false },
+  { phrases: ['ᱴᱮᱵ ᱵᱚᱸᱫ'], action: 'close-tab', hasArgs: false },
+  { phrases: ['ᱥᱟᱨᱟᱸᱥ ᱫᱮ', 'ᱥᱟᱨᱟᱸᱥ'], action: 'summarize', hasArgs: false },
+  { phrases: ['ᱧᱟᱢ', 'ᱧᱟᱢᱢᱮ'], action: 'find', hasArgs: true },
+  { phrases: ['ᱢᱚᱲᱟ', 'ᱦᱮᱞᱯ'], action: 'help', hasArgs: false },
+];
+
+// ---------------------------------------------------------------------------
+// Maithili (mai) — Devanagari script; text-mode only, STT fallback hi-IN
+// ---------------------------------------------------------------------------
+
+const MAI_COMMANDS: IndicCommandMapping[] = [
+  { phrases: ['ऊपर स्क्रोल', 'ऊपर जाउ', 'ऊपर'], action: 'scroll-up', hasArgs: false },
+  { phrases: ['नीचाँ स्क्रोल', 'नीचाँ जाउ', 'नीचाँ'], action: 'scroll-down', hasArgs: false },
+  { phrases: ['पाछाँ जाउ', 'वापस जाउ'], action: 'go-back', hasArgs: false },
+  { phrases: ['आगाँ जाउ', 'आगाँ'], action: 'go-forward', hasArgs: false },
+  { phrases: ['फेर लोड करू', 'रीलोड'], action: 'reload', hasArgs: false },
+  { phrases: ['पैघ करू', 'जूम इन'], action: 'zoom-in', hasArgs: false },
+  { phrases: ['छोट करू', 'जूम आउट'], action: 'zoom-out', hasArgs: false },
+  { phrases: ['अगिला टैब'], action: 'next-tab', hasArgs: false },
+  { phrases: ['पिछला टैब'], action: 'prev-tab', hasArgs: false },
+  { phrases: ['टैब बंद करू'], action: 'close-tab', hasArgs: false },
+  { phrases: ['नव टैब'], action: 'new-tab', hasArgs: false },
+  { phrases: ['सारांश दिय', 'सारांश'], action: 'summarize', hasArgs: false },
+  { phrases: ['सरल करू', 'सहज करू'], action: 'simplify', hasArgs: false },
+  { phrases: ['खोजू', 'ताकू'], action: 'find', hasArgs: true },
+  { phrases: ['मदति', 'हेल्प'], action: 'help', hasArgs: false },
+];
+
+// ---------------------------------------------------------------------------
+// Dogri (doi) — Devanagari script; text-mode only, STT fallback hi-IN
+// Note: Some terms transliterated — marked with [T]
+// ---------------------------------------------------------------------------
+
+const DOI_COMMANDS: IndicCommandMapping[] = [
+  { phrases: ['उप्पर स्क्रोल', 'उप्पर जा', 'उप्पर'], action: 'scroll-up', hasArgs: false },
+  { phrases: ['थल्ले स्क्रोल', 'थल्ले जा', 'थल्ले'], action: 'scroll-down', hasArgs: false },
+  { phrases: ['पिच्छें जा', 'वापस जा'], action: 'go-back', hasArgs: false },
+  { phrases: ['अग्गें जा', 'अग्गें'], action: 'go-forward', hasArgs: false },
+  { phrases: ['फ्हेर लोड', 'रीलोड'], action: 'reload', hasArgs: false },
+  { phrases: ['वड्डा कर', 'जूम इन'], action: 'zoom-in', hasArgs: false },
+  { phrases: ['नान्हा कर', 'जूम आउट'], action: 'zoom-out', hasArgs: false },
+  { phrases: ['अगला टैब'], action: 'next-tab', hasArgs: false },
+  { phrases: ['पिछला टैब'], action: 'prev-tab', hasArgs: false },
+  { phrases: ['टैब बंद कर'], action: 'close-tab', hasArgs: false },
+  { phrases: ['नवाँ टैब'], action: 'new-tab', hasArgs: false },
+  { phrases: ['सारांश दे', 'सारांश'], action: 'summarize', hasArgs: false },
+  { phrases: ['सरल कर', 'सौखला कर'], action: 'simplify', hasArgs: false },           // [T] सौखला≈easy
+  { phrases: ['लब्भ', 'ढूंढ'], action: 'find', hasArgs: true },
+  { phrases: ['मदद', 'हेल्प'], action: 'help', hasArgs: false },
+];
+
+// ---------------------------------------------------------------------------
+// Sindhi (sd) — Arabic (Sindhi) script; text-mode only, STT fallback ur-IN
+// ---------------------------------------------------------------------------
+
+const SD_COMMANDS: IndicCommandMapping[] = [
+  { phrases: ['مٿي اسڪرول', 'مٿي وڃ', 'مٿي'], action: 'scroll-up', hasArgs: false },
+  { phrases: ['هيٺ اسڪرول', 'هيٺ وڃ', 'هيٺ'], action: 'scroll-down', hasArgs: false },
+  { phrases: ['پوئتي وڃ', 'واپس وڃ'], action: 'go-back', hasArgs: false },
+  { phrases: ['اڳتي وڃ', 'اڳتي'], action: 'go-forward', hasArgs: false },
+  { phrases: ['ٻيهر لوڊ', 'ريلوڊ'], action: 'reload', hasArgs: false },
+  { phrases: ['وڏو ڪر', 'زوم ان'], action: 'zoom-in', hasArgs: false },
+  { phrases: ['ننڍو ڪر', 'زوم آئوٽ'], action: 'zoom-out', hasArgs: false },
+  { phrases: ['ايندڙ ٽئب'], action: 'next-tab', hasArgs: false },
+  { phrases: ['اڳئين ٽئب'], action: 'prev-tab', hasArgs: false },
+  { phrases: ['ٽئب بند ڪر'], action: 'close-tab', hasArgs: false },
+  { phrases: ['نئون ٽئب'], action: 'new-tab', hasArgs: false },
+  { phrases: ['خلاصو ڏي', 'خلاصو'], action: 'summarize', hasArgs: false },
+  { phrases: ['سادو ڪر', 'آسان ڪر'], action: 'simplify', hasArgs: false },
+  { phrases: ['ڳول', 'ڳولا ڪر'], action: 'find', hasArgs: true },
+  { phrases: ['مدد', 'هيلپ'], action: 'help', hasArgs: false },
+];
+
+// ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
 
@@ -390,6 +649,18 @@ export const INDIC_COMMANDS: Record<IndicLangCode, IndicCommandMapping[]> = {
   'ml-IN': ML_COMMANDS,
   'pa-IN': PA_COMMANDS,
   'ur-IN': UR_COMMANDS,
+  // 12 new languages (Priority 2)
+  'as-IN': AS_COMMANDS,
+  'sa-IN': SA_COMMANDS,
+  'ks': KS_COMMANDS,
+  'kok': KOK_COMMANDS,
+  'mni': MNI_COMMANDS,
+  'ne-IN': NE_COMMANDS,
+  'brx': BRX_COMMANDS,
+  'sat': SAT_COMMANDS,
+  'mai': MAI_COMMANDS,
+  'doi': DOI_COMMANDS,
+  'sd': SD_COMMANDS,
 };
 
 // ---------------------------------------------------------------------------
@@ -454,4 +725,63 @@ export function matchAnyIndicCommand(
     if (result) return { lang: code, result };
   }
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// STT locale routing
+// ---------------------------------------------------------------------------
+
+/**
+ * Maps each IndicLangCode to its Chrome Web Speech API locale.
+ * Languages with no native Chrome STT support are routed to the
+ * closest supported script family (Devanagari→hi-IN, Bengali→bn-IN,
+ * Arabic-script→ur-IN).
+ *
+ * Key: IndicLangCode
+ * Value: Chrome SpeechRecognition lang string
+ */
+export const STT_FALLBACK_MAP: Record<IndicLangCode, string> = {
+  // Native / direct Chrome STT support
+  'hi-IN': 'hi-IN',
+  'ta-IN': 'ta-IN',
+  'te-IN': 'te-IN',
+  'kn-IN': 'kn-IN',
+  'bn-IN': 'bn-IN',
+  'mr-IN': 'mr-IN',
+  'gu-IN': 'gu-IN',
+  'ml-IN': 'ml-IN',
+  'pa-IN': 'pa-IN',
+  'ur-IN': 'ur-IN',
+  // Assamese: Bengali-Assamese script → bn-IN fallback
+  'as-IN': 'bn-IN',
+  // Devanagari-script languages without native STT → hi-IN fallback
+  'sa-IN': 'hi-IN',
+  'kok': 'hi-IN',
+  'ne-IN': 'hi-IN',
+  'brx': 'hi-IN',
+  'mai': 'hi-IN',
+  'doi': 'hi-IN',
+  // Bengali/Meitei-script language → bn-IN fallback
+  'mni': 'bn-IN',
+  // Ol Chiki (Santali) → hi-IN fallback
+  'sat': 'hi-IN',
+  // Arabic-script languages → ur-IN fallback
+  'ks': 'ur-IN',
+  'sd': 'ur-IN',
+};
+
+/**
+ * Return the Chrome SpeechRecognition locale for a given IndicLangCode.
+ * For languages with native Chrome STT support the locale is returned as-is.
+ * For text-mode-only languages, the nearest-script fallback locale is returned.
+ */
+export function getSTTLocale(code: IndicLangCode): string {
+  return STT_FALLBACK_MAP[code];
+}
+
+/**
+ * Whether the language has native Chrome STT support (no fallback needed).
+ */
+export function hasNativeSTT(code: IndicLangCode): boolean {
+  return STT_FALLBACK_MAP[code] === code;
 }

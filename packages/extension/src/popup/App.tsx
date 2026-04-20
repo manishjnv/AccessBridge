@@ -419,6 +419,12 @@ function SensoryTab({
         value={sensory.highContrast}
         onChange={(v) => onChange({ highContrast: v })}
       />
+      {/* --- Priority 1: Captions + Actions --- */}
+      <Toggle
+        label="Live Captions"
+        value={sensory.liveCaptionsEnabled}
+        onChange={(v) => onChange({ liveCaptionsEnabled: v })}
+      />
     </>
   );
 }
@@ -521,6 +527,12 @@ function CognitiveTab({
           onChange({ distractionShield: v });
           toggleFeature('distraction-shield', v);
         }}
+      />
+      {/* --- Priority 1: Captions + Actions --- */}
+      <Toggle
+        label="Action Items"
+        value={cognitive.actionItemsEnabled}
+        onChange={(v) => onChange({ actionItemsEnabled: v })}
       />
     </>
   );
@@ -829,6 +841,18 @@ function SettingsTab({
             <option value="gu">Gujarati (ગુજરાતી)</option>
             <option value="kn">Kannada (ಕನ್ನಡ)</option>
             <option value="ml">Malayalam (മലയാളം)</option>
+            {/* 12 new languages (Priority 2) — text mode except as */}
+            <option value="mai">Maithili (मैथिली) · text mode</option>
+            <option value="sd">Sindhi (سنڌي) · text mode</option>
+            <option value="ne">Nepali (नेपाली) · text mode</option>
+            <option value="as">Assamese (অসমীয়া)</option>
+            <option value="sat">Santali (ᱥᱟᱱᱛᱟᱲᱤ) · text mode</option>
+            <option value="ks">Kashmiri (کٲشُر) · text mode</option>
+            <option value="doi">Dogri (डोगरी) · text mode</option>
+            <option value="kok">Konkani (कोंकणी) · text mode</option>
+            <option value="mni">Manipuri (মৈতৈলোন্) · text mode</option>
+            <option value="brx">Bodo (बड़ो) · text mode</option>
+            <option value="sa">Sanskrit (संस्कृत) · text mode</option>
           </optgroup>
           <optgroup label="Global Languages">
             <option value="zh">Chinese (中文)</option>

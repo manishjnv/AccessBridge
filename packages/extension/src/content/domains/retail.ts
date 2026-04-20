@@ -10,6 +10,7 @@
  */
 
 import type { DomainConnector } from './index.js';
+import { computeSavings } from './deepenings.js';
 
 // ---------------------------------------------------------------------------
 // Retail jargon glossary
@@ -222,6 +223,70 @@ export class RetailConnector implements DomainConnector {
     this.enhanceProductComparisons();
     this.enhanceRetailForms();
     this.addDeliveryEstimates();
+    // --- Priority 4: Retail deepening ---
+    this.addSavingsBadges();
+  }
+
+  // --- Priority 4: Savings-percentage badge ---------------------------------
+
+  private addSavingsBadges(): void {
+    const parsePrice = (text: string): number | null => {
+      const match = (text || '').match(/[\u20B9$€£]?\s*([\d,]+(?:\.\d+)?)/);
+      if (!match) return null;
+      const n = parseFloat(match[1].replace(/,/g, ''));
+      return Number.isFinite(n) ? n : null;
+    };
+
+    // Find elements that look like a struck-through "was" price
+    const strikeSelectors = [
+      's', 'del', 'strike',
+      '[class*="original" i]',
+      '[class*="mrp" i]',
+      '[class*="list-price" i]',
+      '[class*="was-price" i]',
+      '[style*="line-through"]',
+    ];
+    const candidates = new Set<Element>();
+    for (const sel of strikeSelectors) {
+      document.querySelectorAll(sel).forEach((el) => candidates.add(el));
+    }
+
+    for (const original of Array.from(candidates)) {
+      if (original.closest('.ab-domain-savings-badge')) continue;
+      const originalEl = original as HTMLElement;
+      if (originalEl.dataset.abSavings === 'true') continue;
+
+      const originalPrice = parsePrice(originalEl.textContent || '');
+      if (originalPrice === null) continue;
+
+      // Look for the adjacent sale price among nearby siblings / parent's other text-bearing children
+      const scope = originalEl.parentElement;
+      if (!scope) continue;
+      let salePrice: number | null = null;
+      for (const sibling of Array.from(scope.children)) {
+        if (sibling === originalEl) continue;
+        if (sibling.classList.contains('ab-domain-savings-badge')) continue;
+        const candidate = parsePrice((sibling as HTMLElement).textContent || '');
+        if (candidate !== null && candidate < originalPrice) {
+          salePrice = candidate;
+          break;
+        }
+      }
+      if (salePrice === null) continue;
+
+      const breakdown = computeSavings(originalPrice, salePrice);
+      if (!breakdown) continue;
+
+      const badge = document.createElement('span');
+      badge.className = 'ab-domain-savings-badge';
+      badge.setAttribute('role', 'note');
+      badge.setAttribute('aria-label', breakdown.label);
+      badge.textContent = breakdown.label;
+      scope.appendChild(badge);
+
+      originalEl.dataset.abSavings = 'true';
+      this.overlayElements.push(badge);
+    }
   }
 
   // ---- 1. Jargon decoder ---------------------------------------------------

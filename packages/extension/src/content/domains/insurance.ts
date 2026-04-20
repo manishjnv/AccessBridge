@@ -10,6 +10,7 @@
  */
 
 import type { DomainConnector } from './index.js';
+import { analyzeCoverageGaps } from './deepenings.js';
 
 // ---------------------------------------------------------------------------
 // Insurance jargon glossary
@@ -181,6 +182,51 @@ export class InsuranceConnector implements DomainConnector {
     this.addComparisonHelper();
     this.enhanceClaimForms();
     this.enhancePremiumCalculators();
+    // --- Priority 4: Insurance deepening ---
+    this.addCoverageGapReport();
+  }
+
+  // --- Priority 4: Coverage gap analyzer ------------------------------------
+
+  private addCoverageGapReport(): void {
+    if (document.querySelector('.ab-domain-coverage-gap')) return;
+    const policySection =
+      document.querySelector<HTMLElement>(
+        '[class*="policy" i], [class*="coverage" i], [class*="benefits" i], [id*="policy" i], [id*="benefits" i]',
+      ) ?? document.querySelector<HTMLElement>('main, article');
+    if (!policySection) return;
+
+    const text = (policySection.textContent || '').slice(0, 20_000);
+    if (text.length < 400) return;
+    const report = analyzeCoverageGaps(text);
+    if (report.missing.length === 0 || report.covered.length === 0) return;
+
+    const panel = document.createElement('aside');
+    panel.className = 'ab-domain-coverage-gap';
+    panel.setAttribute('role', 'region');
+    panel.setAttribute('aria-label', 'Potential coverage gaps');
+
+    const title = document.createElement('div');
+    title.className = 'ab-domain-coverage-gap-title';
+    title.textContent = `Coverage check: ${report.covered.length}/${report.covered.length + report.missing.length} common items detected`;
+    panel.appendChild(title);
+
+    const list = document.createElement('ul');
+    list.className = 'ab-domain-coverage-gap-list';
+    for (const item of report.missing.slice(0, 8)) {
+      const li = document.createElement('li');
+      li.textContent = `Not mentioned: ${item}`;
+      list.appendChild(li);
+    }
+    panel.appendChild(list);
+
+    const hint = document.createElement('div');
+    hint.className = 'ab-domain-coverage-gap-hint';
+    hint.textContent = 'Missing items may still be covered — check the full policy document or ask the insurer.';
+    panel.appendChild(hint);
+
+    policySection.insertBefore(panel, policySection.firstChild);
+    this.overlayElements.push(panel);
   }
 
   // ---- 1. Jargon decoder ---------------------------------------------------

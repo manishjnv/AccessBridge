@@ -10,6 +10,7 @@
  */
 
 import type { DomainConnector } from './index.js';
+import { detectDrugInteractions } from './deepenings.js';
 
 // ---------------------------------------------------------------------------
 // Healthcare jargon glossary
@@ -202,6 +203,52 @@ export class HealthcareConnector implements DomainConnector {
     this.simplifyMedicineInfo();
     this.enhanceLabReports();
     this.highlightEmergencyContacts();
+    // --- Priority 4: Healthcare deepening ---
+    this.addDrugInteractionWarnings();
+  }
+
+  // --- Priority 4: Drug interaction detector --------------------------------
+
+  private addDrugInteractionWarnings(): void {
+    if (document.querySelector('.ab-domain-drug-interactions')) return;
+    const host =
+      document.querySelector<HTMLElement>('[class*="prescription" i], [class*="medication" i], [class*="rx" i]') ??
+      document.querySelector<HTMLElement>('main, article');
+    if (!host) return;
+
+    const text = (host.textContent || '').slice(0, 15_000);
+    const findings = detectDrugInteractions(text);
+    if (findings.length === 0) return;
+
+    const panel = document.createElement('aside');
+    panel.className = 'ab-domain-drug-interactions';
+    panel.setAttribute('role', 'alert');
+    panel.setAttribute('aria-label', 'Possible drug interactions');
+
+    const title = document.createElement('div');
+    title.className = 'ab-domain-drug-interactions-title';
+    title.textContent = `Possible drug interaction${findings.length === 1 ? '' : 's'} detected`;
+    panel.appendChild(title);
+
+    const list = document.createElement('ul');
+    list.className = 'ab-domain-drug-interactions-list';
+    for (const finding of findings.slice(0, 5)) {
+      const li = document.createElement('li');
+      const drugs = document.createElement('strong');
+      drugs.textContent = `${finding.drugs[0]} + ${finding.drugs[1]}:`;
+      li.appendChild(drugs);
+      li.appendChild(document.createTextNode(' ' + finding.warning));
+      list.appendChild(li);
+    }
+    panel.appendChild(list);
+
+    const hint = document.createElement('div');
+    hint.className = 'ab-domain-drug-interactions-hint';
+    hint.textContent = 'Informational only. Always consult your pharmacist or doctor before changing any medication.';
+    panel.appendChild(hint);
+
+    host.insertBefore(panel, host.firstChild);
+    this.overlayElements.push(panel);
   }
 
   // ---- 1. Medical jargon decoder -------------------------------------------

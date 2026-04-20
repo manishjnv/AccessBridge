@@ -58,6 +58,7 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 16px;
       height: 56px;
     }
     .navbar-brand {
@@ -90,7 +91,7 @@
       -webkit-text-fill-color: transparent;
       background-clip: text;
     }
-    .navbar-links { display: flex; gap: 28px; align-items: center; }
+    .navbar-links { display: flex; gap: 20px; align-items: center; }
     .navbar-links a {
       font-size: 13px;
       font-weight: 600;
@@ -120,6 +121,22 @@
       white-space: nowrap;
     }
     .navbar-cta:hover { transform: translateY(-1px); box-shadow: 0 4px 16px var(--glow); }
+    .navbar-version {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.6px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: rgba(123, 104, 238, 0.15);
+      color: var(--accent);
+    }
+    .btn-version {
+      font-size: 11px;
+      font-weight: 600;
+      opacity: 0.78;
+      margin-left: 6px;
+      letter-spacing: 0.3px;
+    }
 
     /* Navbar quick-stat pills (right of brand name) */
     .navbar-stats {
@@ -174,12 +191,15 @@
       border-color: transparent;
       box-shadow: 0 6px 20px rgba(123,104,238,0.55);
     }
-    @media (max-width: 1100px) {
+    @media (max-width: 1400px) {
       .navbar-stats { gap: 6px; margin-left: 12px; padding-left: 12px; }
       .nav-stat { padding: 4px 10px; font-size: 11px; }
       .nav-stat-value { font-size: 12.5px; }
     }
-    @media (max-width: 900px) {
+    @media (max-width: 1280px) {
+      /* Hide the quick-stat pills before they can overlap the right-side
+         nav links. Same information still lives in the hero-stats strip
+         immediately below the navbar. */
       .navbar-stats { display: none; }
     }
 
@@ -1443,6 +1463,7 @@
         <a href="#roadmap">Roadmap</a>
         <a href="/observatory/" target="_blank">Observatory</a>
         <a href="https://github.com/manishjnv/AccessBridge" target="_blank">GitHub</a>
+        <span class="app-version navbar-version" aria-label="Current version">v…</span>
         <a href="#install" class="navbar-cta">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
           Install
@@ -2004,6 +2025,7 @@
         <a id="download-btn" href="/downloads/accessbridge-extension.zip" class="btn btn-primary">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
           Download Extension (.zip)
+          <span class="app-version btn-version">v…</span>
         </a>
         <div class="install-steps">
           <div class="step">
@@ -2131,7 +2153,7 @@
       </div>
       <div class="footer-bottom">
         <p>
-          <span class="footer-status"><span class="health-dot" id="health-dot"></span> AccessBridge <span id="app-version">v0.1.1</span></span>
+          <span class="footer-status"><span class="health-dot" id="health-dot"></span> AccessBridge <span class="app-version" id="app-version">v…</span></span>
         </p>
         <p>Team: Manish Kumar &nbsp;|&nbsp; <a href="https://github.com/manishjnv/AccessBridge" target="_blank">github.com/manishjnv/AccessBridge</a></p>
       </div>
@@ -2176,9 +2198,12 @@
 
     // Fetch version from API and update UI dynamically
     fetch('/api/version').then(r => r.json()).then(d => {
-      // Update version display
-      const versionEl = document.getElementById('app-version');
-      if (versionEl && d.version) versionEl.textContent = 'v' + d.version;
+      // Update version display (footer + navbar pill + download button tag)
+      if (d.version) {
+        document.querySelectorAll('.app-version').forEach(el => {
+          el.textContent = 'v' + d.version;
+        });
+      }
 
       // Update download link
       const downloadBtn = document.getElementById('download-btn');

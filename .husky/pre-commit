@@ -1,0 +1,6 @@
+#!/usr/bin/env sh
+# Fast gate: typecheck runs per-package and catches most errors in ~5s.
+# The heavier `pnpm build` gate runs on pre-push.
+# Skip with: git commit --no-verify
+echo "pre-commit: pnpm typecheck"
+pnpm typecheck

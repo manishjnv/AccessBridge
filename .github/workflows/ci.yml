@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: typecheck + test + build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm -r test
+
+      - name: Build
+        run: pnpm build
+
+      - name: BUG-008 IIFE guard
+        run: |
+          node -c packages/extension/dist/src/content/index.js
+          node -c packages/extension/dist/src/background/index.js
+
+      - name: Zip manifest sanity check
+        run: |
+          # Packages the freshly-built dist/ into a zip and verifies the
+          # manifest.version inside the zip matches the source manifest.
+          # Guards against BUG-011-class drift (bump without rezip).
+          cd packages/extension/dist && zip -rq /tmp/check.zip . && cd -
+          SRC_VERSION=$(python -c "import json; print(json.load(open('packages/extension/manifest.json'))['version'])")
+          ZIP_VERSION=$(python -c "import zipfile, json; print(json.loads(zipfile.ZipFile('/tmp/check.zip').read('manifest.json').decode())['version'])")
+          if [ "$SRC_VERSION" != "$ZIP_VERSION" ]; then
+            echo "::error::Zip manifest v$ZIP_VERSION differs from source v$SRC_VERSION"
+            exit 1
+          fi
+          echo "✓ Zip manifest OK at v$ZIP_VERSION"

@@ -1,0 +1,7 @@
+#!/usr/bin/env sh
+# Authoritative gate: full build + test. Catches the cross-package tsc
+# resolution issues that per-package typecheck misses (e.g. RCA BUG-011
+# class of errors — customConditions + isolatedModules + type-cast).
+# Skip with: git push --no-verify
+echo "pre-push: pnpm build && pnpm -r test"
+pnpm build && pnpm -r test

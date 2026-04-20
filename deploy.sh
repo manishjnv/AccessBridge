@@ -208,15 +208,20 @@ ssh "$REMOTE" bash -s <<REMOTE_SCRIPT
 REMOTE_SCRIPT
 
 # ─────────────────────────────────────────────────────────
-# [5/6] Post-deploy health check
+# [5/6] Post-deploy health check (API + end-to-end zip)
 # ─────────────────────────────────────────────────────────
-# Improvement: Tier 2 #8 — verify deploy landed + version matches
+# Two assertions:
+#   (a) /api/version reports $VERSION (catches main.py cache / restart issues)
+#   (b) the publicly-served /downloads/accessbridge-extension.zip actually
+#       contains manifest.version == $VERSION (catches rsync no-op, Caddy
+#       cache staleness, or any future CDN layer serving an old artifact —
+#       i.e. the "stale zip on download page" scenario)
 if [ "$SKIP_CHECK" = false ]; then
   echo "[5/6] Health check against $HEALTH_URL ..."
   sleep 2
   if RESPONSE=$(curl -fsS --max-time 10 "$HEALTH_URL" 2>&1); then
     if echo "$RESPONSE" | grep -q "$VERSION"; then
-      echo "  ✓ Site is live with v${VERSION}."
+      echo "  ✓ API reports v${VERSION}."
     else
       echo "  ⚠ Site responding but version mismatch. API returned:"
       echo "    $RESPONSE"
@@ -225,6 +230,31 @@ if [ "$SKIP_CHECK" = false ]; then
     fi
   else
     echo "  ✗ Site not responding. Check nginx / API."
+    exit 1
+  fi
+
+  # Derive the served-zip URL from $HEALTH_URL so overrides stay consistent:
+  # https://host/api/version → https://host/downloads/accessbridge-extension.zip
+  ZIP_URL="${HEALTH_URL%/api/version}/downloads/accessbridge-extension.zip"
+  TMP_ZIP=$(mktemp --suffix=.zip)
+  trap 'rm -f "$TMP_ZIP"' EXIT
+  echo "  Verifying served zip at $ZIP_URL ..."
+  if ! curl -fsS --max-time 30 -H "Cache-Control: no-cache" -o "$TMP_ZIP" "$ZIP_URL"; then
+    echo "  ✗ Failed to download served zip."
+    exit 1
+  fi
+  if ! SERVED_MANIFEST=$(unzip -p "$TMP_ZIP" manifest.json 2>/dev/null); then
+    echo "  ✗ Served artifact is not a valid zip with manifest.json."
+    exit 1
+  fi
+  SERVED_VERSION=$(node -p "JSON.parse(process.argv[1]).version" "$SERVED_MANIFEST" 2>/dev/null || echo "")
+  if [ "$SERVED_VERSION" = "$VERSION" ]; then
+    echo "  ✓ Served zip contains manifest.version=${SERVED_VERSION}."
+  else
+    echo "  ✗ Served zip version mismatch."
+    echo "    Expected: $VERSION"
+    echo "    Got:      ${SERVED_VERSION:-<unparseable>}"
+    echo "  Likely cause: rsync no-op, Caddy cache, or CDN serving stale artifact."
     exit 1
   fi
 else

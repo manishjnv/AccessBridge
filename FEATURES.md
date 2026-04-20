@@ -1,0 +1,140 @@
+# AccessBridge — Feature Catalog
+
+Single source of truth for every user-facing feature. Update in the same commit as feature changes.
+
+Entry point legend: **P** = Popup toggle, **SP** = Side panel, **V** = Voice command, **A** = Auto-start, **D** = Domain auto-detect
+
+---
+
+## Sensory Module
+
+Visual / perceptual adaptations. All live in [packages/extension/src/content/sensory/adapter.ts](packages/extension/src/content/sensory/adapter.ts).
+
+| ID | Feature | Entry | State | Notes |
+|----|---------|-------|-------|-------|
+| S-01 | Font Scale (0.8x–2.0x) | P | Shipped | CSS zoom on `html` |
+| S-02 | Contrast (0.5x–2.0x) | P | Shipped | CSS filter |
+| S-03 | Color-blindness correction | P | Shipped | SVG filters for protanopia / deuteranopia / tritanopia |
+| S-04 | Line-height + letter-spacing | P | Shipped | Typography sliders |
+| S-05 | Reduced motion | P | Shipped | Disables animations + transitions site-wide |
+
+Tests: indirect via `packages/core/src/__tests__/decision-engine.test.ts`.
+
+---
+
+## Cognitive Module
+
+Focus, simplification, and distraction control.
+
+| ID | Feature | File | Entry | State |
+|----|---------|------|-------|-------|
+| C-01 | Focus Mode (spotlight) | [content/cognitive/simplifier.ts](packages/extension/src/content/cognitive/simplifier.ts) | P | Shipped |
+| C-02 | Reading Guide (cursor highlight bar) | [content/cognitive/simplifier.ts](packages/extension/src/content/cognitive/simplifier.ts) | P | Shipped |
+| C-03 | Reading Mode (65-char column + 1.8 leading) | [content/cognitive/simplifier.ts](packages/extension/src/content/cognitive/simplifier.ts) | P | Shipped |
+| C-04 | Distraction Shield (ads / modals / banners) | [content/cognitive/simplifier.ts](packages/extension/src/content/cognitive/simplifier.ts) | P | Shipped |
+| C-05 | Auto-Summarize (AI) | [content/ai/bridge.ts](packages/extension/src/content/ai/bridge.ts) | P, V | Shipped |
+| C-06 | Text Simplification (off / mild / strong) | [content/ai/bridge.ts](packages/extension/src/content/ai/bridge.ts) | P, V | Shipped |
+| C-07 | Fatigue-Adaptive UI (4-level progressive) | [content/fatigue/adaptive-ui.ts](packages/extension/src/content/fatigue/adaptive-ui.ts) | A | Shipped |
+
+AI-backed features (C-05, C-06) route through the AI engine — see Architecture §5.
+
+---
+
+## Motor Module
+
+Input assistance: voice, gaze, dwell, keyboard.
+
+| ID | Feature | File | Entry | State |
+|----|---------|------|-------|-------|
+| M-01 | Voice Navigation (20+ English commands) | [content/motor/voice-commands.ts](packages/extension/src/content/motor/voice-commands.ts) | P | Shipped |
+| M-02 | Hindi Voice Commands (25+ commands, `lang=hi-IN`) | [content/motor/hindi-commands.ts](packages/extension/src/content/motor/hindi-commands.ts) | A (profile) | Shipped |
+| M-03 | Eye Tracking (FaceDetector API + fallback) | [content/motor/eye-tracker.ts](packages/extension/src/content/motor/eye-tracker.ts) | P | Shipped |
+| M-04 | Dwell Click (configurable delay, radial SVG) | [content/motor/dwell-click.ts](packages/extension/src/content/motor/dwell-click.ts) | P | Shipped |
+| M-05 | Keyboard-Only Mode (skip links, focus ring, `?` overlay) | [content/motor/keyboard-mode.ts](packages/extension/src/content/motor/keyboard-mode.ts) | P | Shipped |
+| M-06 | Predictive Input (word + phrase prediction) | [content/motor/predictive-input.ts](packages/extension/src/content/motor/predictive-input.ts) | P | Shipped |
+| M-07 | Smart Click Targets (enlarge interactive elements) | Applied via DecisionEngine | P, A | Shipped |
+
+Language support: English, Hindi (full commands), plus 7 other `lang` codes for STT — no translated UI yet. Full Indic language plan is deferred (see DEF-004).
+
+---
+
+## Domain Connectors
+
+Auto-activate on domain match — inject jargon decoders, form assistance, and domain-specific simplification.
+
+| ID | Domain | File | Scope |
+|----|--------|------|-------|
+| D-01 | Banking | [content/domains/banking.ts](packages/extension/src/content/domains/banking.ts) | NEFT/RTGS/EMI/KYC jargon (25 terms), form assist, Lakh/Crore amount reader |
+| D-02 | Insurance | [content/domains/insurance.ts](packages/extension/src/content/domains/insurance.ts) | 35-term jargon decoder, policy simplifier, claim form assistant |
+| D-03 | Healthcare | [content/domains/healthcare.ts](packages/extension/src/content/domains/healthcare.ts) | Medical jargon, prescription reader, lab-test simplifier, emergency highlights |
+| D-04 | Telecom | [content/domains/telecom.ts](packages/extension/src/content/domains/telecom.ts) | Plan terms, network specs, billing clarity |
+| D-05 | Retail / E-commerce | [content/domains/retail.ts](packages/extension/src/content/domains/retail.ts) | Delivery clarity, price comparison, checkout assist, savings badges |
+| D-06 | Manufacturing / ERP | [content/domains/manufacturing.ts](packages/extension/src/content/domains/manufacturing.ts) | ERP jargon (production, inventory, supply chain) |
+
+Registry: [content/domains/index.ts](packages/extension/src/content/domains/index.ts) — routes based on hostname match.
+
+---
+
+## AI Engine (package `@accessbridge/ai-engine`)
+
+Three-tier orchestrator. Local tier is default and free; higher tiers unlocked by API keys.
+
+| Layer | File | Purpose |
+|-------|------|---------|
+| Engine | [packages/ai-engine/src/engine.ts](packages/ai-engine/src/engine.ts) | Request lifecycle (cache → normalize → cost check → dispatch → populate → track) |
+| Cache | [packages/ai-engine/src/cache.ts](packages/ai-engine/src/cache.ts) | TTL-configured, keyed by `type:hash(input)` |
+| Cost Tracker | [packages/ai-engine/src/cost-tracker.ts](packages/ai-engine/src/cost-tracker.ts) | Daily spend budget + automatic tier downgrade |
+| Normalizer | [packages/ai-engine/src/normalizer.ts](packages/ai-engine/src/normalizer.ts) | Text pre-processing, email thread dedup, token estimation |
+| Local provider | [packages/ai-engine/src/providers/local.ts](packages/ai-engine/src/providers/local.ts) | Rule-based summarize + 180-term simplify map — offline |
+| Gemini provider | [packages/ai-engine/src/providers/gemini.ts](packages/ai-engine/src/providers/gemini.ts) | Low-cost remote (Gemini Flash) |
+| Claude provider | [packages/ai-engine/src/providers/claude.ts](packages/ai-engine/src/providers/claude.ts) | Premium remote (Claude Sonnet) |
+| Summarizer service | `packages/ai-engine/src/services/summarizer.ts` | `summarizeDocument`, `summarizeEmail`, `summarizeMeeting` |
+| Simplifier service | `packages/ai-engine/src/services/simplifier.ts` | `simplifyText(level)`, `getReadabilityScore()` (Flesch-Kincaid) |
+
+Fallback chain: **premium → low-cost → local**. Configured in `engine.ts` `TIER_ORDER`.
+
+Tests: `packages/ai-engine/src/__tests__/` — cache, cost-tracker, normalizer, local-provider.
+
+### AI-facing Feature
+
+| ID | Feature | File | Entry |
+|----|---------|------|-------|
+| AI-01 | Email Summarization UI (Gmail + Outlook toolbar inject) | [content/ai/email-ui.ts](packages/extension/src/content/ai/email-ui.ts) | A on mail domains |
+
+---
+
+## Core Engine (package `@accessbridge/core`)
+
+Background-side intelligence. Not user-facing directly but drives all auto-adaptations.
+
+| ID | Component | File | Tests |
+|----|-----------|------|-------|
+| CORE-01 | Struggle Detector (10 signal types, sliding 60s window) | `packages/core/src/signals/struggle-detector.ts` | `packages/core/src/__tests__/struggle-detector.test.ts` |
+| CORE-02 | Decision Engine (8+ rules mapping struggle → adaptations) | `packages/core/src/decision/engine.ts` | `packages/core/src/__tests__/decision-engine.test.ts` |
+| CORE-03 | Profile Store (sensory + cognitive + motor + language) | `packages/core/src/profile/store.ts` | `packages/core/src/__tests__/profile-store.test.ts` |
+
+Signal types collected by content script: `SCROLL_VELOCITY`, `CLICK_ACCURACY`, `DWELL_TIME`, `TYPING_RHYTHM`, `BACKSPACE_RATE`, `ZOOM_EVENTS`, `CURSOR_PATH`, `ERROR_RATE`, `READING_SPEED`, `HESITATION`.
+
+---
+
+## Feature-count summary
+
+| Module | Count |
+|--------|-------|
+| Sensory | 5 |
+| Cognitive | 7 (5 rule-based + 2 AI) |
+| Motor | 7 |
+| Domains | 6 |
+| AI engine features | 1 (+ engine layer) |
+| Core engine components | 3 |
+| **Total user-facing features** | **26** |
+
+---
+
+## Maintenance rules
+
+- When adding a feature: add a row here + ID scheme continues (S-06, C-08, etc.)
+- When removing a feature: delete the row; keep the ID retired (don't reuse)
+- When a file moves: update the link; don't leave dead anchors
+- When test coverage changes: update the Tests column
+- State values: **Shipped** (live) / **WIP** (in progress) / **Broken** (regression) / **Deprecated** (not removed yet)

@@ -1,6 +1,51 @@
 # AccessBridge - Shift Handoff
 
-## Last Session: Day 7 — Task A (parallel — Session A): Compliance Observatory with differential privacy (Feature #10) (2026-04-20)
+## Last Session: Day 7 — Task C (parallel — Session C): Gesture Shortcuts for Module C completion (2026-04-20)
+
+### Completed (Task C)
+
+- [x] **Core gesture-recognition library** — new package path `@accessbridge/core/gestures` exposing pure, testable primitives:
+  - [types.ts](packages/core/src/gestures/types.ts) — 16 `GestureType` tokens, `PointerEvent2D`/`GestureStroke`/`RecognizedGesture`/`GestureAction`/`GestureBinding`, plus `GESTURE_TYPES` and `DEFAULT_GESTURE_BINDINGS` (16 bindings covering all gestures).
+  - [recognizer.ts](packages/core/src/gestures/recognizer.ts) — pure functions: `detectSwipeDirection` (50 px min + 1.8× axis dominance), `detectCircle` (centroid-anchored angle integration ≥ 270°), `detectZigzag` (≥ 3 reversals w/ 2 px dead-zone), `detectTapCount` (200 ms / 15 px tap gate), `detectLongPress` (≥ duration + ≤ 10 px travel), `detectPinch` (20 px Δ threshold), `detectTwoFingerSwipe`, and `recognize()` dispatcher with specific-first ordering + confidence scoring (0.75–0.95).
+  - [actions.ts](packages/core/src/gestures/actions.ts) — 30 registered `GestureAction`s across navigation (9), accessibility (8), AI (5), and custom/interactive (8) categories; `getActionById(id)` lookup.
+  - [bindings.ts](packages/core/src/gestures/bindings.ts) — `GestureBindingStore` class: get/set/setEnabled/resetToDefaults, localStorage-backed under `accessbridge.gesture.bindings`, validates gesture and action ids before mutation (silent warn otherwise), safe in node/test (no throw when localStorage absent).
+  - [index.ts](packages/core/src/gestures/index.ts) — re-exports.
+- [x] **Content-script gesture controller + hint overlay** (M-08):
+  - [gestures.ts](packages/extension/src/content/motor/gestures.ts) — `GestureController` class: captures pointerdown/move/up, wheel, keydown; tracks per-`pointerId` strokes; triggers `evaluate()` on all-up or 500 ms idle; dispatches actions via `history`, `window.scrollTo`, `chrome.runtime.sendMessage`, `document.execCommand`, and focused-element `click()`. Wheel handler synthesizes trackpad pinch (via `ctrlKey`) and two-finger horizontal swipes (delta accumulator within 500 ms). Mouse mode gated by Shift by default; `?` summons the help overlay when focus is outside a form field.
+  - [gesture-hints.ts](packages/extension/src/content/motor/gesture-hints.ts) — `GestureHintOverlay` renders the indicator pill (1.5 s slide-in/out) and the `.a11y-gesture-help-overlay` cheat-sheet (click-out, Escape, or `?` to close). Plain DOM, no React; inline SVG map from 16 gesture types to simple icon paths.
+  - [gesture-shortcuts.md](docs/features/gesture-shortcuts.md) — full library, customization, input support, accessibility benefits, and technical thresholds table.
+- [x] **Content-script wiring** (additive only in [content/index.ts](packages/extension/src/content/index.ts)) — one import, one singleton, one start-on-profile branch, one REVERT_ALL stop, and one PROFILE_UPDATED reaction. All grouped under `// --- Task C: Gesture Shortcuts ---` markers for merge clarity.
+- [x] **Profile extension** — MotorProfile gains `gestureShortcutsEnabled` (off by default), `gestureShowHints` (on), `gestureMouseModeRequiresShift` (on). Added to `DEFAULT_MOTOR_PROFILE`. No other profile fields touched.
+- [x] **Popup Motor tab section** — purple-accent card with master toggle + two sub-toggles + "View Gesture Library" button. Library modal (new [popup/components/GestureLibrary.tsx](packages/extension/src/popup/components/GestureLibrary.tsx)) renders all 16 default bindings as icon + uppercase-gesture-label + bold-action rows, dismissible by click-out or the Close button.
+- [x] **CSS** — 145 new lines appended to [content/styles.css](packages/extension/src/content/styles.css) under a `Task C: Gesture Shortcuts` comment block. Tokens sourced from UI_GUIDELINES.md (primary #7b68ee / accent #bb86fc / surface #1a1a2e / muted #94a3b8); 4 px spacing rhythm; 8–16 px radii; respects `prefers-reduced-motion`.
+- [x] **Tests** — 42 new vitest cases across 3 files:
+  - `packages/core/src/gestures/__tests__/recognizer.test.ts` — **30 tests** (6 swipes · 4 circles · 3 zigzags · 4 tap counts · 3 long-presses · 3 pinches · 3 two-finger swipes · 4 dispatcher).
+  - `packages/core/src/gestures/__tests__/bindings.test.ts` — **6 tests** (defaults, persistence, reset, reload via localStorage mock, invalid-gesture rejection, duplicate overwrites).
+  - `packages/extension/src/content/motor/__tests__/gestures.test.ts` — **6 tests** (listener attach / detach, pointer round-trip feeds recognize, recognized gesture routes to `chrome.runtime.sendMessage`, enabled-false gate, Shift gate for mouse).
+- [x] **Docs** — [docs/features/gesture-shortcuts.md](docs/features/gesture-shortcuts.md); [FEATURES.md](FEATURES.md) row `M-08 Gesture Shortcuts (touch + trackpad + mouse, 16 gestures, bindable)`.
+
+**Tests:** core package **309 green** (was 273 before this task; +36 new recognizer + bindings). Extension package **27 green** (was 21 before; +6 new gesture-controller). TypeScript strict across all 3 packages ✅. Vite build clean (content 275.65 KB / background 34.29 KB / sidepanel 409.92 KB / CSS 42.99 KB). `node -c` syntax check on built content + background ✅ (BUG-008 guard). Zips regenerated: `accessbridge-extension.zip` and `deploy/downloads/accessbridge-extension.zip` both 405 KB.
+
+**Ownership note:** stayed within declared boundary — no touches to background/, sidepanel/, content/cognitive/, content/ai/, content/context/, content/domains/, content/sensory/, /opt/accessbridge/, core/src/audit/, core/src/signals/environment.ts, or the Overview/Sensory/Cognitive/Settings tabs of the popup. Only additive edits to content/index.ts, styles.css, App.tsx (Motor tab).
+
+**Codex fallback:** per `/codex:setup` the runtime was ready and authenticated, and a Codex task (`task-mo7d82sk-x7q708`) was dispatched for the full 10-file build. Codex finalized `status=done` after 2 m 51 s but wrote only a stub `index.ts` comment claiming "a parallel session owns the full implementation" — it did not create types/recognizer/actions/bindings or any test file. Opus main session implemented all 10 files from scratch to match the contract. Logged here because the fallback rule (feedback_codex_parallel) requires it.
+
+**Next action:** Task C complete. Remaining post-submission items per [ROADMAP.md](ROADMAP.md) → R1-01 Desktop companion (Tauri).
+
+#### Commits (Task C — mine)
+
+- `(pending)` feat: Task C — Gesture Shortcuts (touch + trackpad + mouse) for Module C completion
+
+#### Tool Contribution (Day 7, Task C)
+
+- **Opus:** full Task C implementation — 10 new files (core library + controller + hints + 3 test files + popup modal + docs), 3 additive integrations (profile, content/index.ts, styles.css), popup Motor-tab section, FEATURES row, HANDOFF entry, zip regeneration.
+- **Sonnet:** n/a — no template-rollout or mechanical contract to parallelize.
+- **Haiku:** n/a — no bulk read / grid-check sweep needed.
+- **codex:rescue:** dispatched for the 10-file core-library build; returned `status=done` but produced only a stub. Opus delivered the full implementation instead. No security-adjacent diff — Task C adds no manifest permissions, no new `host_permissions`, no cross-origin fetch, no content-script injection-logic change (RCA BUG-008 surface untouched).
+
+---
+
+## Previous Session: Day 7 — Task A (parallel — Session A): Compliance Observatory with differential privacy (Feature #10) (2026-04-20)
 
 ### Completed (Task A)
 

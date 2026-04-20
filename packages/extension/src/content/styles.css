@@ -1673,3 +1673,155 @@
 
 .a11y-env-explainer-btn--accept:hover { filter: brightness(1.1); }
 .a11y-env-explainer-btn--deny:hover { background: rgba(148, 163, 184, 0.25); }
+
+/* ============================================
+   Task C: Gesture Shortcuts
+   ============================================ */
+
+.a11y-gesture-indicator {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: rgba(26, 26, 46, 0.95);
+  color: #e2e8f0;
+  padding: 10px 18px;
+  border-radius: 24px;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  z-index: 999995;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.2s, transform 0.2s;
+  pointer-events: none;
+  border: 1px solid rgba(123, 104, 238, 0.3);
+}
+
+.a11y-gesture-indicator.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.a11y-gesture-indicator-icon {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: #bb86fc;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.a11y-gesture-indicator-name {
+  color: #94a3b8;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.a11y-gesture-indicator-action {
+  color: #e2e8f0;
+  font-weight: 600;
+}
+
+.a11y-gesture-help-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 10, 26, 0.85);
+  backdrop-filter: blur(8px);
+  z-index: 999994;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #e2e8f0;
+}
+
+.a11y-gesture-help-panel {
+  background: #1a1a2e;
+  border: 1px solid rgba(123, 104, 238, 0.4);
+  border-radius: 16px;
+  padding: 32px;
+  max-width: 720px;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.a11y-gesture-help-title {
+  font-size: 20px;
+  margin: 0 0 20px 0;
+  background: linear-gradient(135deg, #7b68ee, #bb86fc);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 700;
+}
+
+.a11y-gesture-help-hint {
+  font-size: 12px;
+  color: #94a3b8;
+  margin: 0 0 16px 0;
+}
+
+.a11y-gesture-help-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.a11y-gesture-help-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(123, 104, 238, 0.12);
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.a11y-gesture-help-item-icon {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  fill: none;
+  stroke: #bb86fc;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.a11y-gesture-help-item-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.a11y-gesture-help-item-gesture {
+  color: #94a3b8;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+.a11y-gesture-help-item-action {
+  color: #e2e8f0;
+  font-weight: 600;
+}
+
+.a11y-gesture-path-overlay {
+  position: fixed;
+  pointer-events: none;
+  z-index: 999993;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .a11y-gesture-indicator { transition: none; }
+}

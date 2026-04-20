@@ -32,6 +32,8 @@ import {
   showPermissionExplainer,
   getStoredDecision,
 } from './context/index.js';
+// --- Task C: Gesture Shortcuts ---
+import { GestureController } from './motor/gestures.js';
 
 // ---------- App Detection ----------
 
@@ -252,6 +254,21 @@ let envSensor: EnvironmentSensor | null = null;
 let envIndicator: EnvironmentIndicator | null = null;
 let envSensingEnabled = false;
 let envSensingUnsubscribe: (() => void) | null = null;
+// --- Task C: Gesture Shortcuts ---
+let gestureController: GestureController | null = null;
+
+function getGestureController(): GestureController {
+  if (!gestureController) {
+    gestureController = new GestureController({
+      enabled: false,
+      showHints: true,
+      minSwipeDistance: 50,
+      longPressMs: 600,
+      mouseModeRequiresShift: true,
+    });
+  }
+  return gestureController;
+}
 
 function getTransliteration(): TransliterationController {
   if (!transliterationCtl) {
@@ -571,6 +588,8 @@ function listenForCommands(adapter: BaseAdapter, sensory: SensoryAdapter): void 
           getTransliteration().stop();
           stopEnvironmentSensor();
           envSensingEnabled = false;
+          // --- Task C: Gesture Shortcuts ---
+          gestureController?.stop();
           sendResponse({ reverted: true });
           break;
         }
@@ -636,12 +655,31 @@ function listenForCommands(adapter: BaseAdapter, sensory: SensoryAdapter): void 
         case 'PROFILE_UPDATED': {
           const updatedProfile = message.payload as {
             sensory?: { fontScale?: number; contrastLevel?: number; lineHeight?: number; letterSpacing?: number; colorCorrectionMode?: string; reducedMotion?: boolean; highContrast?: boolean };
+            motor?: { gestureShortcutsEnabled?: boolean; gestureShowHints?: boolean; gestureMouseModeRequiresShift?: boolean };
             transliterationEnabled?: boolean;
             transliterationScript?: 'devanagari' | 'tamil' | 'telugu' | 'kannada';
             environmentSensingEnabled?: boolean;
             environmentLightSampling?: boolean;
             environmentNoiseSampling?: boolean;
           };
+
+          // --- Task C: Gesture Shortcuts ---
+          if (updatedProfile?.motor) {
+            const m = updatedProfile.motor;
+            const ctl = getGestureController();
+            if (m.gestureShowHints !== undefined || m.gestureMouseModeRequiresShift !== undefined) {
+              ctl.setOptions({
+                ...(m.gestureShowHints !== undefined ? { showHints: m.gestureShowHints } : {}),
+                ...(m.gestureMouseModeRequiresShift !== undefined ? { mouseModeRequiresShift: m.gestureMouseModeRequiresShift } : {}),
+              });
+            }
+            if (m.gestureShortcutsEnabled === true) {
+              ctl.setOptions({ enabled: true });
+              ctl.start();
+            } else if (m.gestureShortcutsEnabled === false) {
+              ctl.stop();
+            }
+          }
 
           if (typeof updatedProfile?.environmentSensingEnabled === 'boolean') {
             const shouldEnable = updatedProfile.environmentSensingEnabled;
@@ -896,7 +934,23 @@ function init(): void {
       autoDetectLanguage?: boolean;
       transliterationEnabled?: boolean;
       transliterationScript?: 'devanagari' | 'tamil' | 'telugu' | 'kannada';
+      motor?: {
+        gestureShortcutsEnabled?: boolean;
+        gestureShowHints?: boolean;
+        gestureMouseModeRequiresShift?: boolean;
+      };
     };
+
+    // --- Task C: Gesture Shortcuts ---
+    if (p.motor?.gestureShortcutsEnabled) {
+      const ctl = getGestureController();
+      ctl.setOptions({
+        enabled: true,
+        showHints: p.motor.gestureShowHints ?? true,
+        mouseModeRequiresShift: p.motor.gestureMouseModeRequiresShift ?? true,
+      });
+      ctl.start();
+    }
 
     // BCP-47 mapping covering 28 languages: English + 10 Indian + 17 global.
     const langMap: Record<string, string> = {

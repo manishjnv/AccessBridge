@@ -5,6 +5,7 @@
 - [FEATURES.md](FEATURES.md) — current feature catalog. Add/update/remove rows when a feature changes.
 - [ARCHITECTURE.md](ARCHITECTURE.md) — system design. Update when messages, storage keys, or packages change.
 - [ROADMAP.md](ROADMAP.md) — post-extension execution plan (R1-01 … R4-04). Update status when work starts/ships.
+- [UI_GUIDELINES.md](UI_GUIDELINES.md) — canonical colors, typography, spacing, components. Update in same commit as any token change.
 - [RCA.md](RCA.md) — bug fix log. Append a BUG-XXX entry after every fix.
 - [HANDOFF.md](HANDOFF.md) — session activity log. Update at session exit.
 
@@ -68,7 +69,7 @@ Deploy script ships artifacts only (no VPS-side build). Dependency install on VP
 
 ## Session Binding (global orchestration hooks)
 
-**Phase 0 warm-start reads (parallel):** `CLAUDE.md`, `FEATURES.md`, `ARCHITECTURE.md`, `ROADMAP.md`, `HANDOFF.md`, `RCA.md`, `~/.claude/projects/e--code-AccessBridge/memory/MEMORY.md`
+**Phase 0 warm-start reads (parallel):** `CLAUDE.md`, `FEATURES.md`, `ARCHITECTURE.md`, `ROADMAP.md`, `UI_GUIDELINES.md`, `HANDOFF.md`, `RCA.md`, `~/.claude/projects/e--code-AccessBridge/memory/MEMORY.md`
 
 **Load-bearing paths** (Opus diff review required in Phase 3):
 

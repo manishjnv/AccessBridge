@@ -115,6 +115,42 @@ if [ "$SHOULD_RUN_TESTS" = true ]; then
 fi
 
 # ─────────────────────────────────────────────────────────
+# [1.5/6] Re-zip dist/ — guarantees zip manifest matches
+# the freshly-bumped version. Runs even on --skip-build so
+# that a manual dist/ edit or a post-bump no-op build still
+# results in a version-consistent zip.
+# See RCA BUG-011.
+# ─────────────────────────────────────────────────────────
+echo "[1.5/6] Re-packaging extension zip from dist/ ..."
+DIST_DIR="packages/extension/dist"
+if [ ! -d "$DIST_DIR" ]; then
+  echo "  ✗ $DIST_DIR not found. Run pnpm build first or drop --skip-build."
+  exit 1
+fi
+rm -f accessbridge-extension.zip
+if command -v zip >/dev/null 2>&1; then
+  (cd "$DIST_DIR" && zip -rq ../../../accessbridge-extension.zip .)
+else
+  # Windows Git Bash without zip — fall back to PowerShell Compress-Archive
+  powershell -NoProfile -Command \
+    "Compress-Archive -Path '$DIST_DIR\\*' -DestinationPath 'accessbridge-extension.zip' -Force" \
+    >/dev/null
+fi
+
+# Cross-check: zip's manifest.json version must equal $VERSION.
+# Guards against a stale dist/ being re-packaged.
+ZIP_MANIFEST_VERSION=$(python -c "import zipfile,json; z=zipfile.ZipFile('accessbridge-extension.zip'); print(json.loads(z.read('manifest.json').decode())['version'])" 2>/dev/null)
+if [ "$ZIP_MANIFEST_VERSION" != "$VERSION" ]; then
+  echo "  ✗ Zip manifest says v${ZIP_MANIFEST_VERSION:-unknown}; release is v${VERSION}."
+  echo "    dist/ was not rebuilt after the version bump. Run pnpm build and retry."
+  exit 1
+fi
+echo "  ✓ Zip re-packaged (v${VERSION}, $(stat -c%s accessbridge-extension.zip 2>/dev/null || wc -c < accessbridge-extension.zip) bytes)."
+
+# Also sync to deploy/downloads for the local landing-page preview
+cp -f accessbridge-extension.zip deploy/downloads/accessbridge-extension.zip
+
+# ─────────────────────────────────────────────────────────
 # [2/6] Push to GitHub
 # ─────────────────────────────────────────────────────────
 if [ "$SKIP_PUSH" = false ]; then
@@ -139,42 +175,69 @@ if [ ! -f accessbridge-extension.zip ]; then
   exit 1
 fi
 
-if command -v rsync >/dev/null 2>&1; then
-  rsync -az --progress accessbridge-extension.zip \
-    "$REMOTE:$REMOTE_DIR/docs/downloads/"
-  echo "  ✓ Extension zip synced (${VERSION})."
-
-  rsync -az --delete deploy/ "$REMOTE:$WWW_DIR/"
-  echo "  ✓ Landing page synced."
-else
-  echo "  ℹ rsync not found — using scp + tar-over-ssh fallback."
+sync_via_scp() {
+  # Idempotent fallback: zip via scp, deploy/ via tar-over-ssh.
+  # In-place extract over $WWW_DIR — overwrites matching files but won't
+  # remove stale ones (no --delete semantic). Safe for landing-page content.
   scp -q accessbridge-extension.zip "$REMOTE:$REMOTE_DIR/docs/downloads/"
   echo "  ✓ Extension zip synced (${VERSION})."
 
-  # In-place extract over $WWW_DIR. Overwrites matching files; doesn't remove
-  # stale ones (no --delete semantic). Safe for this use-case since the
-  # landing page rarely removes files.
   ssh "$REMOTE" "mkdir -p '$WWW_DIR'"
   tar -C deploy -czf - . | ssh "$REMOTE" "tar -xzf - -C '$WWW_DIR'"
   echo "  ✓ Landing page synced (in-place, no delete)."
+}
+
+RSYNC_OK=false
+if command -v rsync >/dev/null 2>&1; then
+  # rsync IS installed but may fail at runtime on Windows Git Bash
+  # ("dup() in/out/err failed"). We try it, catch runtime failure, and
+  # fall through to the scp+tar path. See RCA BUG-011.
+  if rsync -az --no-progress accessbridge-extension.zip \
+       "$REMOTE:$REMOTE_DIR/docs/downloads/" 2>/dev/null \
+     && rsync -az --delete deploy/ "$REMOTE:$WWW_DIR/" 2>/dev/null; then
+    echo "  ✓ Extension zip synced (${VERSION})."
+    echo "  ✓ Landing page synced."
+    RSYNC_OK=true
+  else
+    echo "  ⚠ rsync failed at runtime — falling back to scp + tar-over-ssh."
+  fi
 fi
 
-# Ship CHANGELOG.md to /opt/accessbridge/docs/ so main.py can read the
-# latest release-notes section for /api/version's changelog field.
-if [ -f CHANGELOG.md ]; then
-  scp -q CHANGELOG.md "$REMOTE:$REMOTE_DIR/docs/CHANGELOG.md"
-  echo "  ✓ CHANGELOG.md synced."
+if [ "$RSYNC_OK" = false ]; then
+  if ! command -v rsync >/dev/null 2>&1; then
+    echo "  ℹ rsync not found — using scp + tar-over-ssh."
+  fi
+  sync_via_scp
 fi
 
-# Ship API source + restart container so version derivation picks up fresh
-# manifest.json inside the freshly-uploaded zip. The container mounts
-# /opt/accessbridge/api → /app and /opt/accessbridge/docs → /docs (read-only)
-# — see scripts/vps/main.py header for the docker-compose requirement.
-if [ -f scripts/vps/main.py ]; then
-  scp -q scripts/vps/main.py "$REMOTE:$REMOTE_DIR/api/main.py"
-  echo "  ✓ API main.py synced — restarting accessbridge-api..."
-  ssh "$REMOTE" "docker restart accessbridge-api" > /dev/null
-  echo "  ✓ accessbridge-api restarted (version will be re-derived from zip)."
+# Ship CHANGELOG.md + API main.py + restart API — all in one SSH session
+# so we pay one handshake instead of three. On Windows Git Bash where
+# ControlMaster multiplex fails, each avoided handshake saves ~1-2s.
+BATCH_FILES=()
+[ -f CHANGELOG.md ] && BATCH_FILES+=("CHANGELOG.md")
+[ -f scripts/vps/main.py ] && BATCH_FILES+=("scripts/vps/main.py")
+
+if [ "${#BATCH_FILES[@]}" -gt 0 ]; then
+  # Stage into a tempdir with the final relative layout, then tar-over-ssh
+  # in one pipe. The remote side extracts to the correct destinations and
+  # restarts the API container if main.py changed.
+  STAGE=$(mktemp -d)
+  trap "rm -rf '$STAGE'" EXIT
+  mkdir -p "$STAGE/docs" "$STAGE/api"
+  [ -f CHANGELOG.md ] && cp CHANGELOG.md "$STAGE/docs/CHANGELOG.md"
+  [ -f scripts/vps/main.py ] && cp scripts/vps/main.py "$STAGE/api/main.py"
+
+  tar -C "$STAGE" -czf - . | ssh "$REMOTE" "
+    set -euo pipefail
+    tar -xzf - -C '$REMOTE_DIR'
+    if [ -f '$REMOTE_DIR/api/main.py' ]; then
+      docker restart accessbridge-api > /dev/null
+    fi
+  "
+  [ -f CHANGELOG.md ] && echo "  ✓ CHANGELOG.md synced."
+  if [ -f scripts/vps/main.py ]; then
+    echo "  ✓ API main.py synced — accessbridge-api restarted."
+  fi
 fi
 
 # ─────────────────────────────────────────────────────────

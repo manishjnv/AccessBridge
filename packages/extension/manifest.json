@@ -3,7 +3,7 @@
   "description": "Ambient Accessibility Operating Layer - Zero disclosure, cross-application accessibility",
   "version": "0.1.1",
   "manifest_version": 3,
-  "update_url": "http://72.61.227.64:8300/updates.xml",
+  "update_url": "https://accessbridge.space/updates.xml",
   "permissions": ["activeTab", "storage", "offscreen", "sidePanel", "downloads"],
   "host_permissions": ["<all_urls>"],
   "background": {

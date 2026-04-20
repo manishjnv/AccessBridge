@@ -141,7 +141,7 @@ chrome.runtime.onStartup.addListener(() => {
 
 // ---------- Update server ----------
 
-const UPDATE_SERVER = 'http://72.61.227.64:8300/api';
+const UPDATE_SERVER = 'https://accessbridge.space/api';
 
 type MessageType =
   | 'GET_PROFILE'
@@ -333,7 +333,7 @@ async function handleMessage(message: Message): Promise<unknown> {
           hasUpdate,
           currentVersion,
           latestVersion: data.version,
-          downloadUrl: `http://72.61.227.64:8300${data.download_url}`,
+          downloadUrl: `https://accessbridge.space${data.download_url}`,
           changelog: data.changelog,
         };
       } catch {

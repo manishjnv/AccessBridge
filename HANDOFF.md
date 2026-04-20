@@ -1,5 +1,85 @@
 # AccessBridge - Shift Handoff
 
+## Last Session: Day 7 — Stitch: 4-way parallel integration verification (2026-04-20)
+
+### Completed (Stitch)
+
+- [x] **Zero merge conflicts** — Tasks A/E/F/C already landed on `main` (commits `52081fe` · `9c6fe35` · `5059c0c` · `0548379`) with `// --- Task X ---` markers in all four shared files: [content/index.ts](packages/extension/src/content/index.ts), [popup/App.tsx](packages/extension/src/popup/App.tsx), [background/index.ts](packages/extension/src/background/index.ts), [content/styles.css](packages/extension/src/content/styles.css). Every marker co-exists cleanly; no stitch-side code fix was required.
+- [x] **Marker audit** — Task E env-sensor lifecycle at [content/index.ts:29-34,253-256,354-427,684-706,999-1011](packages/extension/src/content/index.ts#L354); Task F audit passthrough at [content/index.ts:28,617-654](packages/extension/src/content/index.ts#L617) and [background/index.ts:190-191,379-405](packages/extension/src/background/index.ts#L379); Task C gesture controller at [content/index.ts:35-36,257-271,591-592,666-682,944-953](packages/extension/src/content/index.ts#L257) and [popup/App.tsx:14,536,621-669](packages/extension/src/popup/App.tsx#L621); Task A observatory at [background/index.ts:23-31,86-89,105-110,122-124,460-463](packages/extension/src/background/index.ts#L23) and [popup/App.tsx:691-702,734-781](packages/extension/src/popup/App.tsx#L734). CSS: Task E [styles.css:1545-1675](packages/extension/src/content/styles.css#L1545), Task C [styles.css:1677-1827](packages/extension/src/content/styles.css#L1677).
+- [x] **Typecheck + build + full test sweep** — `pnpm typecheck` green across core + ai-engine + extension; `pnpm build` green, 477 modules, `dist/src/content/index.js` 275.65 KB / `dist/src/background/index.js` 34.29 KB / `dist/assets/sidepanel-*.js` 409.92 KB; `pnpm -r test` green — **390 tests / 17 files / 3 packages** (ai-engine 54 · core 309 · extension 27).
+- [x] **BUG-008 guard** — `node --check packages/extension/dist/src/content/index.js` and `dist/src/background/index.js` both parse clean. IIFE-wrapper still intact after Tasks A/E/F/C additions (RCA BUG-008 vite-chunk-collision pattern unreproduced).
+- [x] **VPS health** — `accessbridge-observatory` up ~17 min healthy (db row-count = 885), `accessbridge-nginx` up 3 h, `accessbridge-api` up 4 d. `http://localhost:8200/api/health` → `{status:"ok",service:"observatory"}`. Observatory via nginx (`:8300/observatory/`) → 200. Landing (`:8080`) → 200. `/api/version` → `{"version":"0.1.1","download_url":"/downloads/accessbridge-extension.zip"}`.
+- [x] **Zip regen** — fresh `dist/` → `accessbridge-extension.zip` + `deploy/downloads/accessbridge-extension.zip` both 405,196 B. Used PowerShell `Compress-Archive` (bash `zip` binary not on this Windows shell; RCA BUG-006 Checklist Step 9 is the authoritative fallback).
+- [x] **No code changes required** — all four sessions' additive edits already compatible end-to-end. This shift is docs + zip regen + deploy only.
+
+**Tests passing count:** 390 (delta vs Shift 3 / pre-task-series baseline: +14 observatory-publisher [A] / +38 environment + 7 environment-sensor [E] / +96 audit rules + engine [F] / +36 recognizer + bindings + 6 gesture-controller [C]).
+
+**Chrome smoke test:** pending — user drives sideload of `packages/extension/dist/`. Golden paths: A Settings → "Share anonymous metrics" toggle + dashboard link; E Settings → env-sensing toggle + camera/mic grant + bottom-left pill; F Sidepanel → Audit tab → Run Audit + Export PDF; C Motor → gesture toggle + swipe-right = Back + `?` = help overlay. Regressions to re-verify: sensory sliders on Wikipedia, focus mode, voice commands, fatigue level, domain connectors on a banking/healthcare page.
+
+**VPS health:** all green, Observatory dashboard reachable through nginx, landing page live, version API in sync with manifest.
+
+#### Extension Maturity Post-Stitch
+
+- **Features shipped:** full catalog in [FEATURES.md](FEATURES.md) — 11-layer / 3-module / 10-feature matrix. This shift landed the last four headline items: M-08 Gesture Shortcuts · L3 Environment Sensing · L9 Accessibility Audit PDF · F10 Compliance Observatory.
+- **Tests passing:** 390 green / 17 files / 3 packages. Full `pnpm -r test` run-time ~4 s cold.
+- **Build size (gzip):** content 76.47 KB · background 11.59 KB · sidepanel 133.98 KB · styles 2.16 KB + 9.28 KB (two chunks). Total shipped zip 405 KB.
+- **Demo readiness:**
+  - [x] `manifest.json` version `0.1.1` matches VPS `/api/version`.
+  - [x] Observatory + nginx + landing-page + API containers healthy.
+  - [x] Fresh zip in `deploy/downloads/` ready for rsync.
+  - [x] No regression in RCA BUG-001..BUG-008 guard rails (vite base, nginx URL, version sync, popup storage, content-script chunk wrapper).
+  - [ ] Chrome sideload feature-parity walkthrough (owner: user).
+- **Remaining gaps to 100% maturity** (carried from previous shifts' deferred list + ROADMAP.md R1-R4 items):
+  - Captions / audio-description track for Module A meeting brief.
+  - Module B meeting-brief generator wiring (feature shell only).
+  - Profile versioning + forward-migration helper (`profile.version` field + migrator).
+  - First-class `VoiceCommandSystem` parity for the 11 new global-language locales (currently locale-map-only; no native-script command sets like the 10 Indic ones).
+  - Windows-friendly `deploy.sh` (bash `zip` binary missing on this shell — PowerShell `Compress-Archive` is the workaround; worth formalizing in the script).
+  - Local Node ≥ 20.12 upgrade so `npx vitest` inside `deploy.sh` stops tripping `node:util.styleText` export error (workaround: `pnpm -r test` first, then `./deploy.sh --skip-tests --skip-build`).
+  - R1-01 Desktop companion (Tauri) — post-extension roadmap item, unchanged.
+
+**Next action:** user runs Chrome sideload smoke test (golden paths above). If any feature silently regresses, add an RCA BUG-009 entry and reopen the corresponding Task shift. If all green, `v0.1.1` is demo-ready; decide on `0.1.2` bump to advertise the 4 new features in the API changelog — currently still says "Self-hosted update system, master toggle fix, 116 tests".
+
+**Open question:** bump to `0.1.2` now so the update banner fires once more on every sideloaded instance (good for forcing a fresh download of the 4-task zip), or hold at `0.1.1` until after the Chrome smoke test?
+
+#### Commits (Stitch session)
+
+- `(pending)` chore: stitch session — zip regen + HANDOFF + maturity report (no code changes required)
+
+#### Tool Contribution (Day 7, Stitch)
+
+- **Opus:** warm-start parallel read (9 files), cross-file `// --- Task X ---` marker audit, typecheck + build + `pnpm -r test` verification, BUG-008 `node --check` syntax guard, VPS health SSH sweep, zip regeneration (PowerShell Compress-Archive fallback), HANDOFF write-up + maturity report + agent footer.
+- **Sonnet:** n/a — no template-rollout or mechanical contract to parallelize; Tasks A/E/F/C already landed pre-stitch with their own shift footers.
+- **Haiku:** n/a — single-origin VPS health sweep ran inline (3 curl endpoints in one ssh round-trip). Not worth a Haiku cold-start.
+- **codex:rescue:** n/a — no security-adjacent diff this shift (no `manifest.json` permissions change, no content-script injection-logic change, no new cross-origin fetch). Stitch only integrated pre-reviewed shifts.
+
+---
+
+## Last Session: Day 7 — Landing hotfix: hero CTA spacing + HTTPS clarification (2026-04-20)
+
+### Completed (hotfix)
+
+- [x] **Hero CTA spacing** — user reported "Install Extension" and "View on GitHub" visually touching the 4 hero stat cards above them. Root cause: `.hero-stats` at [deploy/index.html:187](deploy/index.html#L187) sets `margin: 24px auto 0` (zero bottom) and `.hero-actions` at [deploy/index.html:294](deploy/index.html#L294) had no top margin. Fix: `margin-top: 32px` on `.hero-actions` — 4 px rhythm, matches the 24–32 px hero-badge/CTA spacing token in [UI_GUIDELINES.md:161](UI_GUIDELINES.md#L161).
+- [x] **"Not secure" question answered (no code change)** — user was viewing `http://72.61.227.64:8300/`, the raw origin IP. Cloudflare strict SSL is bound only to `accessbridge.space`; direct-IP access bypasses CF entirely and serves plain HTTP. Visiting via the domain produces the expected green lock. Flagged the follow-up option of blocking bare-IP access at nginx (Host-header whitelist → 444) — deferred, user did not request.
+- [x] **Surgical hotfix deploy** — working tree was mid-flight with other shifts' WIP (Observatory nav link + core/extension changes for Tasks A/C/E/F). User explicitly asked to "deploy only your changes". Built a clean copy: `git show HEAD:deploy/index.html` → `/tmp/ab-index-clean.html`, applied the single-line sed replacement, verified the diff against HEAD was exactly the one-liner, `scp`'d to `/opt/accessbridge/docs/index.html` on `a11yos-vps`. No `deploy.sh`, no extension zip resync, no build, no push. Pre-deploy sanity: `md5sum /opt/accessbridge/docs/index.html` on VPS equalled `git show HEAD:deploy/index.html | md5sum` (same baseline, safe to overwrite). Post-deploy: `curl http://72.61.227.64:8300/ | md5sum` matched the patched file byte-for-byte.
+- [x] **Rollback parachute** — timestamped backup on VPS at `/opt/accessbridge/docs/index.html.bak-20260420-153918` (clean copy of pre-patch file). One-line revert: `ssh a11yos-vps 'cp /opt/accessbridge/docs/index.html.bak-20260420-153918 /opt/accessbridge/docs/index.html'`.
+- [x] **Git state reconciled** — parallel Task A shift's commit `5059c0c` (Compliance Observatory) swept up my edit along with other WIP in the same deploy/index.html. Result: HEAD now has `margin-top: 32px` on line 294. Verified `git rev-parse HEAD == origin/main` — no unpushed work, no uncommitted drift. Working tree clean except ignorable `.claude/scheduled_tasks.lock`.
+
+**Tests:** not rerun — zero source/test files touched this session; the single CSS property change is invisible to vitest/typecheck and the other shifts' commits ran the full suite when they landed. Live landing page serves HTTP 200, 95 KB. No RCA entry added — cosmetic spacing adjustment, not a regression of a known pattern; the fix is a one-token addition already compliant with UI_GUIDELINES §4.
+
+**Next action:** none carried forward from this shift. Carry-forwards from Shift 3 still stand: R1-01 Desktop companion (Tauri), first-class parity for the 11 new global languages, Windows-friendly `deploy.sh` transport, local Node ≥ 20.12 upgrade.
+
+**Open question:** should nginx reject bare-IP traffic on port 8300 so `72.61.227.64:8300` stops being a valid entry point? Currently serving the full site over plain HTTP at that address is functional but trips the "Not secure" banner every time someone tests via IP.
+
+#### Agent utilization (Day 7 hotfix)
+
+Opus: diagnosis (CSS cascade trace + CF/SSL explanation) + one-line CSS edit + surgical scp hotfix + live-hash verification.
+Sonnet: n/a — single-line edit under the "≤ 30 lines, hot cache, Opus self-executes" carve-out in the orchestration playbook.
+Haiku: n/a — no bulk sweeps, no grep-heavy lookups.
+codex:rescue: n/a — no security-adjacent changes (CSS margin token only; no manifest permissions, no content-script injection, no cross-origin fetch).
+
+---
+
 ## Last Session: Day 7 — Task C (parallel — Session C): Gesture Shortcuts for Module C completion (2026-04-20)
 
 ### Completed (Task C)

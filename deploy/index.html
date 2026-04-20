@@ -91,6 +91,68 @@
       white-space: nowrap;
     }
     .navbar-cta:hover { transform: translateY(-1px); box-shadow: 0 4px 16px var(--glow); }
+
+    /* Navbar quick-stat pills (right of brand name) */
+    .navbar-stats {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin-left: 14px;
+      padding-left: 14px;
+      border-left: 1px solid rgba(123,104,238,0.18);
+    }
+    .nav-stat {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .nav-stat-value {
+      color: var(--accent);
+      font-weight: 700;
+      margin-right: 3px;
+    }
+    @media (max-width: 900px) {
+      .navbar-stats { display: none; }
+    }
+
+    /* Hero coverage strip */
+    .hero-stats {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      max-width: 760px;
+      margin: 24px auto 0;
+      padding: 0 16px;
+    }
+    .hero-stat {
+      background: rgba(123,104,238,0.08);
+      border: 1px solid rgba(123,104,238,0.22);
+      border-radius: 12px;
+      padding: 12px 10px;
+      text-align: center;
+      backdrop-filter: blur(6px);
+    }
+    .hero-stat-value {
+      font-size: clamp(1.1rem, 3.2vw, 1.5rem);
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      line-height: 1.1;
+    }
+    .hero-stat-label {
+      font-size: 10px;
+      color: var(--muted);
+      margin-top: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 600;
+    }
+    @media (max-width: 560px) {
+      .hero-stats { grid-template-columns: repeat(2, 1fr); }
+    }
+
     .navbar-toggle {
       display: none;
       background: none;
@@ -277,11 +339,36 @@
       color: var(--accent);
       font-weight: 700;
     }
+    .reach-coverage-badge {
+      display: inline-block;
+      margin-top: 8px;
+      padding: 8px 16px;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      color: white;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      box-shadow: 0 4px 14px rgba(123,104,238,0.35);
+    }
+    .reach-list {
+      max-height: 560px;
+      overflow-y: auto;
+      padding-right: 6px;
+    }
+    .reach-list::-webkit-scrollbar { width: 6px; }
+    .reach-list::-webkit-scrollbar-thumb {
+      background: rgba(123,104,238,0.3);
+      border-radius: 3px;
+    }
+    .reach-row-indian { border-left: 2px solid var(--accent); padding-left: 8px; }
+    .reach-row-global { border-left: 2px solid rgba(123,104,238,0.25); padding-left: 8px; }
     @media (min-width: 720px) {
       .reach-row {
         grid-template-columns: 140px 180px 1fr;
       }
       .reach-bar-track { grid-column: auto; height: 12px; }
+      .reach-list { max-height: none; overflow: visible; }
     }
     .stat {
       text-align: center;
@@ -767,7 +854,14 @@
   <!-- Navbar -->
   <nav class="navbar" id="navbar">
     <div class="navbar-inner">
-      <a href="#top" class="navbar-brand">AccessBridge</a>
+      <div style="display: flex; align-items: center;">
+        <a href="#top" class="navbar-brand">AccessBridge</a>
+        <div class="navbar-stats" aria-label="Coverage quick stats">
+          <span class="nav-stat"><span class="nav-stat-value">17</span>langs</span>
+          <span class="nav-stat"><span class="nav-stat-value">5.6B</span>reached</span>
+          <span class="nav-stat"><span class="nav-stat-value">71%</span>of world</span>
+        </div>
+      </div>
       <div class="navbar-links" id="nav-links">
         <a href="#global-reach">Reach</a>
         <a href="#how-it-works">How It Works</a>
@@ -792,6 +886,14 @@
       <h1>AccessBridge</h1>
       <p class="hero-tagline">The Ambient Accessibility Operating Layer</p>
       <p class="hero-desc">A Chrome extension that silently detects user struggles and auto-adapts any web app in real time. Zero disclosure. Zero configuration. Powered by on-device AI.</p>
+
+      <div class="hero-stats fade-in">
+        <div class="hero-stat"><div class="hero-stat-value">8.0 B</div><div class="hero-stat-label">World Population</div></div>
+        <div class="hero-stat"><div class="hero-stat-value">17</div><div class="hero-stat-label">Languages Covered</div></div>
+        <div class="hero-stat"><div class="hero-stat-value">5.6 B</div><div class="hero-stat-label">Speakers Reached</div></div>
+        <div class="hero-stat"><div class="hero-stat-value">71 %</div><div class="hero-stat-label">Of World Population</div></div>
+      </div>
+
       <div class="hero-actions">
         <a href="#install" class="btn btn-primary">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
@@ -818,7 +920,7 @@
           <div class="stat-label">Voice Commands</div>
         </div>
         <div class="stat fade-in">
-          <div class="stat-value">18</div>
+          <div class="stat-value">17</div>
           <div class="stat-label">Languages Supported</div>
         </div>
         <div class="stat fade-in">
@@ -833,32 +935,44 @@
   <section class="reach-section" id="global-reach">
     <div class="container">
       <h2 class="section-title fade-in">Global Reach</h2>
-      <p class="section-sub fade-in">First-class voice commands in 11 languages — reaching about 39% of the world's population in their native script.</p>
+      <p class="section-sub fade-in">First-class voice commands in 17 languages — reaching ~5.6 billion speakers, roughly <strong style="color:var(--accent)">71% of the world population</strong>, each in its native script.</p>
       <div class="reach-card fade-in">
         <div class="reach-coverage">
           <div>
-            <div class="reach-big">~3.1 billion speakers</div>
-            <div class="reach-big-sub">10 Indian languages + English, native script on every one</div>
+            <div class="reach-big">~5.655 billion speakers</div>
+            <div class="reach-big-sub">10 Indian languages + English + 6 global languages, native script on every one</div>
+            <div class="reach-coverage-badge">~71% of world population covered</div>
           </div>
-          <div class="reach-big-sub">Total world population: ~8.0 billion</div>
+          <div style="text-align: right;">
+            <div class="reach-big-sub">World population</div>
+            <div class="reach-big" style="font-size: clamp(1.2rem, 3vw, 1.6rem);">~8.0 billion</div>
+          </div>
         </div>
         <div class="reach-list">
-          <div class="reach-row"><span class="reach-native">English</span><span class="reach-name">1,456M speakers</span><div class="reach-bar-track"><div class="reach-bar" style="width: 100%"></div></div></div>
-          <div class="reach-row"><span class="reach-native">हिन्दी</span><span class="reach-name">Hindi — 602M</span><div class="reach-bar-track"><div class="reach-bar" style="width: 41%"></div></div></div>
-          <div class="reach-row"><span class="reach-native">বাংলা</span><span class="reach-name">Bengali — 273M</span><div class="reach-bar-track"><div class="reach-bar" style="width: 19%"></div></div></div>
-          <div class="reach-row"><span class="reach-native">اردو</span><span class="reach-name">Urdu — 232M</span><div class="reach-bar-track"><div class="reach-bar" style="width: 16%"></div></div></div>
-          <div class="reach-row"><span class="reach-native">ਪੰਜਾਬੀ</span><span class="reach-name">Punjabi — 113M</span><div class="reach-bar-track"><div class="reach-bar" style="width: 8%"></div></div></div>
-          <div class="reach-row"><span class="reach-native">मराठी</span><span class="reach-name">Marathi — 99M</span><div class="reach-bar-track"><div class="reach-bar" style="width: 7%"></div></div></div>
-          <div class="reach-row"><span class="reach-native">తెలుగు</span><span class="reach-name">Telugu — 96M</span><div class="reach-bar-track"><div class="reach-bar" style="width: 7%"></div></div></div>
-          <div class="reach-row"><span class="reach-native">தமிழ்</span><span class="reach-name">Tamil — 86M</span><div class="reach-bar-track"><div class="reach-bar" style="width: 6%"></div></div></div>
-          <div class="reach-row"><span class="reach-native">ગુજરાતી</span><span class="reach-name">Gujarati — 62M</span><div class="reach-bar-track"><div class="reach-bar" style="width: 4.3%"></div></div></div>
-          <div class="reach-row"><span class="reach-native">ಕನ್ನಡ</span><span class="reach-name">Kannada — 59M</span><div class="reach-bar-track"><div class="reach-bar" style="width: 4%"></div></div></div>
-          <div class="reach-row"><span class="reach-native">മലയാളം</span><span class="reach-name">Malayalam — 38M</span><div class="reach-bar-track"><div class="reach-bar" style="width: 2.6%"></div></div></div>
+          <div class="reach-row reach-row-global"><span class="reach-native">English</span><span class="reach-name">English — 1,456M</span><div class="reach-bar-track"><div class="reach-bar" style="width: 100%"></div></div></div>
+          <div class="reach-row reach-row-global"><span class="reach-native">中文</span><span class="reach-name">Chinese — 1,138M</span><div class="reach-bar-track"><div class="reach-bar" style="width: 78.2%"></div></div></div>
+          <div class="reach-row reach-row-indian"><span class="reach-native">हिन्दी</span><span class="reach-name">Hindi — 602M</span><div class="reach-bar-track"><div class="reach-bar" style="width: 41.3%"></div></div></div>
+          <div class="reach-row reach-row-global"><span class="reach-native">Español</span><span class="reach-name">Spanish — 559M</span><div class="reach-bar-track"><div class="reach-bar" style="width: 38.4%"></div></div></div>
+          <div class="reach-row reach-row-global"><span class="reach-native">Français</span><span class="reach-name">French — 310M</span><div class="reach-bar-track"><div class="reach-bar" style="width: 21.3%"></div></div></div>
+          <div class="reach-row reach-row-global"><span class="reach-native">العربية</span><span class="reach-name">Arabic — 274M</span><div class="reach-bar-track"><div class="reach-bar" style="width: 18.8%"></div></div></div>
+          <div class="reach-row reach-row-indian"><span class="reach-native">বাংলা</span><span class="reach-name">Bengali — 273M</span><div class="reach-bar-track"><div class="reach-bar" style="width: 18.7%"></div></div></div>
+          <div class="reach-row reach-row-indian"><span class="reach-native">اردو</span><span class="reach-name">Urdu — 232M</span><div class="reach-bar-track"><div class="reach-bar" style="width: 15.9%"></div></div></div>
+          <div class="reach-row reach-row-global"><span class="reach-native">Deutsch</span><span class="reach-name">German — 133M</span><div class="reach-bar-track"><div class="reach-bar" style="width: 9.1%"></div></div></div>
+          <div class="reach-row reach-row-global"><span class="reach-native">日本語</span><span class="reach-name">Japanese — 125M</span><div class="reach-bar-track"><div class="reach-bar" style="width: 8.6%"></div></div></div>
+          <div class="reach-row reach-row-indian"><span class="reach-native">ਪੰਜਾਬੀ</span><span class="reach-name">Punjabi — 113M</span><div class="reach-bar-track"><div class="reach-bar" style="width: 7.8%"></div></div></div>
+          <div class="reach-row reach-row-indian"><span class="reach-native">मराठी</span><span class="reach-name">Marathi — 99M</span><div class="reach-bar-track"><div class="reach-bar" style="width: 6.8%"></div></div></div>
+          <div class="reach-row reach-row-indian"><span class="reach-native">తెలుగు</span><span class="reach-name">Telugu — 96M</span><div class="reach-bar-track"><div class="reach-bar" style="width: 6.6%"></div></div></div>
+          <div class="reach-row reach-row-indian"><span class="reach-native">தமிழ்</span><span class="reach-name">Tamil — 86M</span><div class="reach-bar-track"><div class="reach-bar" style="width: 5.9%"></div></div></div>
+          <div class="reach-row reach-row-indian"><span class="reach-native">ગુજરાતી</span><span class="reach-name">Gujarati — 62M</span><div class="reach-bar-track"><div class="reach-bar" style="width: 4.3%"></div></div></div>
+          <div class="reach-row reach-row-indian"><span class="reach-native">ಕನ್ನಡ</span><span class="reach-name">Kannada — 59M</span><div class="reach-bar-track"><div class="reach-bar" style="width: 4.1%"></div></div></div>
+          <div class="reach-row reach-row-indian"><span class="reach-native">മലയാളം</span><span class="reach-name">Malayalam — 38M</span><div class="reach-bar-track"><div class="reach-bar" style="width: 2.6%"></div></div></div>
         </div>
         <div class="reach-summary">
-          <strong>10 Indian languages + English ≈ 3.116 B speakers</strong>
-          &nbsp;·&nbsp; covering roughly <strong>39%</strong> of the world population.
-          Latin → Devanagari / Tamil / Telugu / Kannada transliteration is built in (press Alt+T in any input).
+          <strong>17 languages</strong> &nbsp;·&nbsp; <strong>~5.655 B speakers</strong> &nbsp;·&nbsp; covering roughly <strong>71%</strong> of the 8.0 B world population.
+          <br>
+          <span style="font-size: 12px; color: var(--muted);">
+            Accent-bordered rows = the 10 Indian languages (first-class native-script support with Latin → Devanagari / Tamil / Telugu / Kannada transliteration — press Alt+T in any input).
+          </span>
         </div>
       </div>
     </div>

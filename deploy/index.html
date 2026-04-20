@@ -1869,47 +1869,76 @@
         </div>
       </div>
 
-      <!-- Critical challenges -->
+      <!-- Accessibility challenges we solve -->
       <div class="arch-card fade-in">
-        <h3>Critical Challenges, Solved</h3>
-        <p class="card-sub">Hard problems encountered during the build, and the engineering decisions that closed them. Each one is documented in <a href="https://github.com/manishjnv/AccessBridge/blob/main/RCA.md" target="_blank" style="color:var(--accent);text-decoration:none;border-bottom:1px dashed var(--accent)">RCA.md</a>.</p>
+        <h3>Accessibility Challenges We Solve</h3>
+        <p class="card-sub">The lived barriers AccessBridge was built to dissolve — spanning vision, motor, cognitive, linguistic, temporal, and social dimensions of accessibility. Each pairs a real-world problem with the on-device mechanism that addresses it.</p>
         <div class="challenges">
+
           <div class="challenge">
-            <span class="chal-tag">BUG-008 · Critical</span>
-            <h4>Content-script chunk collisions</h4>
-            <p>Vite minifies shared chunks into short var names (<code style="background:rgba(123,104,238,0.15);padding:1px 5px;border-radius:4px">R</code>, <code style="background:rgba(123,104,238,0.15);padding:1px 5px;border-radius:4px">I</code>). When the build-time plugin inlined every chunk into a single IIFE, two chunks declared <code style="background:rgba(123,104,238,0.15);padding:1px 5px;border-radius:4px">var R</code> — a <em>SyntaxError</em> killed every feature on every page.</p>
-            <p class="fix"><strong>Fix:</strong> wrap each chunk in its own IIFE that returns a namespace object; import bindings are aliased from the namespace. No identifier leaks between chunks.</p>
+            <span class="chal-tag">Vision</span>
+            <h4>Small text, low contrast, color blindness</h4>
+            <p>Roughly <strong>2.2 billion people</strong> live with some form of vision impairment. Yet most websites ship a single 14-16px body size, fixed contrast, and a palette that's invisible to 8% of men with red–green color blindness.</p>
+            <p class="fix"><strong>AccessBridge does:</strong> detects repeated zooming, slower scroll, and re-reading of the same paragraph, then quietly scales text, deepens contrast, and remaps colors for protanopia / deuteranopia / tritanopia — no site cooperation required.</p>
+            <div class="chal-features"><strong>Engages</strong> · Sensory Adapter · Auto Adaptations · Color Correction</div>
           </div>
+
           <div class="challenge">
-            <span class="chal-tag">BUG-007 · High</span>
-            <h4>Site-agnostic font scaling</h4>
-            <p>Wikipedia's deeply specific selectors defeated <code style="background:rgba(123,104,238,0.15);padding:1px 5px;border-radius:4px">font-size: inherit !important</code> on a universal <code style="background:rgba(123,104,238,0.15);padding:1px 5px;border-radius:4px">*</code> rule — the font slider did nothing on complex sites.</p>
-            <p class="fix"><strong>Fix:</strong> switched to the CSS <code style="background:rgba(123,104,238,0.15);padding:1px 5px;border-radius:4px">zoom</code> property, which works above the cascade and scales layout uniformly across every site tested.</p>
+            <span class="chal-tag">Motor</span>
+            <h4>Can't use a mouse or fine-motor control</h4>
+            <p>People with Parkinson's, ALS, severe arthritis, or hand tremor can't reliably click a 16px button or drag a scrollbar. Dedicated assistive hardware (gaze trackers, switch devices) costs <strong>$1,500 – $3,500</strong> and needs setup most users never finish.</p>
+            <p class="fix"><strong>AccessBridge does:</strong> turns any laptop webcam into a gaze cursor (30-second calibration), adds hover-to-click with a visible progress ring, and runs the browser by voice in 17 languages — all with zero extra hardware.</p>
+            <div class="chal-features"><strong>Engages</strong> · Eye Tracking · Dwell Click · Voice Commands · Keyboard-Only Mode</div>
           </div>
+
           <div class="challenge">
-            <span class="chal-tag">BUG-005 · High</span>
-            <h4>Popup state that survives close</h4>
-            <p>React <code style="background:rgba(123,104,238,0.15);padding:1px 5px;border-radius:4px">useState</code> resets every time the popup closes. The master on/off toggle silently flipped back to "on" on reopen, making the disable control feel broken.</p>
-            <p class="fix"><strong>Fix:</strong> a chrome.storage.local bridge hydrates the React tree on mount and mirrors writes back. <code style="background:rgba(123,104,238,0.15);padding:1px 5px;border-radius:4px">chrome.storage.onChanged</code> broadcasts updates to content scripts so changes are applied live.</p>
+            <span class="chal-tag">Cognitive</span>
+            <h4>Attention difficulties &amp; cognitive overload</h4>
+            <p>People with ADHD, autism, traumatic brain injury, or anxiety get swamped by modern web pages where <strong>70–80% of the pixels</strong> are sidebars, ads, notifications, and recommendations — all competing for attention they can't spare.</p>
+            <p class="fix"><strong>AccessBridge does:</strong> a soft spotlight follows the paragraph being read while everything else dims; ads and sidebars hide on demand; layout simplifies automatically when struggle signals rise — the page gets quieter, not louder.</p>
+            <div class="chal-features"><strong>Engages</strong> · Focus Mode · Reading Guide · Distraction Shield · Auto Adaptations</div>
           </div>
+
           <div class="challenge">
-            <span class="chal-tag">BUG-001 · Critical</span>
-            <h4>Chrome sideload blank-page trap</h4>
-            <p>Vite's default <code style="background:rgba(123,104,238,0.15);padding:1px 5px;border-radius:4px">base: '/'</code> produces absolute asset paths — which resolve to nothing inside the <code style="background:rgba(123,104,238,0.15);padding:1px 5px;border-radius:4px">chrome-extension://</code> origin. Popup and side panel rendered blank white.</p>
-            <p class="fix"><strong>Fix:</strong> set <code style="background:rgba(123,104,238,0.15);padding:1px 5px;border-radius:4px">base: ''</code> so HTML uses relative paths. Pinned as an invariant in CLAUDE.md; any HTML entry point is checked at build for relative asset URLs.</p>
+            <span class="chal-tag">Language</span>
+            <h4>Content &amp; tooling isn't in my language</h4>
+            <p>Over <strong>4.8 billion people</strong> speak a non-English primary language. Enterprise apps ship English-first, voice features rarely understand Tamil or Bengali, and Latin→Indic keyboards are a Windows-only pain no one wants to configure.</p>
+            <p class="fix"><strong>AccessBridge does:</strong> voice commands in 10 Indian languages + 7 global; Unicode-range page detection sets the voice locale automatically; press Alt+T in any input to type in Latin and watch it become Devanagari / Tamil / Telugu / Kannada.</p>
+            <div class="chal-features"><strong>Engages</strong> · Multi-Language Voice · Transliteration · Language Auto-Detect</div>
           </div>
+
           <div class="challenge">
-            <span class="chal-tag">Research · Hard</span>
-            <h4>ITRANS transliteration without a server</h4>
-            <p>10 Indian languages need on-device Latin→script conversion. Simple char maps don't handle matras (vowels become diacritics after a consonant) or halant (consonant clusters need a joiner).</p>
-            <p class="fix"><strong>Fix:</strong> a greedy longest-match scanner with a 2-state machine (<em>initial</em> / <em>after-consonant</em>). ~200 rules per script, 49 unit tests, ships in under 10 KB.</p>
+            <span class="chal-tag">Temporal</span>
+            <h4>Fatigue &amp; eye strain over long sessions</h4>
+            <p>Mental fatigue, digital eye strain, and migraine thresholds build up across an 8-hour workday. An interface that felt fine at 9 am is hostile at 10 pm — but no website knows or cares what time you started.</p>
+            <p class="fix"><strong>AccessBridge does:</strong> tracks time-of-day and session length, then progressively simplifies the UI through four calmer levels — hiding optional panels, opening spacing, softening colors, reducing motion — without the user pressing a thing.</p>
+            <div class="chal-features"><strong>Engages</strong> · Fatigue-Adaptive UI · Reduced Motion · Contrast Easing</div>
           </div>
+
           <div class="challenge">
-            <span class="chal-tag">Scale · Subtle</span>
-            <h4>Routing 10 Indic languages to one dispatcher</h4>
-            <p>Every language needs its own native-script phrase set, but duplicating the English command switch 10× is a maintenance trap — one rename would drift across all of them.</p>
-            <p class="fix"><strong>Fix:</strong> a unified <code style="background:rgba(123,104,238,0.15);padding:1px 5px;border-radius:4px">INDIC_COMMANDS</code> registry where each phrase maps to the same English <code style="background:rgba(123,104,238,0.15);padding:1px 5px;border-radius:4px">action</code> string. One dispatcher handles all 17 locales; adding a language is a pure-data change.</p>
+            <span class="chal-tag">Comprehension</span>
+            <h4>Dense jargon on critical portals</h4>
+            <p>Banking, insurance, healthcare, and legal sites assume every user parses "deductible," "prior authorization," "underwriting," "1.5 Lakh." When you can't, the stakes are real — a missed claim, a wrong premium, a refused treatment.</p>
+            <p class="fix"><strong>AccessBridge does:</strong> on-device AI rewrites jargon into plain language and summarizes long emails into bullets; 6 domain connectors (Banking, Insurance, Telecom, Retail, Healthcare, Manufacturing) decode terms inline as you browse.</p>
+            <div class="chal-features"><strong>Engages</strong> · AI Simplification · AI Summarization · Domain Connectors</div>
           </div>
+
+          <div class="challenge">
+            <span class="chal-tag">Social</span>
+            <h4>The stigma of asking for help</h4>
+            <p>Many users with disabilities — especially invisible ones like dyslexia, low vision, or cognitive differences — hide their needs at work or school rather than formally disclose. The ask itself carries social and professional cost.</p>
+            <p class="fix"><strong>AccessBridge does:</strong> zero disclosure. The user never tells the website, the employer, or a coworker. Every adaptation happens silently on the user's own browser; the website never knows an accommodation fired.</p>
+            <div class="chal-features"><strong>Engages</strong> · Ambient Detection · On-Device Processing · Privacy Guarantees</div>
+          </div>
+
+          <div class="challenge">
+            <span class="chal-tag">Access</span>
+            <h4>Assistive tools cost more than the device</h4>
+            <p>Commercial screen readers run <strong>$900 – $1,200</strong>. Eye trackers start at <strong>$150</strong> and climb past <strong>$25,000</strong> for medical-grade. Enterprise assistive suites license at <strong>$400/user/year</strong>. Most people who need them can't afford them.</p>
+            <p class="fix"><strong>AccessBridge does:</strong> ships as a free Chrome extension. Runs on any laptop made in the last five years. Uses the webcam you already have, the microphone you already have, and the browser you're already in.</p>
+            <div class="chal-features"><strong>Engages</strong> · Everything — every feature is free and local</div>
+          </div>
+
         </div>
       </div>
 

@@ -25,6 +25,12 @@ import { PredictiveInputSystem } from './motor/predictive-input.js';
 import { DomainConnectorRegistry } from './domains/index.js';
 import { TransliterationController } from './i18n/transliteration.js';
 import { detectPageLanguage, detectedLangToVoiceLocale } from './i18n/language-detect.js';
+import {
+  EnvironmentSensor,
+  EnvironmentIndicator,
+  showPermissionExplainer,
+  getStoredDecision,
+} from './context/index.js';
 
 // ---------- App Detection ----------
 
@@ -241,6 +247,10 @@ let predictiveInput: PredictiveInputSystem | null = null;
 let emailUI: EmailSummarizationUI | null = null;
 let domainRegistry: DomainConnectorRegistry | null = null;
 let transliterationCtl: TransliterationController | null = null;
+let envSensor: EnvironmentSensor | null = null;
+let envIndicator: EnvironmentIndicator | null = null;
+let envSensingEnabled = false;
+let envSensingUnsubscribe: (() => void) | null = null;
 
 function getTransliteration(): TransliterationController {
   if (!transliterationCtl) {
@@ -321,6 +331,81 @@ function getFatigue(): FatigueAdaptiveUI {
     fatigueUI = new FatigueAdaptiveUI();
   }
   return fatigueUI;
+}
+
+// ---------- Environment sensor lifecycle ----------
+
+async function startEnvironmentSensor(
+  lightSampling: boolean,
+  noiseSampling: boolean,
+): Promise<void> {
+  if (envSensor) return; // already running
+
+  // Show in-page explainer before triggering the native getUserMedia prompt,
+  // but only when at least one stream is requested and the user hasn't said 'deny' before.
+  const wantLight = lightSampling;
+  const wantNoise = noiseSampling;
+  const needsExplainer = wantLight || wantNoise;
+
+  if (needsExplainer) {
+    const prior = await getStoredDecision();
+    if (prior !== 'accept') {
+      const choice = await showPermissionExplainer({ wantLight, wantNoise });
+      if (choice === 'deny') {
+        // Still start the sensor for time-of-day + network, but skip media streams.
+        envSensor = new EnvironmentSensor({
+          lightSamplingEnabled: false,
+          noiseSamplingEnabled: false,
+          samplingIntervalMs: 30_000,
+        });
+        await envSensor.start();
+        bindEnvIndicator();
+        bindEnvSnapshotForwarding();
+        return;
+      }
+    }
+  }
+
+  envSensor = new EnvironmentSensor({
+    lightSamplingEnabled: wantLight,
+    noiseSamplingEnabled: wantNoise,
+    samplingIntervalMs: 30_000,
+  });
+  await envSensor.start();
+  bindEnvIndicator();
+  bindEnvSnapshotForwarding();
+}
+
+function bindEnvIndicator(): void {
+  if (!envSensor) return;
+  if (!envIndicator) envIndicator = new EnvironmentIndicator();
+  envIndicator.attach(envSensor);
+}
+
+function bindEnvSnapshotForwarding(): void {
+  if (!envSensor) return;
+  envSensingUnsubscribe = envSensor.onSnapshot((snapshot) => {
+    chrome.runtime.sendMessage({
+      type: 'ENVIRONMENT_UPDATE',
+      payload: snapshot,
+    }).catch(() => {});
+    envIndicator?.refresh();
+  });
+}
+
+function stopEnvironmentSensor(): void {
+  if (envSensingUnsubscribe) {
+    envSensingUnsubscribe();
+    envSensingUnsubscribe = null;
+  }
+  if (envSensor) {
+    envSensor.stop();
+    envSensor = null;
+  }
+  if (envIndicator) {
+    envIndicator.detach();
+    envIndicator = null;
+  }
 }
 
 // ---------- Voice command handler ----------
@@ -483,6 +568,8 @@ function listenForCommands(adapter: BaseAdapter, sensory: SensoryAdapter): void 
           getAI().dismiss();
           getDomainRegistry().deactivateAll();
           getTransliteration().stop();
+          stopEnvironmentSensor();
+          envSensingEnabled = false;
           sendResponse({ reverted: true });
           break;
         }
@@ -512,7 +599,35 @@ function listenForCommands(adapter: BaseAdapter, sensory: SensoryAdapter): void 
             sensory?: { fontScale?: number; contrastLevel?: number; lineHeight?: number; letterSpacing?: number; colorCorrectionMode?: string; reducedMotion?: boolean; highContrast?: boolean };
             transliterationEnabled?: boolean;
             transliterationScript?: 'devanagari' | 'tamil' | 'telugu' | 'kannada';
+            environmentSensingEnabled?: boolean;
+            environmentLightSampling?: boolean;
+            environmentNoiseSampling?: boolean;
           };
+
+          if (typeof updatedProfile?.environmentSensingEnabled === 'boolean') {
+            const shouldEnable = updatedProfile.environmentSensingEnabled;
+            if (shouldEnable && !envSensingEnabled) {
+              envSensingEnabled = true;
+              const light = updatedProfile.environmentLightSampling ?? true;
+              const noise = updatedProfile.environmentNoiseSampling ?? true;
+              startEnvironmentSensor(light, noise).catch((err) => {
+                console.warn('[AccessBridge] env sensor start failed', err);
+              });
+            } else if (!shouldEnable && envSensingEnabled) {
+              envSensingEnabled = false;
+              stopEnvironmentSensor();
+            } else if (shouldEnable && envSensingEnabled) {
+              const light = updatedProfile.environmentLightSampling ?? true;
+              const noise = updatedProfile.environmentNoiseSampling ?? true;
+              const currentLight = envSensor?.isLightActive() ?? false;
+              const currentNoise = envSensor?.isNoiseActive() ?? false;
+              if (light !== currentLight || noise !== currentNoise) {
+                stopEnvironmentSensor();
+                startEnvironmentSensor(light, noise).catch(() => {});
+              }
+            }
+          }
+
           if (updatedProfile?.transliterationEnabled !== undefined) {
             const ctl = getTransliteration();
             if (updatedProfile.transliterationScript) ctl.setScript(updatedProfile.transliterationScript);
@@ -786,6 +901,20 @@ function init(): void {
       const ctl = getTransliteration();
       ctl.setScript(p.transliterationScript ?? 'devanagari');
       ctl.start();
+    }
+
+    const envProfile = profile as {
+      environmentSensingEnabled?: boolean;
+      environmentLightSampling?: boolean;
+      environmentNoiseSampling?: boolean;
+    };
+    if (envProfile.environmentSensingEnabled) {
+      envSensingEnabled = true;
+      const light = envProfile.environmentLightSampling ?? true;
+      const noise = envProfile.environmentNoiseSampling ?? true;
+      startEnvironmentSensor(light, noise).catch((err) => {
+        console.warn('[AccessBridge] env sensor start failed', err);
+      });
     }
   }).catch(() => {});
 

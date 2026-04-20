@@ -32,6 +32,10 @@ function makeProfile(
     transliterationScript: 'devanagari',
     adaptationMode: 'auto',
     confidenceThreshold: 0.0, // accept all confidence levels by default in tests
+    shareAnonymousMetrics: false,
+    environmentSensingEnabled: false,
+    environmentLightSampling: true,
+    environmentNoiseSampling: true,
     ...overrides,
   };
 }

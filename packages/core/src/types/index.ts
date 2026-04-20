@@ -12,13 +12,19 @@ export {
   DEFAULT_PROFILE,
 } from './profile.js';
 
-export { SignalType } from './signals.js';
+export { SignalType, EnvironmentSignalType } from './signals.js';
 
 export type {
   BehaviorSignal,
   StruggleScore,
   SignalBaseline,
   UserBaseline,
+  EnvironmentSnapshot,
+  EnvironmentContext,
+  NetworkQuality,
+  TimeOfDay,
+  LightingCondition,
+  NoiseEnvironment,
 } from './signals.js';
 
 export { AdaptationType } from './adaptation.js';

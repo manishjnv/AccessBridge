@@ -26,6 +26,12 @@ export interface MotorProfile {
   keyboardOnlyMode: boolean;
   dwellClickEnabled: boolean;
   dwellClickDelay: number;
+  /** Task C: recognize mouse/touch/trackpad gestures and dispatch bound actions. */
+  gestureShortcutsEnabled: boolean;
+  /** Task C: briefly show a bottom-right indicator when a gesture is recognized. */
+  gestureShowHints: boolean;
+  /** Task C: require holding Shift for mouse-driven gestures (prevents accidental activation). */
+  gestureMouseModeRequiresShift: boolean;
 }
 
 export interface AccessibilityProfile {
@@ -47,6 +53,17 @@ export interface AccessibilityProfile {
   adaptationMode: 'auto' | 'manual' | 'suggest';
   /** Minimum confidence threshold (0-1) for applying adaptations */
   confidenceThreshold: number;
+  /**
+   * Opt-in: publish anonymous, differentially-private daily counters to the
+   * Compliance Observatory. Off by default. Never transmits identity, content, URLs, or IP.
+   */
+  shareAnonymousMetrics: boolean;
+  /** Master opt-in for ambient environment sensing (webcam light + mic noise). Off by default. */
+  environmentSensingEnabled: boolean;
+  /** Sample ambient light via webcam every 30s. Applies only when environmentSensingEnabled is true. */
+  environmentLightSampling: boolean;
+  /** Sample ambient noise via microphone every 15s. Applies only when environmentSensingEnabled is true. */
+  environmentNoiseSampling: boolean;
 }
 
 export const DEFAULT_SENSORY_PROFILE: SensoryProfile = {
@@ -77,6 +94,9 @@ export const DEFAULT_MOTOR_PROFILE: MotorProfile = {
   keyboardOnlyMode: false,
   dwellClickEnabled: false,
   dwellClickDelay: 800,
+  gestureShortcutsEnabled: false,
+  gestureShowHints: true,
+  gestureMouseModeRequiresShift: true,
 };
 
 export const DEFAULT_PROFILE: AccessibilityProfile = {
@@ -93,4 +113,8 @@ export const DEFAULT_PROFILE: AccessibilityProfile = {
   transliterationScript: 'devanagari',
   adaptationMode: 'suggest',
   confidenceThreshold: 0.6,
+  shareAnonymousMetrics: false,
+  environmentSensingEnabled: false,
+  environmentLightSampling: true,
+  environmentNoiseSampling: true,
 };

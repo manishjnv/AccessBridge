@@ -1,5 +1,96 @@
 # AccessBridge - Shift Handoff
 
+## Last Session: Session 8 — Chrome Sideload QA + Submission Polish (2026-04-21)
+
+### Headline
+
+Submission package assembled for Wipro TopGear ideathon. Manual Chrome sideload QA matrix structured and held for the user to drive a 30-minute pre-submission spot check; floor signal is 544 unit tests + clean build + BUG-008 IIFE guard + green deterministic gates. Three demo formats produced (recorded flight plan, pre-flight checklist, live script with risk tiers + 10-question Q&A prep). PPT updated to current reality (28 features, 45+ voice commands, 544 tests, 14 test files, 6 named domain connectors); two new slides appended (Roadmap with Phase 1/2/3, QA Summary). Judge-facing `deliverables/` package assembled with README entry point. Released v0.6.0 (auto-bumped from `feat(deploy)` commit); deploy hit two Windows-specific defects (BUG-011) requiring manual recovery. End-to-end `/api/version` + `/downloads` cross-check verified live on `https://accessbridge.space`.
+
+### Completed
+
+#### Phase 0 — Warm start (Opus)
+
+Parallel-read 11 docs (CLAUDE.md, FEATURES, ARCHITECTURE, ROADMAP, UI_GUIDELINES, HANDOFF, RCA, MEMORY index, manifest, glob of pptx + docs/features). Surfaced 8-file +612/-37 working-tree WIP from Session 7 + 1 untracked file (`action-items-ui.ts`) before touching code; gated on user approval before build.
+
+#### Phase 1 — Build clean + zip regeneration (Opus)
+
+- Diff-reviewed all 8 WIP files. Captions deepening (language picker / translate / fontSize / drag handlers + close button) and ActionItemsExtractor v2 (confidence scoring + assignee detection + min-confidence threshold + context detection) are clean and wired to the popup. New `ActionItemsService` (ai-engine) + `EXTRACT_ACTION_ITEMS` background handler + `ActionItemsUI` (content) form an unwired trio: `.ab-action-*` CSS classes don't exist in `styles.css` (verified 0 matches), `ActionItemsUI` is never imported (Rollup tree-shakes it), `'action-items'` AIRequestType cast bypasses the discriminated-union check. Documented as harmless dead-code that ships in source but not in bundle.
+- Discovered initial `pnpm build` failure: cross-package `tsc` couldn't resolve `AIRequestType` in `services/action-items.ts`'s type cast. Fixed by removing the unnecessary cast — `'action-items'` is already a valid `AIRequestType` literal in `types.ts:24`. (User then committed Session 7 work as `96d7562` mid-session, which already had this fix in HEAD; the working tree converged to the same state.)
+- `pnpm typecheck` green across 3 packages. `pnpm -r test` green: **544 / 544 passing** (ai-engine 54 · core 382 · extension 108). `pnpm build` clean: content 322 KB / background 36 KB / popup 30 KB / sidepanel 414 KB. BUG-008 IIFE-collision guard: `node -c` green on both `dist/src/content/index.js` and `dist/src/background/index.js`. Zip regenerated (422 KB) and copied to `deploy/downloads/`.
+
+#### Phase 2/3 — Manual Chrome QA (DEFERRED to user)
+
+Skipped per user direction "hold manual qa, move forward". 54-item QA matrix structured in [QA_REPORT.md](QA_REPORT.md) and held for a 30-minute pre-submission spot check. Floor signal: 544 unit tests + clean build + IIFE guard + RCA prevention rules re-asserted by build pipeline. Recommendation in QA_REPORT: 15 min on must-work tier (Sensory font scale, Focus Mode, Struggle Score gauge), 10 min on should-work tier (voice nav, distraction shield, Gmail summarize), 5 min capturing screenshots.
+
+#### Phase 4 — PPT v2 (Opus)
+
+[scripts/update_presentation_v2.py](scripts/update_presentation_v2.py) — idempotent regenerator. Surgical text replacements in 6 slides (cover stats: 10+ → 28 features / 25+ → 45+ voice cmds / 116 → 544 tests; bundle sizes; Slide 9 names all 6 connectors; Slide 11 test breakdown matches reality; Slide 13 contact-line uses "Manish Kumar"). Two new slides appended via blank-layout python-pptx textboxes (matching dark-theme `#0a0a1a` background + `#bb86fc` purple titles + `#94a3b8` muted labels): Slide 14 Roadmap (Phase 1 shipped / Phase 2 desktop+sync+ONNX / Phase 3 mobile+enterprise+SDK), Slide 15 QA Summary (placeholder-pending stats + recommendation reference). Output: `AccessBridge_Presentation_v2.pptx` — 15 slides total, original v1 preserved.
+
+#### Phase 5 — Demo docs (Sonnet × 3 parallel)
+
+Three Sonnet subagents in one parallel burst, each with full self-contained briefing (file paths + contract + acceptance test + ≤ 100-word report format):
+
+- [DEMO_FLIGHT_PLAN.md](DEMO_FLIGHT_PLAN.md) — 5-min recorded-demo beat sheet, 8 beats with URLs / actions / expected screen state / speaker notes / fallbacks. ~2,450 words. Cut for time: gestures, eye-tracker calibration, profile export. Invented URLs flagged in agent report.
+- [DEMO_CHECKLIST.md](DEMO_CHECKLIST.md) — 46-checkbox pre-flight across 7 sections: hardware, fresh Chrome profile, BUG-001/005/007/008 regression sanity (each ≤ 15 s), recorder setup, test accounts, fallback kit, post-record validation.
+- [DEMO_LIVE_SCRIPT.md](DEMO_LIVE_SCRIPT.md) — live-demo script with explicit MUST (3) / SHOULD (5) / NICE (5) risk tiers, fallback talking points per beat, 10-question Q&A prep, opening + closing 30-sec scripts. ~3,686 words. Riskiest SHOULD-tier feature flagged: Gmail summarize (3 stacked failure points).
+
+#### Phase 6 — Deliverables (Opus)
+
+[deliverables/README.md](deliverables/README.md) — judge-facing entry point (~150 lines): one-liner, install steps, feature tour, architecture summary (1 paragraph), roadmap (Phase 1/2/3 narrative), contact info. Directory populated with all demo docs, QA report, PPT v2, v0.6.0 zip (post-deploy refresh), full `docs/` copy, empty `screenshots/` directory.
+
+#### Phase 7 — Commit + push + deploy (Opus + manual recovery)
+
+Three logical commits with noreply email pattern (per global CLAUDE.md GitHub email-privacy rule):
+
+1. `a9e56c4 feat(deploy): post-deploy end-to-end zip-version cross-check` — adds second health-check assertion (deploy.sh fetches public `/downloads/...zip` and verifies `manifest.version` matches `/api/version`).
+2. `516156e fix(branding): correct team name in PPT regenerator` — `generate_presentation.py:542` "Team AccessBridge" → "Manish Kumar" (CLAUDE.md + UI_GUIDELINES §10 enforcement).
+3. `a524e4d chore(submission): Session 8 — Chrome QA matrix + demo docs + PPT v2` — 28 files, +4554 lines.
+
+Push succeeded (3 commits → main). `./deploy.sh` triggered minor auto-bump v0.5.0 → v0.6.0 (`af69344 chore(release): v0.6.0`). Deploy died at `[3/6] Syncing artifacts to VPS` with `rsync: connection unexpectedly closed` + `dup() in/out/err failed` — Git Bash on Windows defect. Manual recovery: scp'd zip + CHANGELOG + main.py, tar+ssh extracted `deploy/`, `docker restart accessbridge-api`. Then realised the rebuilt zip on disk was stale (deploy.sh's `[0/6]` bumps manifest but never re-zips); manually rebuilt zip from `dist/` with v0.6.0 manifest, re-scp'd, restarted API again. End-to-end verification: `/api/version` reports `0.6.0` with new changelog; `https://accessbridge.space/downloads/accessbridge-extension.zip?v=0.6.0` returns 423120 bytes (matches local v0.6.0 zip). BUG-010 cache-bust pattern still working as designed.
+
+#### Phase 8 — RCA + HANDOFF (Opus)
+
+Added BUG-011 to [RCA.md](RCA.md) — captures both the Windows rsync runtime-failure-without-fallback defect and the auto-bump-without-rezip defect. Both deferred to a follow-up `deploy.sh` patch session (workaround documented in Prevention section).
+
+### Verification
+
+- 544 / 544 unit tests passing across all 3 packages
+- `pnpm typecheck` green
+- `pnpm build` clean — bundle sizes within envelope (content +12 KB from Session 7 captions/extractor work)
+- BUG-008 IIFE guard: `node -c` green on built bundles
+- Stale-data scan: "Team AccessBridge" only present in `scripts/update_presentation_v2.py` as a SOURCE-TO-REPLACE string (not shipped text) and in `RCA.md` BUG-009 historical entry
+- VPS health: `/api/version` returns v0.6.0 + new changelog; cache-busted download serves 423120-byte v0.6.0 zip; `accessbridge-api` container up post-restart
+- 3 commits pushed cleanly with noreply email; v0.6.0 git tag created and pushed
+
+### Post-session state
+
+- Submission package assembled in `deliverables/`. README + 3 demo docs + QA matrix + PPT v2 + v0.6.0 zip + docs copy + empty screenshots dir.
+- Extension feature-complete and live at v0.6.0. Auto-update endpoint serves the right version. Landing page download button serves v0.6.0 zip via cache-busted URL.
+- 30-minute pre-submission user-driven spot check is the only outstanding manual step before the package is judge-ready. If spot check finds a P0 (extension fails to load, content script crashes), QA_REPORT documents the rollback plan: `git revert` Session 7 commits, rebuild from v0.4.0, redeploy.
+
+### Open questions / carry-forward
+
+- **deploy.sh bump-without-rezip + Windows rsync fallback** — BUG-011 prevention notes the manual workaround; permanent code fix deferred. Two TODOs: (a) add `[1.5/6] Re-zip dist` step after `[1/6] build`, before `[3/6] sync`; (b) wrap rsync in try-with-scp-fallback so Git Bash stdio failures degrade.
+- **Action Items UI dead code** — `packages/extension/src/content/cognitive/action-items-ui.ts` is implemented but never imported and missing CSS. Either wire it into `content/index.ts` + add `.ab-action-*` CSS classes (~30 min integration work) or `git rm` it. `ActionItemsService` (ai-engine) + `EXTRACT_ACTION_ITEMS` background handler are in the same trio — same decision applies.
+- **Sidepanel Profile History tab + Shortcut Settings editor** — core libraries done in Session 6, UI deferred. Same status as last handoff. Not blocking for ideathon submission.
+- **Codex stdin hang carryforward** — Codex was set up successfully this session (v0.118.0, authenticated, sandbox fixed per setup output); not invoked because no security-adjacent diffs surfaced and parallel Sonnet handled all delegable work. The Session 6 stdin hang is still un-investigated.
+
+### Next actions
+
+1. **User runs the 30-minute spot check** following QA_REPORT recommendation (must-work tier first, capture screenshots).
+2. If spot check is GO: add screenshots to `deliverables/screenshots/`, optionally re-run `scripts/update_presentation_v2.py` to wire the screenshots into the deck, submit.
+3. If spot check finds P0: execute QA_REPORT rollback plan.
+4. Post-submission: BUG-011 deploy.sh patch + Action Items UI wiring decision.
+
+### Agent utilization (Session 8)
+
+Opus: Phase 0 warm start (11 parallel reads), Phase 1 WIP diff review + AIRequestType cast fix + build/test/zip verification, Phase 4 PPT update script + 2 new slides + slide 11 patch script, Phase 6 deliverables README + folder assembly, Phase 7 commit orchestration with noreply pattern + manual deploy recovery (scp/tar/restart/rebuild) after rsync defect, Phase 8 RCA BUG-011 + this handoff entry. Decision-bearing work (which WIP to keep, dead-code disposition, deploy fallback strategy, deferred-QA framing).
+Sonnet: 3 parallel agents in one burst (Phase 5) — DEMO_FLIGHT_PLAN, DEMO_CHECKLIST, DEMO_LIVE_SCRIPT. Each agent self-contained brief with file-path + contract + acceptance test + report format. All three returned clean diffs matching contract; no rework.
+Haiku: n/a — no bulk grep sweep, log triage, or read-many-files-for-one-fact task this session that a Haiku agent would beat an inline Grep on. The Phase 0 warm-start reads were 11 specific files known by path, not a fact-finding distillation.
+codex:rescue: n/a — no security-adjacent diffs this session. Manifest permissions unchanged. No new content-script injection logic. No new cross-origin fetch in background. The deploy.sh end-to-end zip cross-check is infrastructure code with no security surface. Codex setup verified ready (v0.118.0 + auth + direct startup runtime); held in reserve.
+
+---
+
 ## Last Session: Day 9 — Priority 1 Captions + Action Items Depth (Session 7, 2026-04-21)
 
 ### Headline

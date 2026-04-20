@@ -162,6 +162,21 @@ Track every bug fix: what broke, why, how it was fixed, and how to prevent recur
 
 ---
 
+## BUG-011: `./deploy.sh` ships stale zip on auto-bump; rsync runtime failure does not fall back to scp
+
+| Field | Detail |
+| ------- | -------- |
+| **Date** | 2026-04-21 |
+| **Severity** | High |
+| **Symptom** | Session 8 deploy of v0.6.0 (`feat(deploy)` triggered minor bump from v0.5.0). Pipeline reported "✓ build passed" then died on `[3/6] Syncing artifacts to VPS` with `rsync: connection unexpectedly closed (0 bytes received so far) [sender=3.4.1]` and `dup() in/out/err failed`. After manual scp recovery + container restart, `/api/version` reported `0.4.0` not `0.6.0` — three releases behind. Ditto local `accessbridge-extension.zip` on disk: manifest claimed `0.4.0`. |
+| **Root Cause** | Two compounding defects: (1) **No re-zip on bump.** `[0/6] Auto-bump version` updates `manifest.json` and `package.json` files, then `[1/6]` runs `pnpm build` which refreshes `dist/`. But the script never repackages `dist/` into `accessbridge-extension.zip` — that step is implicit/manual elsewhere in the workflow. So the deploy uploads whichever stale zip happens to be on disk (in our case the v0.4.0 zip from an earlier session). The new `/api/version` end-to-end zip cross-check (added this same session in [deploy.sh:230-260](deploy.sh#L230)) WOULD have caught this — but never executed because step 3 died first. (2) **rsync fallback gates on installed-vs-not, not runtime success.** [deploy.sh:142](deploy.sh#L142) uses `command -v rsync` to choose between rsync path and scp+tar fallback. On Git Bash for Windows, `rsync` IS installed but its progress reporting collides with the parent shell's stdio (`dup() in/out/err failed`), failing every invocation. The script has no `||` fallback for this case. |
+| **Fix** | Manual recovery this session: rebuilt zip from `dist/` after bump, scp'd zip + CHANGELOG + main.py to VPS, `docker restart accessbridge-api`. End-to-end verified `/api/version` returns 0.6.0 and `/downloads/accessbridge-extension.zip?v=0.6.0` returns the 423120-byte v0.6.0 zip. Permanent fixes deferred to a follow-up: (a) add `[1.5/6] Re-zip dist` step after build, before VPS sync; (b) wrap rsync invocation in a try-with-scp-fallback so runtime failures degrade gracefully on Windows. |
+| **Files Changed** | None this session — code fix deferred. Artifacts re-uploaded manually. |
+| **Commit** | Recovery commits this session document the workaround; `deploy.sh` patch is open for next session. |
+| **Prevention** | (a) Until deploy.sh is patched: after any `[0/6] Auto-bump` run, **manually verify** the zip's manifest version matches the bump target before proceeding — `python -c "import zipfile,json; print(json.loads(zipfile.ZipFile('accessbridge-extension.zip').read('manifest.json').decode())['version'])"`. (b) On Windows Git Bash, prefer `./deploy.sh --skip-bump` followed by manual zip rebuild + scp until rsync fallback is hardened. (c) The end-to-end zip cross-check from this session's `feat(deploy)` commit IS the right floor — it catches the symptom even if the root cause persists. Make sure step 3 doesn't crash before step 5 runs. |
+
+---
+
 ## Checklist: Version Bump — AUTOMATED (post-commit `a4bd6a1`)
 
 Version bumping is now driven by `./deploy.sh` → `scripts/bump-version.sh --auto` — do **not** hand-edit versions. The checklist is only included here for manual overrides.

@@ -132,17 +132,27 @@ Track every bug fix: what broke, why, how it was fixed, and how to prevent recur
 
 ---
 
-## Checklist: Version Bump
+## BUG-009: Landing navbar stat pills overlap right-side nav links
 
-1. `packages/extension/manifest.json` — update `version` (SINGLE SOURCE OF TRUTH)
-2. `packages/core/package.json` — update `version` to match
-3. `packages/ai-engine/package.json` — update `version` to match
-4. `packages/extension/package.json` — update `version` to match
-5. VPS API `/opt/accessbridge/api/main.py` — update `CURRENT_VERSION` to match
-6. `pnpm build`
-7. `npx vitest run` — verify tests pass
-8. Verify: `grep -r "0\.OLD\.VERSION" packages/` — must return zero results
-9. Create zip: `powershell Compress-Archive -Path dist/* -DestinationPath accessbridge-extension.zip -Force`
-10. Upload: `scp accessbridge-extension.zip a11yos-vps:/opt/accessbridge/docs/downloads/`
-11. Restart API: `ssh a11yos-vps "cd /opt/accessbridge && docker compose restart accessbridge-api"`
-12. Landing page + popup + sidepanel version update automatically (all read dynamically)
+| Field | Detail |
+| ------- | -------- |
+| **Date** | 2026-04-20 |
+| **Severity** | Medium |
+| **Symptom** | On 1280–1440 px viewports (common 13–15″ laptops), the three "28 Languages / 7.0 B Speakers / 87% of World" quick-stat pills visually butted into the first right-side nav link ("Reach"), obscuring it |
+| **Root Cause** | `.navbar-inner` used `justify-content: space-between` with no `gap`, so once the combined width of (brand + 3 pills) plus (7 nav links + version pill + Install button) exceeded the container, the two flex halves simply touched. The stat-pill hide breakpoint was set at 900 px, far narrower than the overlap threshold |
+| **Fix** | (1) `.navbar-inner` now has `gap: 16px` as a guaranteed minimum separator. (2) `.navbar-links` gap trimmed 28 → 20 px (still 4 px rhythm). (3) Stat-pill breakpoints raised: shrink at ≤ 1400 px (was 1100), hide at ≤ 1280 px (was 900). Hero-stats strip below still carries the same data. (4) Replaced three hardcoded `v0.1.1` placeholders in the HTML with `v…` so the pre-JS render flash never shows a stale version — BUG-004 prevention re-asserted |
+| **Files Changed** | `deploy/index.html` |
+| **Commit** | `8828476` |
+| **Prevention** | Any `flex` container using `justify-content: space-between` MUST also set a `gap` so overflow still leaves visual separation between children. Whenever adding elements to `.navbar-inner`, re-measure at 1280 px and 1440 px viewports. Any hardcoded `v…` version string in `deploy/index.html` is a bug — use `v…` as the loading placeholder; `/api/version` populates the real value |
+
+---
+
+## Checklist: Version Bump — AUTOMATED (post-commit `a4bd6a1`)
+
+Version bumping is now driven by `./deploy.sh` → `scripts/bump-version.sh --auto` — do **not** hand-edit versions. The checklist is only included here for manual overrides.
+
+1. Auto-bump path (preferred): `./deploy.sh` — reads conventional commits since the last `v*` tag, picks major/minor/patch, syncs all `package.json` files + `manifest.json` + prepends `CHANGELOG.md`, commits, tags, pushes with `--follow-tags`, ships the new zip + CHANGELOG + `scripts/vps/main.py` to VPS, restarts `accessbridge-api`. No manual steps.
+2. Manual override: `bash scripts/bump-version.sh minor` (or `major`/`patch`/`X.Y.Z`). Same downstream effects; just skips commit-message parsing.
+3. Skip-bump path: `./deploy.sh --skip-bump` — re-ships artifacts without bumping. Use for doc-only tweaks or re-deploys.
+
+VPS `/api/version` **derives** the version from `manifest.json` *inside* the deployed zip (mtime-cached), and the changelog from the top `## v*` section of `/opt/accessbridge/docs/CHANGELOG.md`. No hardcoded `CURRENT_VERSION` anywhere.

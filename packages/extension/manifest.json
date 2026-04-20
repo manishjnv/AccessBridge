@@ -4,7 +4,7 @@
   "version": "0.1.1",
   "manifest_version": 3,
   "update_url": "https://accessbridge.space/updates.xml",
-  "permissions": ["activeTab", "storage", "offscreen", "sidePanel", "downloads"],
+  "permissions": ["activeTab", "storage", "offscreen", "sidePanel", "downloads", "alarms"],
   "host_permissions": ["<all_urls>"],
   "background": {
     "service_worker": "src/background/index.ts",

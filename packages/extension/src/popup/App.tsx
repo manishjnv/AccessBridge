@@ -11,6 +11,7 @@ import {
 import { TabNav } from './components/TabNav.js';
 import { Slider } from './components/Slider.js';
 import { Toggle } from './components/Toggle.js';
+import { GestureLibrary } from './components/GestureLibrary.js';
 
 type Tab = 'overview' | 'sensory' | 'cognitive' | 'motor' | 'settings';
 
@@ -532,6 +533,7 @@ function MotorTab({
   motor: MotorProfile;
   onChange: (patch: Partial<MotorProfile>) => void;
 }) {
+  const [showLibrary, setShowLibrary] = useState(false);
   return (
     <>
       <Toggle
@@ -615,6 +617,56 @@ function MotorTab({
           unit="ms"
         />
       )}
+
+      {/* --- Task C: Gesture Shortcuts --- */}
+      <div
+        className="bg-a11y-surface rounded-lg p-3 border border-a11y-primary/20"
+        style={{ borderLeft: '4px solid #7b68ee', marginTop: 8 }}
+      >
+        <div
+          className="text-xs font-bold uppercase mb-2"
+          style={{ color: '#bb86fc', letterSpacing: '1.2px' }}
+        >
+          Gesture Shortcuts
+        </div>
+        <Toggle
+          label="Enable gesture shortcuts"
+          value={motor.gestureShortcutsEnabled}
+          onChange={(v) => onChange({ gestureShortcutsEnabled: v })}
+        />
+        {motor.gestureShortcutsEnabled && (
+          <>
+            <Toggle
+              label="Show hints on gesture"
+              value={motor.gestureShowHints}
+              onChange={(v) => onChange({ gestureShowHints: v })}
+            />
+            <Toggle
+              label="Require Shift for mouse gestures"
+              value={motor.gestureMouseModeRequiresShift}
+              onChange={(v) => onChange({ gestureMouseModeRequiresShift: v })}
+            />
+            <p className="text-xs text-a11y-muted mt-2" style={{ lineHeight: 1.5 }}>
+              Swipe, circle, or tap with touch / trackpad / mouse. Press <kbd>?</kbd> on
+              any page to see all gestures.
+            </p>
+            <button
+              onClick={() => setShowLibrary(true)}
+              className="w-full mt-3 text-sm py-2 rounded transition-colors"
+              style={{
+                background: 'linear-gradient(135deg, #7b68ee, #bb86fc)',
+                color: '#fff',
+                border: 'none',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              View Gesture Library
+            </button>
+          </>
+        )}
+      </div>
+      {showLibrary && <GestureLibrary onClose={() => setShowLibrary(false)} />}
     </>
   );
 }
@@ -636,6 +688,27 @@ function SettingsTab({
   checkingUpdate: boolean;
   updateInfo: UpdateInfo | null;
 }) {
+  const [lastPublish, setLastPublish] = useState<number | null>(null);
+  const [daysContributed, setDaysContributed] = useState<number>(0);
+
+  useEffect(() => {
+    chrome.storage.local
+      .get(['observatory_last_publish', 'observatory_days_contributed'])
+      .then((res) => {
+        setLastPublish((res.observatory_last_publish as number) ?? null);
+        setDaysContributed((res.observatory_days_contributed as number) ?? 0);
+      })
+      .catch(() => {});
+  }, [profile.shareAnonymousMetrics]);
+
+  const formatLastPublish = (ts: number | null): string => {
+    if (!ts) return 'Never';
+    const hoursAgo = Math.floor((Date.now() - ts) / 3_600_000);
+    if (hoursAgo < 1) return 'Under an hour ago';
+    if (hoursAgo < 48) return `${hoursAgo} h ago`;
+    return `${Math.floor(hoursAgo / 24)} d ago`;
+  };
+
   return (
     <>
       {/* Update section */}
@@ -656,6 +729,55 @@ function SettingsTab({
             You are on the latest version
           </div>
         )}
+      </div>
+
+      {/* Anonymous Metrics (Opt-in) — Compliance Observatory */}
+      <div
+        className="bg-a11y-surface rounded-lg p-3 border border-a11y-primary/20"
+        style={{ borderLeft: '4px solid #7b68ee' }}
+      >
+        <div className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: '#bb86fc', letterSpacing: '1.2px' }}>
+          Anonymous Metrics (Opt-in)
+        </div>
+        <Toggle
+          label="Share anonymous accessibility metrics"
+          value={profile.shareAnonymousMetrics}
+          onChange={(v) =>
+            onSave({ ...profile, shareAnonymousMetrics: v, updatedAt: Date.now() })
+          }
+        />
+        <p className="text-xs text-a11y-muted mt-2" style={{ lineHeight: 1.5 }}>
+          Sharing uses differential privacy (Laplace noise, ε = 1.0). Your identity,
+          content, and browsing history are never collected.
+        </p>
+        {profile.shareAnonymousMetrics && (
+          <div className="mt-3 space-y-1 text-xs">
+            <div className="flex justify-between">
+              <span className="text-a11y-muted">Last publish</span>
+              <span className="text-a11y-text font-mono">{formatLastPublish(lastPublish)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-a11y-muted">Days contributed</span>
+              <span className="text-a11y-text font-mono">{daysContributed}</span>
+            </div>
+          </div>
+        )}
+        <a
+          href="http://72.61.227.64:8300/observatory/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block text-center mt-3 text-xs"
+          style={{
+            padding: '8px 12px',
+            borderRadius: '8px',
+            background: 'rgba(123, 104, 238, 0.15)',
+            color: '#bb86fc',
+            fontWeight: 600,
+            textDecoration: 'none',
+          }}
+        >
+          View Organization Dashboard →
+        </a>
       </div>
 
       <div className="space-y-1">

@@ -1,0 +1,64 @@
+networks:
+  accessbridge-net:
+    name: accessbridge-net
+    driver: bridge
+
+services:
+  accessbridge-api:
+    container_name: accessbridge-api
+    image: python:3.11-slim
+    working_dir: /app
+    volumes:
+      - ./api:/app
+    ports:
+      - "8100:8100"
+    command: bash -c "pip install -q fastapi uvicorn && python main.py"
+    restart: unless-stopped
+    networks:
+      - accessbridge-net
+
+  accessbridge-observatory:
+    container_name: accessbridge-observatory
+    image: node:20-slim
+    working_dir: /app
+    volumes:
+      - ./observatory:/app
+    ports:
+      - "8200:8200"
+    command: >
+      bash -c "
+      apt-get update -qq && apt-get install -y -qq --no-install-recommends python3 make g++ > /dev/null 2>&1 || true;
+      if [ ! -d node_modules ] || [ package.json -nt node_modules/.installed ]; then
+        npm install --omit=dev --no-audit --no-fund &&
+        touch node_modules/.installed;
+      fi;
+      node seed-demo-data.js || true;
+      node server.js
+      "
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:8200/api/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    networks:
+      - accessbridge-net
+
+  accessbridge-nginx:
+    container_name: accessbridge-nginx
+    image: nginx:alpine
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./models:/usr/share/nginx/html/models:ro
+      - ./docs:/usr/share/nginx/html/docs:ro
+    ports:
+      - "8080:80"
+      - "8300:80"
+      - "9090:80"
+    depends_on:
+      - accessbridge-api
+      - accessbridge-observatory
+    restart: unless-stopped
+    networks:
+      - accessbridge-net

@@ -1,0 +1,15 @@
+{
+  "name": "accessbridge-observatory",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AccessBridge Compliance Observatory — differentially-private accessibility metrics",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "seed": "node seed-demo-data.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "better-sqlite3": "^11.3.0"
+  }
+}

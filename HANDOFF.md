@@ -1,6 +1,80 @@
 # AccessBridge - Shift Handoff
 
-## Last Session: Day 6 — Shift 4 (parallel — Session F): Task F — Accessibility Audit PDF Export (Layer 9 completion) (2026-04-20)
+## Last Session: Day 7 — Task A (parallel — Session A): Compliance Observatory with differential privacy (Feature #10) (2026-04-20)
+
+### Completed (Task A)
+
+- [x] **Anonymous metrics publisher** — [packages/extension/src/background/observatory-publisher.ts](packages/extension/src/background/observatory-publisher.ts): pure `addLaplaceNoise` (ε=1.0, sensitivity=1 via `crypto.getRandomValues` uniform draw), `merkleRoot` (binary SHA-256 tree, duplicate-last on odd, empty → `sha256("")`), `aggregateDailyBundle` (noises every count, clamps score 0–100, dedupes + sorts `languages_used` without noise), plus runtime `publishDailyBundle` with 15 s AbortController timeout. POST target: `http://72.61.227.64:8300/observatory/api/publish`.
+- [x] **In-memory collector + daily alarm** — [packages/extension/src/background/observatory-collector.ts](packages/extension/src/background/observatory-collector.ts): counters persist to `chrome.storage.local` for SW-suspension resilience; auto-reset at local midnight; `chrome.alarms` fires hourly, publish window 02:00–05:00 local, deterministic-per-device hour derived from a persisted `observatory_device_salt` (djb2 hash, salt never transmitted). Alarm handler reads opt-in fresh from storage each fire (MV3 SW-wake resilience).
+- [x] **Background wiring** — [background/index.ts](packages/extension/src/background/index.ts): observatory taps on struggle ≥ 50, every applied adaptation, every toggled feature, and on profile save (language). Every `record*` call is gated by `currentProfile?.shareAnonymousMetrics`.
+- [x] **Profile type + default** — [packages/core/src/types/profile.ts](packages/core/src/types/profile.ts): added `shareAnonymousMetrics: boolean` (default false). Decision-engine test helper updated.
+- [x] **Popup Settings UI** — opt-in section with toggle, DP explanation, last-publish + days-contributed status rows, and "View Organization Dashboard →" link.
+- [x] **Manifest permission** — added `alarms` to `permissions` in [manifest.json](packages/extension/manifest.json).
+- [x] **VPS service** — [ops/observatory/server.js](ops/observatory/server.js) + [ops/observatory/package.json](ops/observatory/package.json): Express 4 + better-sqlite3, endpoints `POST /api/publish`, `GET /api/summary`, `GET /api/trends?metric=&days=`, `GET /api/health`, `GET /api/compliance-report`. Schema: `daily_submissions` + `aggregated_daily` + **`UNIQUE(date, merkle_root)`** for replay protection. Per-IP rate limit 60/60 s. Body cap 64 KB. Allowlists on every categorical key. k-anonymity floor ≥ 5 devices before a categorical enters top-N. Server-side Merkle verification rejects forged bundles.
+- [x] **Seed demo data** — [ops/observatory/seed-demo-data.js](ops/observatory/seed-demo-data.js): 30-day linear adoption ramp (12 → 47 devices), realistic language mix (hi 30%, en 40%, ta 10%, bn 8%, ...), Laplace-noised counters, Merkle roots. Idempotent; `--force` reseeds.
+- [x] **Dashboard SPA** — [ops/observatory/public/](ops/observatory/public/) (index.html + styles.css + app.js), vanilla, zero deps. 3 tabs via hash routing: Overview (KPIs, top-5 languages / domains / adaptations / features bar charts), Trends (3 hand-coded SVG line charts with gradient fills + grid + X labels), Compliance Report (RPwD/EAA/ADA mapping + "Generate PDF (Print)" button that isolates the compliance page via `print-mode` class). Dark theme uses the canonical brand tokens from [UI_GUIDELINES.md](UI_GUIDELINES.md) §1; Inter via Google Fonts.
+- [x] **Docker + nginx** — [ops/docker-compose.yml](ops/docker-compose.yml) (observatory installs deps + runs seed + boots via entrypoint; healthcheck on `/api/health`; nginx `depends_on` observatory) + [ops/nginx/default.conf](ops/nginx/default.conf) (`/observatory/` proxies to `accessbridge-observatory:8200/`, strips prefix, CORS open for `POST`, `client_max_body_size 64k`).
+- [x] **Landing-page link** — Observatory entry added to the nav in [deploy/index.html](deploy/index.html).
+- [x] **Feature doc** — [docs/features/compliance-observatory.md](docs/features/compliance-observatory.md) (32 KB, 13 sections per brief).
+- [x] **Tests** — 14 new tests for the publisher's pure helpers in [src/background/__tests__/observatory-publisher.test.ts](packages/extension/src/background/__tests__/observatory-publisher.test.ts). **14/14 green.** Full repo test suite 348 tests, all passing. `pnpm typecheck` + `pnpm build` clean; extension zip regenerated at 398 KB.
+- [x] **codex:rescue adversarial review** — 4 findings, all applied before push:
+  1. [HIGH] Replay/forge → `UNIQUE(date, merkle_root)` + server-side merkle recomputation + `verifyMerkle` rejection.
+  2. [HIGH] Categorical membership leak → server allowlists on keys; k-anonymity floor (≥ 5 devices) on every top-N categorical; residual risk documented in feature doc §10.
+  3. [MEDIUM] Unbounded metric cardinality → allowlists + `MAX_KEYS_PER_RECORD=32` + `MAX_LANGS=6` + per-value bound ≤ 1 M.
+  4. [MEDIUM] Alarm reads stale in-memory `currentProfile` after MV3 SW wake → handler now reads profile from `chrome.storage.local` each fire.
+- [x] **VPS deployed** — observatory container recreated, seed populated 885 device-days (12→47 ramp × 30 days). Verified:
+  - `http://72.61.227.64:8300/observatory/api/health` → 200 `{"status":"ok","service":"observatory","db":885}`.
+  - `http://72.61.227.64:8300/observatory/api/summary?days=30` → top-5 languages / top-3 domains / top-5 adaptations / top-5 features with DP disclaimer.
+  - `http://72.61.227.64:8300/observatory/` → dashboard renders, assets resolve.
+
+#### Codex fallback note
+
+Task brief required parallel Codex dispatch. Four `codex:rescue` agents were fired in parallel; all returned blocked by Codex sandbox/workspace misalignment (Codex resolved `E:\code\AI` while the project is `E:\code\AccessBridge`, and writes were rejected by policy). One Sonnet agent handled the docs file and completed successfully. All extension/VPS code was written directly in the Opus main session per the fallback rule in `~/.claude/projects/e--code-AccessBridge/memory/feedback_codex_parallel.md`. Codex was still used for the **adversarial review** step (read-only), which produced the 4 findings applied above.
+
+#### Cross-session interactions with Tasks B and C
+
+- `packages/core/src/types/profile.ts`: Session B (Environment Sensing) added `environmentSensingEnabled`, `environmentLightSampling`, `environmentNoiseSampling`. Append-only — no conflict with my `shareAnonymousMetrics`.
+- `packages/extension/src/popup/App.tsx`: Session C added a `GestureLibrary` import + button. No conflict with my Settings-tab opt-in section.
+- `packages/core/src/gestures/`: I created a minimal stub (5 exports) to unblock my build mid-session; Session C then shipped its real recognizer / actions / bindings module, preserving and extending the exports my stub provided.
+- `packages/extension/manifest.json` + `background/index.ts`: both were overwritten once mid-session by a linter/parallel edit and my observatory changes were re-applied on top.
+
+None of these collisions produced a broken build at commit time.
+
+#### Files added / modified (Task A)
+
+```text
+packages/core/src/types/profile.ts                          shareAnonymousMetrics field
+packages/core/src/__tests__/decision-engine.test.ts         helper updated with new field
+packages/extension/manifest.json                            + "alarms" permission
+packages/extension/src/background/observatory-publisher.ts  new — DP + Merkle + POST
+packages/extension/src/background/observatory-collector.ts  new — counters + alarm
+packages/extension/src/background/index.ts                  observatory init + tap points
+packages/extension/src/background/__tests__/observatory-publisher.test.ts  new — 14 tests
+packages/extension/src/popup/App.tsx                        Settings-tab opt-in section
+docs/features/compliance-observatory.md                     new — 32 KB feature doc
+ops/docker-compose.yml                                      new (staging) — observatory entrypoint + healthcheck
+ops/nginx/default.conf                                      new (staging) — /observatory/ proxy + CORS
+ops/observatory/package.json                                new — express + better-sqlite3
+ops/observatory/server.js                                   new — SQLite service with k-anon + merkle verify
+ops/observatory/seed-demo-data.js                           new — 30d × up-to-47 devices
+ops/observatory/public/index.html                           new — dashboard shell
+ops/observatory/public/styles.css                           new — dark theme + print CSS
+ops/observatory/public/app.js                               new — hash routing + SVG charts
+deploy/index.html                                           + "Observatory" nav link
+accessbridge-extension.zip                                  regenerated (398 KB)
+deploy/downloads/accessbridge-extension.zip                 regenerated (398 KB)
+FEATURES.md                                                 + Compliance Observatory section (OBS-01..OBS-07)
+HANDOFF.md                                                  Task A entry
+```
+
+Opus: Foundation + orchestration + all code (publisher, collector, wiring, Settings UI, server.js, seed, dashboard, infra, build-unblock gestures stub); merkle/DP math; post-review fixes; VPS deploy; HANDOFF + FEATURES authoring.
+Sonnet: docs/features/compliance-observatory.md (Agent a38838c8, 32 KB, 13 sections; 4 VERIFY-flagged regulatory-text items left for owner review).
+Haiku: n/a — no bulk-grep or post-deploy sweep needed; Opus handled deploy verification directly.
+codex:rescue: 4 parallel task dispatches all sandbox-blocked (Codex fallback to Opus); adversarial-review used successfully, produced 4 findings, all accepted and fixed before push.
+
+---
+
+## Previous Session: Day 6 — Shift 4 (parallel — Session F): Task F — Accessibility Audit PDF Export (Layer 9 completion) (2026-04-20)
 
 ### Completed (Day 6, Shift 4 — Session F)
 

@@ -53,6 +53,7 @@ Input assistance: voice, gaze, dwell, keyboard.
 | M-05 | Keyboard-Only Mode (skip links, focus ring, `?` overlay) | [content/motor/keyboard-mode.ts](packages/extension/src/content/motor/keyboard-mode.ts) | P | Shipped |
 | M-06 | Predictive Input (word + phrase prediction) | [content/motor/predictive-input.ts](packages/extension/src/content/motor/predictive-input.ts) | P | Shipped |
 | M-07 | Smart Click Targets (enlarge interactive elements) | Applied via DecisionEngine | P, A | Shipped |
+| M-08 | Gesture Shortcuts (touch + trackpad + mouse, 16 gestures, bindable) | [content/motor/gestures.ts](packages/extension/src/content/motor/gestures.ts) | P | Shipped |
 
 Language support: English, Hindi (full commands), plus 7 other `lang` codes for STT — no translated UI yet. Full Indic language plan is deferred (see DEF-004).
 
@@ -114,6 +115,26 @@ Background-side intelligence. Not user-facing directly but drives all auto-adapt
 | CORE-03 | Profile Store (sensory + cognitive + motor + language) | `packages/core/src/profile/store.ts` | `packages/core/src/__tests__/profile-store.test.ts` |
 
 Signal types collected by content script: `SCROLL_VELOCITY`, `CLICK_ACCURACY`, `DWELL_TIME`, `TYPING_RHYTHM`, `BACKSPACE_RATE`, `ZOOM_EVENTS`, `CURSOR_PATH`, `ERROR_RATE`, `READING_SPEED`, `HESITATION`.
+
+---
+
+## Compliance Observatory (Feature #10)
+
+Anonymous, differentially-private daily metrics stream from the extension to a VPS dashboard for HR / compliance audits. Opt-in only; zero identity / content / URLs / IP collected.
+
+| ID | Component | File | Role |
+|----|-----------|------|------|
+| OBS-01 | Metrics publisher (Laplace noise, Merkle commit, POST) | [packages/extension/src/background/observatory-publisher.ts](packages/extension/src/background/observatory-publisher.ts) | DP helpers + daily publish |
+| OBS-02 | In-memory collector + chrome.alarms scheduler | [packages/extension/src/background/observatory-collector.ts](packages/extension/src/background/observatory-collector.ts) | Counters, daily reset, publish-hour deterministic spread |
+| OBS-03 | Opt-in toggle (popup Settings tab) | [packages/extension/src/popup/App.tsx](packages/extension/src/popup/App.tsx) | `shareAnonymousMetrics` gate + dashboard link |
+| OBS-04 | VPS Express + SQLite service | [ops/observatory/server.js](ops/observatory/server.js) | `/api/publish`, `/summary`, `/trends`, `/compliance-report`, `/health` |
+| OBS-05 | Demo seed (30d × up-to-47 devices) | [ops/observatory/seed-demo-data.js](ops/observatory/seed-demo-data.js) | Idempotent; `--force` to reseed |
+| OBS-06 | Dashboard (3 tabs, SVG charts, print-to-PDF) | [ops/observatory/public/](ops/observatory/public/) | `#overview`, `#trends`, `#compliance` |
+| OBS-07 | Tests (14 cases: Laplace, Merkle, aggregate) | [packages/extension/src/background/__tests__/observatory-publisher.test.ts](packages/extension/src/background/__tests__/observatory-publisher.test.ts) | Non-determinism, order sensitivity, empty inputs |
+
+Live dashboard: `http://72.61.227.64:8300/observatory/` (also linked from landing nav). Docs: [docs/features/compliance-observatory.md](docs/features/compliance-observatory.md).
+
+Security invariants enforced at multiple layers: (a) opt-in gate on every `record*` call in background; (b) allowlist of metric keys server-side; (c) UNIQUE(date, merkle_root) + server-side merkle verification for replay/forge resistance; (d) k-anonymity floor of 5 devices before a categorical appears in top-N lists; (e) rate limit 60 req/60 s per IP.
 
 ---
 

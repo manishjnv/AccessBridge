@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AccessBridge — Compliance Observatory</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-brand">
+      <svg width="32" height="32" viewBox="0 0 64 64" aria-hidden="true">
+        <defs>
+          <linearGradient id="ab-grad" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#7b68ee"/>
+            <stop offset="1" stop-color="#bb86fc"/>
+          </linearGradient>
+        </defs>
+        <rect width="64" height="64" rx="14" fill="url(#ab-grad)"/>
+        <path d="M20 46 L32 18 L44 46" stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M24 36 L40 36" stroke="#fff" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+        <path d="M14 53 Q32 47 50 53" stroke="#fff" stroke-width="2.8" fill="none" stroke-linecap="round" opacity="0.85"/>
+      </svg>
+      <span class="brand-text">AccessBridge Observatory</span>
+    </div>
+    <div class="nav-tabs">
+      <a href="#overview" class="nav-tab" data-tab="overview">Overview</a>
+      <a href="#trends" class="nav-tab" data-tab="trends">Trends</a>
+      <a href="#compliance" class="nav-tab" data-tab="compliance">Compliance Report</a>
+    </div>
+  </nav>
+
+  <div class="dp-disclaimer" role="note">
+    <strong>Differential Privacy:</strong> Metrics include Laplace noise (ε = 1.0, sensitivity = 1).
+    Individual users cannot be identified. Schema version 1.
+  </div>
+
+  <main id="main-content">
+    <section id="page-overview" class="page">
+      <h1>Overview</h1>
+      <div class="kpi-grid"></div>
+
+      <div class="two-col">
+        <div class="card">
+          <h2>Top 5 Languages</h2>
+          <div id="top-langs" class="bar-chart"></div>
+        </div>
+        <div class="card">
+          <h2>Top 3 Domain Connectors</h2>
+          <div id="top-domains" class="bar-chart"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Top 5 Adaptations Applied</h2>
+        <div id="top-adaptations" class="bar-chart"></div>
+      </div>
+
+      <div class="card">
+        <h2>Top 5 Features Enabled</h2>
+        <div id="top-features" class="bar-chart"></div>
+      </div>
+    </section>
+
+    <section id="page-trends" class="page" hidden>
+      <h1>Trends (last 30 days)</h1>
+
+      <div class="card">
+        <h2>Struggle Events per Day</h2>
+        <svg id="chart-struggle" class="line-chart" viewBox="0 0 800 240" aria-label="Struggle events per day line chart"></svg>
+      </div>
+
+      <div class="card">
+        <h2>Accessibility Score Improvement per Day</h2>
+        <svg id="chart-score" class="line-chart" viewBox="0 0 800 240" aria-label="Score improvement per day line chart"></svg>
+      </div>
+
+      <div class="card">
+        <h2>Adaptations (FONT_SCALE) per Day</h2>
+        <svg id="chart-adaptations" class="line-chart" viewBox="0 0 800 240" aria-label="Adaptations applied per day line chart"></svg>
+      </div>
+    </section>
+
+    <section id="page-compliance" class="page" hidden>
+      <h1>Compliance Report</h1>
+      <div class="compliance-actions no-print">
+        <button id="btn-print" class="btn-primary">Generate PDF (Print)</button>
+      </div>
+      <div id="compliance-body"></div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div>Manish Kumar — AccessBridge Compliance Observatory</div>
+    <div class="footer-sub">Metrics derive from anonymous device-level submissions with differential-privacy noise.</div>
+  </footer>
+
+  <script src="./app.js"></script>
+</body>
+</html>

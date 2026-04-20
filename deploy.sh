@@ -9,7 +9,7 @@ set -euo pipefail
 
 REMOTE="a11yos-vps"
 REMOTE_DIR="/opt/accessbridge"
-WWW_DIR="/var/www/accessbridge"
+WWW_DIR="/opt/accessbridge/docs"
 BRANCH="main"
 HEALTH_URL="${HEALTH_URL:-https://accessbridge.space/api/version}"
 

@@ -117,8 +117,11 @@ Background-side intelligence. Not user-facing directly but drives all auto-adapt
 | CORE-01 | Struggle Detector (10 signal types, sliding 60s window) | `packages/core/src/signals/struggle-detector.ts` | `packages/core/src/__tests__/struggle-detector.test.ts` |
 | CORE-02 | Decision Engine (8+ rules mapping struggle → adaptations) | `packages/core/src/decision/engine.ts` | `packages/core/src/__tests__/decision-engine.test.ts` |
 | CORE-03 | Profile Store (sensory + cognitive + motor + language) | `packages/core/src/profile/store.ts` | `packages/core/src/__tests__/profile-store.test.ts` |
+| CORE-04 | Multi-Modal Fusion Layer 5 (unified 10-channel event stream, 5 cross-modal compensation rules, 7-intent inference, decision-engine integration — all on-device) | [packages/core/src/fusion/](packages/core/src/fusion/) + [packages/extension/src/content/fusion/](packages/extension/src/content/fusion/) | quality-estimator 26 · compensator 25 · intent-inference 43 · fusion-engine 20 = 114 tests · see [docs/features/multi-modal-fusion.md](docs/features/multi-modal-fusion.md) |
 
 Signal types collected by content script: `SCROLL_VELOCITY`, `CLICK_ACCURACY`, `DWELL_TIME`, `TYPING_RHYTHM`, `BACKSPACE_RATE`, `ZOOM_EVENTS`, `CURSOR_PATH`, `ERROR_RATE`, `READING_SPEED`, `HESITATION`.
+
+Fusion channels (Layer 5, independent of the StruggleDetector signal types): `keyboard`, `mouse`, `gaze`, `voice`, `touch`, `pointer`, `screen`, `env-light`, `env-noise`, `env-network`.
 
 ---
 

@@ -3,6 +3,8 @@ import { AdaptationType } from '../types/adaptation.js';
 import type { Adaptation, AdaptationRule } from '../types/adaptation.js';
 import { SignalType } from '../types/signals.js';
 import type { StruggleScore, BehaviorSignal } from '../types/signals.js';
+// --- Session 11: Intent-Driven Adaptations ---
+import type { IntentHypothesis, IntentType } from '../fusion/types.js';
 
 let adaptationIdCounter = 0;
 
@@ -266,4 +268,58 @@ export class DecisionEngine {
   updateProfile(profile: AccessibilityProfile): void {
     this.profile = profile;
   }
+
+  // --- Session 11: Intent-Driven Adaptations ---
+  /**
+   * Map a Layer-5 intent hypothesis to zero or more Adaptation objects.
+   * Separate from `evaluate()` (which consumes StruggleScore) — intent is a
+   * higher-level inference fed by the fusion engine. Manual mode returns [].
+   * Confidence gate: only fires when `hypothesis.confidence` ≥
+   * `profile.fusionIntentMinConfidence` (fallback 0.65).
+   */
+  evaluateIntent(hypothesis: IntentHypothesis): Adaptation[] {
+    if (this.profile.adaptationMode === 'manual') return [];
+    const minConf = this.profile.fusionIntentMinConfidence ?? 0.65;
+    if (hypothesis.confidence < minConf) return [];
+    return buildIntentAdaptations(hypothesis, hypothesis.confidence);
+  }
+}
+
+// --- Session 11: Intent-Driven Adaptations ---
+
+const INTENT_ADAPTATION_MAP: Record<IntentType, Array<{ kind: string; value: unknown }>> = {
+  'click-imminent': [{ kind: 'preview-tooltip', value: { subtle: true } }],
+  'scroll-continuation': [{ kind: 'smooth-scroll-hint', value: true }],
+  reading: [{ kind: 'reading-mode-offer', value: true }],
+  hesitation: [
+    { kind: 'confirmation-widget', value: true },
+    { kind: 'inline-help', value: true },
+  ],
+  searching: [{ kind: 'find-in-page-helper', value: true }],
+  typing: [{ kind: 'suppress-interruptions', value: true }],
+  abandoning: [{ kind: 'auto-save-form-draft', value: true }],
+  'help-seeking': [{ kind: 'contextual-help-panel', value: true }],
+};
+
+let intentAdaptationCounter = 0;
+
+export function buildIntentAdaptations(
+  hypothesis: IntentHypothesis,
+  confidence: number,
+): Adaptation[] {
+  const specs = INTENT_ADAPTATION_MAP[hypothesis.intent] ?? [];
+  const out: Adaptation[] = [];
+  for (const spec of specs) {
+    intentAdaptationCounter += 1;
+    out.push({
+      id: `intent-${hypothesis.intent}-${Date.now()}-${intentAdaptationCounter}`,
+      type: AdaptationType.INTENT_HINT,
+      value: { kind: spec.kind, intent: hypothesis.intent, detail: spec.value },
+      confidence,
+      applied: true,
+      timestamp: Date.now(),
+      reversible: true,
+    });
+  }
+  return out;
 }

@@ -30,3 +30,19 @@ export type {
 export { AdaptationType } from './adaptation.js';
 
 export type { Adaptation, AdaptationRule } from './adaptation.js';
+
+// --- Session 11: Multi-Modal Fusion (Layer 5) ---
+export type {
+  InputChannel,
+  ChannelQuality,
+  ChannelQualityMap,
+  UnifiedEvent,
+  IngestEvent,
+  EnvironmentConditions,
+  FusedContext,
+  IntentType,
+  IntentHypothesis,
+  CrossModalCompensationRule,
+  FusionEngineConfig,
+  FusionStats,
+} from '../fusion/types.js';

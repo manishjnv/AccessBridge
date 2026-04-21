@@ -42,3 +42,30 @@ export type {
   RecoveryCache,
   ApiVisionClient,
 } from './vision/index.js';
+
+export {
+  FusionEngine,
+  estimateChannelQuality,
+  applyCompensation,
+  getActiveRules,
+  inferIntent,
+  DEFAULT_COMPENSATION_RULES,
+  DEFAULT_FUSION_CONFIG,
+  ALL_INPUT_CHANNELS,
+  ALL_INTENT_TYPES,
+} from './fusion/index.js';
+
+export type {
+  InputChannel,
+  ChannelQuality,
+  ChannelQualityMap,
+  UnifiedEvent,
+  IngestEvent,
+  EnvironmentConditions,
+  FusedContext,
+  IntentType,
+  IntentHypothesis,
+  CrossModalCompensationRule,
+  FusionEngineConfig,
+  FusionStats,
+} from './fusion/index.js';

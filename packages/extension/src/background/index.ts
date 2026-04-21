@@ -38,6 +38,42 @@ let simplifier: SimplifierService | null = null;
 let actionItemsService: ActionItemsService | undefined;
 let visionRecoveryService: VisionRecoveryService | undefined;
 
+// --- Session 11: Fusion pipeline ---
+function evaluateIntentForProfile(
+  payload: { intent: string; confidence: number; suggestedAdaptations: string[] },
+  _profile: AccessibilityProfile,
+): Adaptation[] {
+  // Build a minimal IntentHypothesis shape and delegate to DecisionEngine.
+  // supportingEvents are intentionally stripped at the bridge — only the
+  // aggregate count crosses, never raw event payloads.
+  const engine = getOrCreateEngine();
+  return engine.evaluateIntent({
+    intent: payload.intent as
+      | 'click-imminent'
+      | 'scroll-continuation'
+      | 'reading'
+      | 'hesitation'
+      | 'searching'
+      | 'typing'
+      | 'abandoning'
+      | 'help-seeking',
+    confidence: payload.confidence,
+    supportingEvents: [],
+    suggestedAdaptations: payload.suggestedAdaptations ?? [],
+  });
+}
+
+interface FusionIntentRecord {
+  intent: string;
+  confidence: number;
+  suggestedAdaptations: string[];
+  supportingEventCount: number;
+  timestamp: number;
+  tabId?: number;
+}
+const fusionIntentHistory: FusionIntentRecord[] = [];
+const FUSION_HISTORY_MAX = 50;
+
 function getAIEngine(): AIEngine {
   if (!aiEngine) {
     aiEngine = new AIEngine(); // starts with local (free) tier
@@ -212,7 +248,11 @@ type MessageType =
   | 'EXTRACT_ACTION_ITEMS'
   | 'ACTION_ITEMS_UPDATE'
   // --- Session 10: Vision Recovery ---
-  | 'VISION_RECOVER_VIA_API';
+  | 'VISION_RECOVER_VIA_API'
+  // --- Session 11: Fusion pipeline ---
+  | 'FUSION_INTENT_EMITTED'
+  | 'FUSION_GET_STATS'
+  | 'FUSION_GET_HISTORY';
 
 interface Message {
   type: MessageType;
@@ -222,10 +262,10 @@ interface Message {
 chrome.runtime.onMessage.addListener(
   (
     message: Message,
-    _sender: chrome.runtime.MessageSender,
+    sender: chrome.runtime.MessageSender,
     sendResponse: (response: unknown) => void,
   ) => {
-    handleMessage(message)
+    handleMessage(message, sender)
       .then(sendResponse)
       .catch((err) => {
         console.error('[AccessBridge] message error', err);
@@ -235,7 +275,10 @@ chrome.runtime.onMessage.addListener(
   },
 );
 
-async function handleMessage(message: Message): Promise<unknown> {
+async function handleMessage(
+  message: Message,
+  sender?: chrome.runtime.MessageSender,
+): Promise<unknown> {
   switch (message.type) {
     case 'GET_PROFILE': {
       if (!currentProfile) {
@@ -492,6 +535,65 @@ async function handleMessage(message: Message): Promise<unknown> {
         .catch(() => {});
 
       return { received: true };
+    }
+
+    // --- Session 11: Fusion pipeline ---
+    case 'FUSION_INTENT_EMITTED': {
+      const payload = message.payload as {
+        intent: string;
+        confidence: number;
+        suggestedAdaptations: string[];
+        supportingEventCount: number;
+        timestamp: number;
+      };
+      const tabId = sender?.tab?.id;
+      const record: FusionIntentRecord = {
+        intent: payload.intent,
+        confidence: payload.confidence,
+        suggestedAdaptations: payload.suggestedAdaptations ?? [],
+        supportingEventCount: payload.supportingEventCount ?? 0,
+        timestamp: payload.timestamp ?? Date.now(),
+        ...(typeof tabId === 'number' ? { tabId } : {}),
+      };
+      fusionIntentHistory.unshift(record);
+      if (fusionIntentHistory.length > FUSION_HISTORY_MAX) {
+        fusionIntentHistory.length = FUSION_HISTORY_MAX;
+      }
+      // Route to Decision Engine's intent path for adaptation suggestions.
+      // Confidence gate applied on both sides (content + here) to avoid
+      // flapping at the boundary.
+      if (currentProfile && payload.confidence >= (currentProfile.fusionIntentMinConfidence ?? 0.65)) {
+        const adaptations = evaluateIntentForProfile(payload, currentProfile);
+        for (const adaptation of adaptations) {
+          activeAdaptations.set(adaptation.id, adaptation);
+          if (typeof tabId === 'number') {
+            chrome.tabs
+              .sendMessage(tabId, { type: 'APPLY_ADAPTATION', payload: adaptation })
+              .catch(() => {});
+          }
+        }
+      }
+      // Broadcast to popup/sidepanel so Intelligence tab can stream it live.
+      chrome.runtime
+        .sendMessage({ type: 'FUSION_INTENT_EMITTED', payload: record })
+        .catch(() => {});
+      return { received: true };
+    }
+
+    case 'FUSION_GET_STATS': {
+      // Forward to active tab's content script and await its response.
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab?.id) return { running: false };
+      try {
+        const response = await chrome.tabs.sendMessage(tab.id, { type: 'FUSION_GET_STATS' });
+        return response ?? { running: false };
+      } catch {
+        return { running: false };
+      }
+    }
+
+    case 'FUSION_GET_HISTORY': {
+      return { history: [...fusionIntentHistory] };
     }
 
     default: {

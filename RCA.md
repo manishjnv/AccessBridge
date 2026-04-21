@@ -192,6 +192,21 @@ Track every bug fix: what broke, why, how it was fixed, and how to prevent recur
 
 ---
 
+## BUG-013: FusionEngine `_recentIngestTimes` grows unbounded until `getStats()` is called
+
+| Field | Detail |
+| ------- | -------- |
+| **Date** | 2026-04-21 |
+| **Severity** | Medium (memory leak, not a correctness bug) |
+| **Symptom** | Found by the Session 11 Opus-solo adversarial pass (codex:rescue was unavailable — quota exhausted). The `FusionEngine._recentIngestTimes` array was appended-to on every `ingest()` but only pruned inside `getStats()`. On tabs where the popup / sidepanel Intelligence tab is never opened, `getStats()` is never called, so the array grew without bound at content-script mousemove rates (~20 events/s × hours = 72k entries/hour). No visible symptom in short-lived testing; caught by adversarial audit before the feature shipped. |
+| **Root Cause** | Design oversight: eventsPerSec was computed from the ring inside `getStats()` so pruning lived there too. The ingest path had no reason to touch it, but ingest is the only path that APPENDS to it — so in long-running sessions without observers it became a one-way-grow buffer. |
+| **Fix** | `packages/core/src/fusion/fusion-engine.ts:84-91` — added an inline tail-prune in `ingest()`: `const ingestCutoff = now - 1000; if (this._recentIngestTimes.length > 0 && this._recentIngestTimes[0]! < ingestCutoff) { this._recentIngestTimes = this._recentIngestTimes.filter((t) => t >= ingestCutoff); }` — the bounded window is now enforced on the write path, not the read path. All 114 fusion tests still pass (the invariant exercised by `eventsPerSec updates correctly` was unchanged). |
+| **Files Changed** | `packages/core/src/fusion/fusion-engine.ts` |
+| **Commit** | (pending — combined Session 11 commit) |
+| **Prevention** | **Any time a member buffer is appended-to on one code path and pruned on another, treat it as a leak candidate.** A useful invariant for sliding-window data structures: pruning belongs on the write path; reads must be idempotent queries over an already-bounded state. Adversarial-pass checklist for future sessions adds a grep: `find appends (`push`/`unshift`) → confirm every appending path also enforces the bound`. Also: when `codex:rescue` is blocked, Opus MUST still perform the adversarial questions; this bug would not have been caught by happy-path testing alone. |
+
+---
+
 ## Checklist: Version Bump — AUTOMATED (post-commit `a4bd6a1`)
 
 Version bumping is now driven by `./deploy.sh` → `scripts/bump-version.sh --auto` — do **not** hand-edit versions. The checklist is only included here for manual overrides.

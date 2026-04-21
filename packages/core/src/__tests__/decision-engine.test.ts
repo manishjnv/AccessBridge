@@ -36,6 +36,11 @@ function makeProfile(
     environmentSensingEnabled: false,
     environmentLightSampling: true,
     environmentNoiseSampling: true,
+    // --- Session 11: Multi-Modal Fusion ---
+    fusionEnabled: true,
+    fusionWindowMs: 3000,
+    fusionCompensationEnabled: true,
+    fusionIntentMinConfidence: 0.65,
     ...overrides,
   };
 }

@@ -244,6 +244,31 @@ Per-page sequence:
 
 ---
 
+## 8b. Layer 5 — Multi-Modal Fusion (Session 11)
+
+A parallel on-device pipeline running inside the content script that unifies
+every input channel (keyboard · mouse · touch · pointer · screen · gaze · voice
+· env-light · env-noise · env-network) into a single time-aligned event stream,
+then re-weights channels when one is degraded and infers user intent via seven
+rule-based detectors.
+
+- **Engine** — [packages/core/src/fusion/fusion-engine.ts](packages/core/src/fusion/fusion-engine.ts). Ring buffer (3 s / 500 events default), 100 ms emit tick, pub-sub for `FusedContext` and `IntentHypothesis`.
+- **Quality estimator** — [packages/core/src/fusion/quality-estimator.ts](packages/core/src/fusion/quality-estimator.ts). Per-channel heuristics using SNR, face-detection ratio, inter-event variance, smoothness, etc.
+- **Compensator** — [packages/core/src/fusion/compensator.ts](packages/core/src/fusion/compensator.ts). Five built-in rules (noisy-degrades-voice, low-light-degrades-gaze, poor-network-degrades-voice, typing-flurry-suppresses-gaze, reading-elevates-gaze).
+- **Intent inference** — [packages/core/src/fusion/intent-inference.ts](packages/core/src/fusion/intent-inference.ts). Seven intents: click-imminent, hesitation, reading, searching, typing, abandoning, help-seeking.
+- **Content wiring** — [packages/extension/src/content/fusion/](packages/extension/src/content/fusion/). Pure adapters per channel + FusionController which rate-limits intent forwarding (1.5 s per type) and routes through FUSION_INTENT_EMITTED to the background.
+- **Decision-engine intent path** — [packages/core/src/decision/engine.ts](packages/core/src/decision/engine.ts) `evaluateIntent()` maps intents to `INTENT_HINT` adaptations.
+- **UI** — popup Settings section "Multi-Modal Fusion (Layer 5)" + new sidepanel "Intelligence" tab with live channel bars, environment panel, intent timeline.
+
+**Privacy invariant:** all fusion runs on-device; the `FUSION_INTENT_EMITTED`
+message carries only the aggregate intent + confidence + adaptation tags + event
+*count* — never raw event payloads. No new manifest permissions (fusion
+consumes already-consented streams).
+
+Docs: [docs/features/multi-modal-fusion.md](docs/features/multi-modal-fusion.md). Tests: 114 (quality-estimator 26 · compensator 25 · intent-inference 43 · fusion-engine 20) + 13 content-side integration tests.
+
+---
+
 ## 9. Architectural properties worth knowing
 
 1. **Cost-aware AI by default** — local tier always available; no API key required for baseline function

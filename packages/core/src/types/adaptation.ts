@@ -17,6 +17,8 @@ export enum AdaptationType {
   LANGUAGE_SWITCH = 'LANGUAGE_SWITCH',
   KEYBOARD_ONLY = 'KEYBOARD_ONLY',
   PREDICTIVE_INPUT = 'PREDICTIVE_INPUT',
+  // --- Session 11: Intent-Driven Adaptations ---
+  INTENT_HINT = 'INTENT_HINT',
 }
 
 export interface Adaptation {

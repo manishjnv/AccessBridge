@@ -49,6 +49,11 @@ import {
   registerVisionRecoveryHandlers,
 } from './vision/recovery.js';
 import { VisionRecoveryUI } from './vision/recovery-ui.js';
+// --- Session 11: Multi-Modal Fusion (Layer 5) ---
+import {
+  FusionController,
+  registerFusionStatsHandler,
+} from './fusion/controller.js';
 
 // ---------- App Detection ----------
 
@@ -321,6 +326,15 @@ let timeAwarenessController: TimeAwarenessController | null = null;
 // --- Session 10: Vision Recovery ---
 let visionRecoveryController: VisionRecoveryController | null = null;
 let visionRecoveryUI: VisionRecoveryUI | null = null;
+// --- Session 11: Multi-Modal Fusion ---
+let fusionController: FusionController | null = null;
+
+function getFusionController(): FusionController {
+  if (!fusionController) {
+    fusionController = new FusionController({ enabled: false });
+  }
+  return fusionController;
+}
 
 function getVisionRecovery(): VisionRecoveryController {
   if (!visionRecoveryController) {
@@ -378,7 +392,12 @@ function getDwell(): DwellClickSystem {
 
 function getEyeTracker(): EyeTracker {
   if (!eyeTracker) {
-    eyeTracker = new EyeTracker();
+    eyeTracker = new EyeTracker({
+      // --- Session 11: tap gaze samples into fusion engine ---
+      onGaze: (x: number, y: number) => {
+        fusionController?.reportGaze(x, y);
+      },
+    });
   }
   return eyeTracker;
 }
@@ -493,6 +512,28 @@ function bindEnvSnapshotForwarding(): void {
       payload: snapshot,
     }).catch(() => {});
     envIndicator?.refresh();
+    // --- Session 11: feed env snapshot into fusion engine ---
+    // NetworkQuality is a string enum ('poor' | 'fair' | 'good' | 'excellent').
+    // Map to a 0-1 numeric quality proxy for the fusion pipeline.
+    const netScoreMap: Record<string, number> = {
+      poor: 0.2,
+      fair: 0.5,
+      good: 0.8,
+      excellent: 1.0,
+    };
+    const snap = snapshot as unknown as {
+      lightLevel?: number | null;
+      noiseLevel?: number | null;
+      networkQuality?: string;
+    };
+    fusionController?.reportEnvironment({
+      lightLevel: typeof snap.lightLevel === 'number' ? snap.lightLevel : undefined,
+      noiseLevel: typeof snap.noiseLevel === 'number' ? snap.noiseLevel : undefined,
+      networkQuality:
+        typeof snap.networkQuality === 'string'
+          ? netScoreMap[snap.networkQuality] ?? 0.5
+          : undefined,
+    });
   });
 }
 
@@ -514,6 +555,13 @@ function stopEnvironmentSensor(): void {
 // ---------- Voice command handler ----------
 
 function handleVoiceCommand(command: string, args: string): void {
+  // --- Session 11: tap voice command into fusion engine ---
+  fusionController?.reportVoice(command + (args ? ' ' + args : ''), {
+    final: true,
+    snr: 0.8,
+    transcriptConfidence: 0.85,
+  });
+
   // Try native-script matching across all 10 Indic languages first.
   // If the transcript is an Indic phrase, it routes to the same English action.
   const indicMatch = matchAnyIndicCommand(command + (args ? ' ' + args : ''));
@@ -684,6 +732,8 @@ function listenForCommands(adapter: BaseAdapter, sensory: SensoryAdapter): void 
           // --- Session 10: Vision Recovery ---
           visionRecoveryController?.stop();
           visionRecoveryUI?.unmount();
+          // --- Session 11: Multi-Modal Fusion ---
+          fusionController?.stop();
           sendResponse({ reverted: true });
           break;
         }
@@ -881,6 +931,33 @@ function listenForCommands(adapter: BaseAdapter, sensory: SensoryAdapter): void 
             if (typeof p.cognitive?.timeAwarenessEnabled === 'boolean') {
               if (p.cognitive.timeAwarenessEnabled) getTimeAwarenessController().start();
               else timeAwarenessController?.stop();
+            }
+          }
+          // --- Session 11: Multi-Modal Fusion ---
+          {
+            const f = updatedProfile as {
+              fusionEnabled?: boolean;
+              fusionWindowMs?: number;
+              fusionCompensationEnabled?: boolean;
+              fusionIntentMinConfidence?: number;
+            };
+            const ctl = getFusionController();
+            const patch: Partial<{
+              windowMs: number;
+              compensationEnabled: boolean;
+              intentMinConfidence: number;
+            }> = {};
+            if (typeof f.fusionWindowMs === 'number') patch.windowMs = f.fusionWindowMs;
+            if (typeof f.fusionCompensationEnabled === 'boolean')
+              patch.compensationEnabled = f.fusionCompensationEnabled;
+            if (typeof f.fusionIntentMinConfidence === 'number')
+              patch.intentMinConfidence = f.fusionIntentMinConfidence;
+            if (Object.keys(patch).length > 0) ctl.setOptions(patch);
+            if (f.fusionEnabled === true && !ctl.isRunning()) {
+              ctl.setOptions({ enabled: true });
+              ctl.start();
+            } else if (f.fusionEnabled === false && ctl.isRunning()) {
+              ctl.stop();
             }
           }
           // --- Session 10: Vision Recovery ---
@@ -1106,6 +1183,9 @@ function init(): void {
   // --- Session 10: Vision Recovery — register message handlers ---
   registerVisionRecoveryHandlers(() => getVisionRecovery());
 
+  // --- Session 11: Multi-Modal Fusion — register stats message handler ---
+  registerFusionStatsHandler(() => fusionController);
+
   // Watch for dynamic content
   observeDynamicContent(adapter);
 
@@ -1278,6 +1358,26 @@ function init(): void {
       startEnvironmentSensor(light, noise).catch((err) => {
         console.warn('[AccessBridge] env sensor start failed', err);
       });
+    }
+
+    // --- Session 11: Multi-Modal Fusion init (profile-driven, default on) ---
+    {
+      const fProfile = profile as {
+        fusionEnabled?: boolean;
+        fusionWindowMs?: number;
+        fusionCompensationEnabled?: boolean;
+        fusionIntentMinConfidence?: number;
+      };
+      if (fProfile.fusionEnabled !== false) {
+        const ctl = getFusionController();
+        ctl.setOptions({
+          enabled: true,
+          windowMs: fProfile.fusionWindowMs ?? 3000,
+          compensationEnabled: fProfile.fusionCompensationEnabled ?? true,
+          intentMinConfidence: fProfile.fusionIntentMinConfidence ?? 0.65,
+        });
+        ctl.start();
+      }
     }
   }).catch(() => {});
 

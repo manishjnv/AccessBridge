@@ -9,8 +9,10 @@ import { AuditPanel } from './audit/AuditPanel.js';
 import ActionsPanel from './actions/ActionsPanel.js';
 // --- Session 10: Vision Recovery ---
 import VisionPanel from './vision/VisionPanel.js';
+// --- Session 11: Multi-Modal Fusion ---
+import IntelligencePanel from './intelligence/IntelligencePanel.js';
 
-type SidePanelTab = 'dashboard' | 'audit' | 'actions' | 'vision';
+type SidePanelTab = 'dashboard' | 'audit' | 'actions' | 'vision' | 'intelligence';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -689,12 +691,16 @@ function SidePanel() {
         <TabButton label="Actions" active={tab === 'actions'} onClick={() => setTab('actions')} />
         {/* --- Session 10: Vision Recovery --- */}
         <TabButton label="Vision" active={tab === 'vision'} onClick={() => setTab('vision')} />
+        {/* --- Session 11: Multi-Modal Fusion --- */}
+        <TabButton label="Intelligence" active={tab === 'intelligence'} onClick={() => setTab('intelligence')} />
       </nav>
 
       {/* ── Body ───────────────────────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3">
         {/* --- Priority 1: Captions + Actions --- */}
-        {tab === 'vision' ? (
+        {tab === 'intelligence' ? (
+          <IntelligencePanel />
+        ) : tab === 'vision' ? (
           <VisionPanel />
         ) : tab === 'actions' ? (
           <ActionsPanel />

@@ -1,6 +1,130 @@
 # AccessBridge - Shift Handoff
 
-## Last Session: Session 10 — Vision-Assisted Semantic Recovery (Feature #5) (2026-04-21)
+## Last Session: Session 11 — Multi-Modal Fusion (Layer 5) (2026-04-21)
+
+### Headline
+
+Shipped Layer 5 Multi-Modal Fusion end-to-end — the only architectural layer from the plan V4 that was not implemented in V3. New capabilities: (a) unified time-aligned event stream across 10 input channels (keyboard · mouse · gaze · voice · touch · pointer · screen · env-light · env-noise · env-network); (b) cross-modal compensation — 5 built-in rules that re-weight degraded channels (noisy room reduces voice weight by 50%; poor lighting reduces gaze weight by 60%; etc.); (c) 7-intent rules-based inference (click-imminent, hesitation, reading, searching, typing, abandoning, help-seeking) with rate-limited forwarding to Decision Engine for INTENT_HINT adaptations. 4 Sonnet subagents in parallel wrote the 4 pure modules (Codex quota was exhausted — saw error "hit your usage limit" and fell back to Sonnet per `feedback_codex_parallel` memory). Total new tests: 127 (26 quality-estimator + 25 compensator + 43 intent-inference + 20 fusion-engine + 13 FusionController integration). Test total: 629 → **756**. New file count: 12 (6 core fusion + 3 content fusion + 1 sidepanel Intelligence panel + 1 docs + 1 test). Zero new manifest permissions.
+
+### Completed
+
+#### Phase 0 — Warm start (Opus)
+
+Parallel-read 9 docs (CLAUDE.md, FEATURES, ARCHITECTURE, ROADMAP, UI_GUIDELINES, HANDOFF head, RCA, MEMORY index, .husky/pre-push) + current content/index.ts + profile.ts + types/index.ts + decision engine. Flagged 3 risks up front: (a) session-label collision with last session's "Session 10" → proposed Session 11; user approved; (b) UI_GUIDELINES violation in task-provided CSS (`#6366f1` indigo / `rgba(99,102,241,0.95)`) → rewrote to canonical `#7b68ee` / `rgba(123,104,238,0.95)`; (c) RCA BUG-012 IIFE chunk-graph depth — new `@accessbridge/core/fusion` imports in content script would grow the chunk graph; post-build `node -c` stayed mandatory.
+
+#### Phase 1 — Draft
+
+**Types contract first:** `packages/core/src/fusion/types.ts` (150 LOC) — InputChannel, ChannelQuality, UnifiedEvent, IngestEvent, FusedContext, IntentHypothesis, CrossModalCompensationRule, FusionEngineConfig, FusionStats. Written Opus-direct before dispatching subagents so the 4 pure modules could import against a stable contract.
+
+**Codex attempt → quota-exhausted:** fired 4 parallel `codex exec` tasks; first task failed with `ERROR: You've hit your usage limit. Upgrade to Plus or try again at Apr 26th, 2026`. The same quota wall as Session 10. Stopped the other 3 in-flight tasks (all were stuck on stdin) and re-dispatched as 4 parallel Sonnet subagents instead.
+
+**4 parallel Sonnet subagents:**
+1. `packages/core/src/fusion/quality-estimator.ts` (248 LOC) + 26 tests — per-channel heuristics (voice SNR, gaze brightness/face/blink, keyboard rhythm consistency, mouse smoothness, pointer gesture, env-sensor passthrough)
+2. `packages/core/src/fusion/compensator.ts` (154 LOC) + 25 tests — 5 built-in rules + normalized weight map
+3. `packages/core/src/fusion/intent-inference.ts` (365 LOC) + 43 tests — 7 detector helpers, each <40 LOC
+4. `packages/core/src/fusion/fusion-engine.ts` (217 LOC + 293 test LOC, 20 tests) — ring buffer + emit tick + pub-sub. Initial fusion-engine launch was blocked by my own "STOP if any dependency missing" guard in the prompt; re-fired after intent-inference landed.
+
+**Opus-direct integration (parallel with Sonnet):**
+- `packages/core/src/fusion/index.ts` — re-exports (FusionEngine, DEFAULT_COMPENSATION_RULES, etc.)
+- `packages/core/src/index.ts` + `packages/core/src/types/index.ts` — top-level + types re-exports
+- `packages/core/package.json` — added `./fusion` + `./fusion/*` subpath exports
+- `packages/core/src/types/profile.ts` — 4 new AccessibilityProfile fields (top-level since architectural, not sensory-grouped): `fusionEnabled:true, fusionWindowMs:3000, fusionCompensationEnabled:true, fusionIntentMinConfidence:0.65`
+- `packages/core/src/types/adaptation.ts` — new `AdaptationType.INTENT_HINT`
+- `packages/core/src/decision/engine.ts` — `evaluateIntent(hypothesis)` method + `buildIntentAdaptations` helper + `INTENT_ADAPTATION_MAP` (7 intents → adaptation specs)
+- `packages/extension/src/content/fusion/adapters.ts` (293 LOC) — 7 adapter factories: keyboard, mouse (throttled 50ms), touch, pointer, screen (beforeunload + visibility), `emitGazeSample`, `emitVoiceSample`, `emitEnvironmentSample` + `snapshotToConditions`
+- `packages/extension/src/content/fusion/controller.ts` (210 LOC) — FusionController class + registerFusionStatsHandler; rate-limits intent forwarding to 1/1500ms per intent type; forwards ONLY aggregate intent (type + confidence + adaptation tags + event count) — NEVER raw event payloads
+- `packages/extension/src/content/index.ts` — additive wiring: FusionController singleton, REVERT_ALL stops it, PROFILE_UPDATED patches it, GET_PROFILE initial-startup gates on fusionEnabled!==false (default on), EyeTracker onGaze now taps fusion, handleVoiceCommand taps fusion, EnvironmentSensor snapshot callback taps fusion (with NetworkQuality enum→number mapping), registerFusionStatsHandler registered in init
+- `packages/extension/src/background/index.ts` — 3 new MessageType cases (`FUSION_INTENT_EMITTED`, `FUSION_GET_STATS`, `FUSION_GET_HISTORY`) + `fusionIntentHistory` ring buffer (cap 50) + `evaluateIntentForProfile` helper that delegates to `DecisionEngine.evaluateIntent`
+- `packages/extension/src/popup/App.tsx` — new `FusionSection` component (150 LOC) inside SettingsTab with master toggle, window slider (1-10s), compensation toggle, confidence threshold slider, live-polled stats (active channels, dominant, degraded, events/sec, last intent). Marker `{/* --- Session 11: Multi-Modal Fusion --- */}`.
+- `packages/extension/src/sidepanel/intelligence/IntelligencePanel.tsx` (300 LOC) + sidepanel tab wiring — 10 channel quality bars, environment panel, compensation "why" explanations, scrolling intent timeline with relative time formatting
+- `packages/extension/src/content/styles.css` — Session 11 CSS (60 LOC) — all canonical palette after rewriting task-spec's off-palette indigo
+- `docs/features/multi-modal-fusion.md` (new) — full Layer 5 specification, channel heuristics, compensation rules, intent taxonomy, privacy invariants, tuning guide
+- `FEATURES.md` — new CORE-04 row
+- `ARCHITECTURE.md` — new §8b "Layer 5 — Multi-Modal Fusion" between §8 and §9
+- 13 `FusionController` integration tests (`packages/extension/src/content/fusion/__tests__/controller.test.ts`) covering defaults, option merge, start gating, report* no-op when not running, rate limit per type, rate-limit expiry after 1500ms, registerFusionStatsHandler wiring, stats routing
+
+#### Phase 2 — Deterministic gates (all green)
+
+- `pnpm typecheck` clean across 3 workspaces
+- `pnpm -r test` green: **756 total** (ai-engine 67 · core 536 · extension 153) — was 629 pre-session, +127 new
+- Initial `pnpm build` failed twice: first on fusion types not being re-exported from `@accessbridge/core/types` (fixed via `./fusion` subpath exports + types/index.ts re-export); second on `NetworkQuality` enum (string) vs my fusion code expecting number (fixed with enum→0..1 map at the content/index.ts integration seam). Post-fix build clean: content 366.36 KB (+21 KB from Session 10 baseline), background 37.83 KB.
+- `node -c` green on both `dist/src/content/index.js` and `dist/src/background/index.js` — the critical BUG-008/012 IIFE guard held despite the new `@accessbridge/core/fusion` chunk set expanding the module graph.
+- Secrets scan on new fusion code: clean
+- TODO/FIXME/XXX scan on new fusion code: clean
+
+#### Phase 3 — Opus diff review
+
+Reviewed diffs only (not full files) for load-bearing paths per CLAUDE.md:
+- **manifest.json / vite.config.ts / deploy.sh:** NOT TOUCHED (confirmed via `git diff --stat`). No new permissions required — fusion consumes already-consented mic/camera streams via existing toggles.
+- **content/index.ts:** additive only — REVERT_ALL, PROFILE_UPDATED, GET_PROFILE each got new branches that don't alter existing behavior.
+- **background/index.ts:** new FUSION_* cases scoped + error-guarded; `evaluateIntentForProfile` delegates to DecisionEngine, doesn't interpret attacker-supplied `suggestedAdaptations` (uses internal INTENT_ADAPTATION_MAP instead).
+- **popup/App.tsx:** read-only live stats polling + profile-driven toggles; no security surface.
+- **CSS:** canonical `#7b68ee` / `#bb86fc` / `#10b981` / `#f59e0b` / `#64748b` only (task-spec `#6366f1` indigo rewritten to match UI_GUIDELINES §1).
+- **No "& Team" regressions; no stale version strings** introduced.
+
+#### Phase 4 — codex:rescue adversarial sign-off
+
+**Codex quota exhausted (same session-10 wall — resets 2026-04-26).** Per CLAUDE.md + the freshly-saved `feedback_rescue_fallback` memory, Opus did the adversarial pass solo on 8 specific questions. Seven ACCEPTED, one REVISE:
+
+**Finding 4 (fixed pre-push):** `_recentIngestTimes` in FusionEngine was only pruned on `getStats()` call. If a tab never opens the popup/sidepanel, the array grows unbounded at mousemove rates (~20 events/s × hours of session). Applied inline prune in `ingest()`: after push, filter entries older than `now - 1000ms`. Confirmed 114 fusion tests still pass after fix.
+
+Other findings verified SAFE:
+1. No raw event payload ever crosses the chrome.runtime.sendMessage bridge (only intent type + confidence + adaptation tags + supporting-event COUNT, never IDs).
+2. A malicious content script sending FUSION_INTENT_EMITTED with attacker-controlled `intent` → empty INTENT_ADAPTATION_MAP lookup → no-op. `suggestedAdaptations` is ignored by evaluateIntent (uses internal map).
+3. Rate limit (1500 ms per intent type) runs on same-origin attack path; can't be bypassed.
+5. dispose() is idempotent and clears all listeners/buffer/timers/rate-limit map.
+6. JS single-threaded → no setOptions TOCTOU.
+7. Compensation rule conditions are pure reads.
+8. `suggestedAdaptations` is fixed-length per intent (1-2 items); evaluateIntent uses internal map not attacker input.
+
+**Verdict: accepted (1 revise applied)** — scale of change matches additive sensor wiring pattern; no new egress paths; no new permissions.
+
+#### Phase 5 — deploy
+
+Pending: commit + push + `./deploy.sh` (expected to minor-bump v0.7.2 → v0.8.0 since `feat:` commit is present) + post-deploy `/api/version` + zip cross-check. BUG-011 manual zip rebuild + scp fallback ready if Git-Bash rsync stdio failure repeats.
+
+### Verification
+
+- 756 / 756 unit tests passing across all 3 packages (was 629 pre-session, +127 new)
+- `pnpm typecheck` green
+- `pnpm build` clean — content 366.36 KB (+21 KB for fusion)
+- BUG-008/012 IIFE guard: `node -c` green on built bundles
+- Zip rebuilt: 444,195 bytes, local + deploy/downloads/ in sync
+- Decision-engine INTENT_HINT adaptation path wired + gated by profile.fusionIntentMinConfidence (default 0.65)
+- No new manifest permissions; no new cross-origin fetches
+
+### Post-session state
+
+- Layer 5 fully wired: types + 4 pure modules + engine + content controller + adapters + popup Settings section + sidepanel Intelligence tab + background handlers + decision engine integration + docs + tests.
+- Fusion is default-ON (per spec: "core value, opt-out"), gated behind the profile master toggle. Every existing sensor continues to emit signals standalone — fusion is purely a layer on top.
+- Privacy invariant documented in `docs/features/multi-modal-fusion.md` and enforced in code: aggregate-only across the content/background boundary, no raw event payloads ever cross.
+- BUG-012 prevention held: the vite plugin correctly handles the new `@accessbridge/core/fusion` chunk graph without IIFE SyntaxError regression.
+
+### Open questions / carry-forward
+
+- **Neural intent model** — current 7-intent inference is rules-based. Plan V4 calls for a Phase 2 ML upgrade (ONNX Runtime Web on-device). Deferred; `InferIntent` signature is stable so swap-in is non-breaking.
+- **Cross-tab fusion** — out of scope per task; each tab's FusionController runs independently.
+- **Codex quota** exhausted until 2026-04-26 (same as Session 10). Remaining sessions must continue Sonnet/Opus fallback.
+- **BUG-011** (deploy.sh no-rezip + Windows rsync fallback) — still deferred; manual zip rebuild used this session.
+- **Action Items UI dead code** (Session 7 carry-over) — still unwired. Not touched this session.
+- **Shadow DOM + iframe traversal** for gaze targeting — a malicious iframe could evade the `document.elementFromPoint` call in `emitGazeSample`. Low priority.
+
+### Next actions
+
+1. Commit + push + `./deploy.sh` (v0.8.0 minor bump expected from Layer 5 `feat:` scope).
+2. Manual Chrome spot-check: enable mic + camera, verify popup Intelligence stats update live; trigger hesitation (hover + no click) and confirm INTENT_HINT adaptation dispatches.
+3. Re-attempt `codex:rescue` adversarial pass after 2026-04-26 quota reset if user wants belt-and-braces validation.
+
+### Agent utilization (Session 11)
+
+Opus: Phase 0 warm start, types contract authoring, core + content + background + popup + sidepanel integration, decision-engine `evaluateIntent`, NetworkQuality enum→number adapter fix after build failure, adapters.ts + controller.ts + IntelligencePanel.tsx + CSS + docs + FEATURES + ARCHITECTURE updates, 13 FusionController integration tests, Phase 3 diff review, Phase 4 adversarial pass + unbounded ring-buffer fix (finding #4), HANDOFF + RCA + this footer.
+Sonnet: 4 parallel subagents (Phase 1) wrote the 4 pure fusion modules + their 114 tests — quality-estimator (248 impl / 26 tests), compensator (154 / 25), intent-inference (365 / 43), fusion-engine (217 / 20). First attempt at fusion-engine aborted on my own "STOP if dependency missing" prompt guard; re-fired after intent-inference landed.
+Haiku: n/a — no bulk grep or many-files-for-one-fact task this session; all reads were targeted and path-known.
+codex:rescue: n/a — Codex quota exhausted (ChatGPT Plus limit; same wall as Session 10, resets 2026-04-26). Opus performed the 8-question adversarial pass solo; 1 finding applied (bounded `_recentIngestTimes` ring), 7 accepted.
+
+---
+
+## Session 10 — Vision-Assisted Semantic Recovery (Feature #5) (2026-04-21)
 
 ### Headline
 

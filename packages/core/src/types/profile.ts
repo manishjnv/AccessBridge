@@ -102,6 +102,15 @@ export interface AccessibilityProfile {
   environmentLightSampling: boolean;
   /** Sample ambient noise via microphone every 15s. Applies only when environmentSensingEnabled is true. */
   environmentNoiseSampling: boolean;
+  // --- Session 11: Multi-Modal Fusion (Layer 5) ---
+  /** Master toggle for unified multi-channel event fusion + intent inference. Core value, opt-out. */
+  fusionEnabled: boolean;
+  /** Sliding window size in milliseconds. 1000-10000. */
+  fusionWindowMs: number;
+  /** Enable cross-modal compensation rules (degraded channel → boost alternatives). */
+  fusionCompensationEnabled: boolean;
+  /** Minimum confidence (0.3-0.9) at which an inferred intent triggers an adaptation. */
+  fusionIntentMinConfidence: number;
 }
 
 export const DEFAULT_SENSORY_PROFILE: SensoryProfile = {
@@ -174,4 +183,9 @@ export const DEFAULT_PROFILE: AccessibilityProfile = {
   environmentSensingEnabled: false,
   environmentLightSampling: true,
   environmentNoiseSampling: true,
+  // --- Session 11: Multi-Modal Fusion (Layer 5) ---
+  fusionEnabled: true,
+  fusionWindowMs: 3000,
+  fusionCompensationEnabled: true,
+  fusionIntentMinConfidence: 0.65,
 };

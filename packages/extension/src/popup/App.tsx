@@ -944,6 +944,9 @@ function SettingsTab({
         </a>
       </div>
 
+      {/* --- Session 11: Multi-Modal Fusion --- */}
+      <FusionSection profile={profile} onSave={onSave} />
+
       <div className="space-y-1">
         <label className="text-xs text-a11y-muted">Adaptation Mode</label>
         <select
@@ -1073,5 +1076,152 @@ function SettingsTab({
         </button>
       </div>
     </>
+  );
+}
+
+// --- Session 11: Multi-Modal Fusion ---
+
+interface FusionStatsResponse {
+  running: boolean;
+  stats?: {
+    totalIngested: number;
+    eventsPerSec: number;
+    activeChannels: number;
+    dominantChannel: string | null;
+    degradedChannels: string[];
+    lastIntent: { intent: string; confidence: number } | null;
+  };
+  environmentConditions?: { lighting: string; noise: string; network: string; timeOfDay: string } | null;
+  activeRules?: string[];
+}
+
+function FusionSection({
+  profile,
+  onSave,
+}: {
+  profile: AccessibilityProfile;
+  onSave: (p: AccessibilityProfile) => void;
+}) {
+  const [stats, setStats] = useState<FusionStatsResponse | null>(null);
+
+  useEffect(() => {
+    if (!profile.fusionEnabled) {
+      setStats(null);
+      return;
+    }
+    let cancelled = false;
+    const poll = () => {
+      chrome.runtime
+        .sendMessage({ type: 'FUSION_GET_STATS' })
+        .then((r: unknown) => {
+          if (!cancelled) setStats(r as FusionStatsResponse);
+        })
+        .catch(() => {});
+    };
+    poll();
+    const id = setInterval(poll, 1500);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [profile.fusionEnabled]);
+
+  const update = (patch: Partial<AccessibilityProfile>) =>
+    onSave({ ...profile, ...patch, updatedAt: Date.now() });
+
+  return (
+    <div
+      className="bg-a11y-surface rounded-lg p-3 border border-a11y-primary/20"
+      style={{ borderLeft: '4px solid #7b68ee' }}
+    >
+      <div
+        className="text-xs font-bold uppercase tracking-wider mb-2"
+        style={{ color: '#bb86fc', letterSpacing: '1.2px' }}
+      >
+        Multi-Modal Fusion (Layer 5)
+      </div>
+      <p className="text-xs text-a11y-muted mb-3" style={{ lineHeight: 1.5 }}>
+        Unifies keyboard · mouse · gaze · voice · environment into one event
+        stream. Detects intent (reading, hesitation, abandoning…) and boosts
+        the most reliable channel when another is noisy.
+      </p>
+      <Toggle
+        label="Enable fusion"
+        value={profile.fusionEnabled}
+        onChange={(v) => update({ fusionEnabled: v })}
+      />
+      {profile.fusionEnabled && (
+        <>
+          <div className="mt-3">
+            <label className="text-xs text-a11y-muted">
+              Window size: {(profile.fusionWindowMs / 1000).toFixed(1)}s
+            </label>
+            <input
+              type="range"
+              min={1000}
+              max={10000}
+              step={500}
+              value={profile.fusionWindowMs}
+              onChange={(e) => update({ fusionWindowMs: parseInt(e.target.value, 10) })}
+              className="w-full"
+            />
+          </div>
+          <Toggle
+            label="Cross-modal compensation"
+            value={profile.fusionCompensationEnabled}
+            onChange={(v) => update({ fusionCompensationEnabled: v })}
+          />
+          <Slider
+            label="Intent confidence threshold"
+            value={profile.fusionIntentMinConfidence}
+            min={0.3}
+            max={0.9}
+            step={0.05}
+            onChange={(v) => update({ fusionIntentMinConfidence: v })}
+          />
+
+          {/* Live stats */}
+          {stats?.running && stats.stats && (
+            <div className="mt-3 space-y-1 text-xs">
+              <div className="flex justify-between">
+                <span className="text-a11y-muted">Active channels</span>
+                <span className="text-a11y-text font-mono">{stats.stats.activeChannels}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-a11y-muted">Dominant</span>
+                <span className="text-a11y-text font-mono">
+                  {stats.stats.dominantChannel ?? '—'}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-a11y-muted">Degraded</span>
+                <span className="text-a11y-text font-mono">
+                  {stats.stats.degradedChannels.length > 0
+                    ? stats.stats.degradedChannels.join(', ')
+                    : 'none'}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-a11y-muted">Events/sec</span>
+                <span className="text-a11y-text font-mono">{stats.stats.eventsPerSec}</span>
+              </div>
+              {stats.stats.lastIntent && (
+                <div className="flex justify-between">
+                  <span className="text-a11y-muted">Last intent</span>
+                  <span className="text-a11y-text font-mono">
+                    {stats.stats.lastIntent.intent} · {(stats.stats.lastIntent.confidence * 100).toFixed(0)}%
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+          {stats && !stats.running && (
+            <div className="mt-3 text-xs text-a11y-muted">
+              Fusion not running on this tab. Reload the page to activate.
+            </div>
+          )}
+        </>
+      )}
+    </div>
   );
 }

@@ -2268,3 +2268,53 @@
   background: #10b981;
   transition: width 0.2s;
 }
+
+/* --- Session 11: Multi-Modal Fusion (Layer 5) --- */
+/* Channel quality bars — used in popup + sidepanel Intelligence tab. */
+.a11y-fusion-channel-bar {
+  display: inline-block;
+  width: 40px;
+  height: 4px;
+  background: rgba(123, 104, 238, 0.12);
+  border-radius: 2px;
+  margin-right: 6px;
+  position: relative;
+  overflow: hidden;
+}
+.a11y-fusion-channel-bar-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  background: #10b981;
+  border-radius: 2px;
+  transition: width 0.2s, background 0.2s;
+}
+.a11y-fusion-channel-bar-fill.degraded {
+  background: #f59e0b;
+}
+.a11y-fusion-channel-bar-fill.off {
+  background: #64748b;
+}
+
+/* Transient intent badge — appears when a high-confidence intent fires. */
+.a11y-fusion-intent-badge {
+  position: fixed;
+  bottom: 120px;
+  right: 24px;
+  background: rgba(123, 104, 238, 0.95);
+  color: #ffffff;
+  padding: 6px 12px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  box-shadow: 0 4px 12px rgba(123, 104, 238, 0.35);
+  z-index: 999990;
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+}
+.a11y-fusion-intent-badge.visible {
+  opacity: 0.92;
+}
+

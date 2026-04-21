@@ -20,7 +20,9 @@
     "./gestures": "./src/gestures/index.ts",
     "./gestures/*": "./src/gestures/*",
     "./audit": "./src/audit/index.ts",
-    "./audit/*": "./src/audit/*"
+    "./audit/*": "./src/audit/*",
+    "./fusion": "./src/fusion/index.ts",
+    "./fusion/*": "./src/fusion/*"
   },
   "scripts": {
     "test": "vitest run",

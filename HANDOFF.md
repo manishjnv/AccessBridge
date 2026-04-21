@@ -1,6 +1,124 @@
 # AccessBridge - Shift Handoff
 
-## Last Session: Session 19 — Desktop Agent MVP (Tauri 2 + Windows UIA) + extension↔agent IPC + cross-surface profile sync foundation (Layer 6 → 80%, Feature #4 → 60%) (2026-04-21)
+## Last Session: Session 20 — Enterprise Deployment Track B (managed-policy lockdown + ADMX/ADML/mobileconfig/JSON templates + admin docs + observatory orgHash + landing-page enterprise surface + deploy.sh --with-enterprise) (2026-04-21)
+
+### Headline
+
+Landed Track B of the enterprise-deployment scope per explicit user approval on the pre-work split: ship the code + templates + docs that deliver real, durable value today, and defer the infra-dependent artifacts (signed MSI, MST transforms, IntuneWinAppUtil packaging, live SQLite migration for org_hash, EV code-signing) to Session 21 when the toolchain + production cert exist. This session produces a fully-wired chrome.storage.managed → profile lockdown pipeline in the extension, the full ADMX/ADML set for the 9 AccessBridge-specific admin policies plus Chrome's `ExtensionInstallForcelist` + `ExtensionSettings`, macOS mobileconfig + Linux JSON mirrors, en-US + hi-IN ADML localizations, four admin-facing deployment docs plus a DevOps signing strategy doc (with an explicit "what lockdown actually guarantees" section), the observatory publisher's `org_hash` propagation + stub server endpoints returning 501, a landing-page Enterprise section with three cards linking to downloads / docs / admin contact, and a `deploy.sh --with-enterprise` flag that zips the ADMX bundle. **Opus-solo adversarial pass caught a real proto-pollution bug** (featureNameToProfilePath(`__proto__`) returned Object.prototype via object-literal lookup — same class as RCA BUG-015; fixed by switching FEATURE_NAME_MAP to a `Map<>`). **Two additional MEDIUM-latent findings** — raw-wins-over-managed in org_hash precedence, and customAPIEndpoint accepting `javascript:`/`file://`/`http://` URLs — fixed before commit with `coerceHttpsUrl` + `coerceSemver` validators. **46 new vitest cases** (30 enterprise-policy behavior + 16 template-validation), bringing workspace total from 992 → 1098. **Version bumped to v0.19.0** across all 7 `package.json` + `manifest.json` files + the Chrome-extension ADMX's `minimum_version_required`.
+
+### Completed
+
+#### Phase 0 — Warm start (Opus)
+
+Ran `codex:setup` → codex-cli 0.118.0 authenticated, direct runtime ready. Parallel-read CLAUDE.md project + global, FEATURES, ARCHITECTURE, ROADMAP, UI_GUIDELINES, HANDOFF Session 19 header, RCA (all 16 entries — especially BUG-002 HTTPS/port-8300 invariant, BUG-008/012 IIFE guards, BUG-015 proto-pollution pattern that would recur in this session), docs/features/desktop-agent.md, memory index. Flagged to user five blockers in the Session 20 brief (stale v0.14.0 target, Chrome force-install needs HTTPS not raw IP, no EV cert, Rust toolchain still missing, plutil macOS-only). Offered Track A (full brief, honest stubs) vs Track B (real code + templates + docs, defer infra-dependent parts to Session 21); user chose Track B.
+
+#### Phase 1 — Parallel subagent burst (4 concurrent Sonnet agents)
+
+All four fired in a single message; non-overlapping file sets:
+
+- **Sonnet #1** — `packages/extension/src/background/enterprise/policy.ts` (NEW, ~366 LOC) + `packages/extension/src/background/enterprise/index.ts` (barrel) + additive edits to `background/index.ts` (import block, `currentManagedPolicy` / `currentLockdown` singletons, two new `MessageType` variants, SAVE_PROFILE handler re-applies merge, startup loadManagedPolicy + subscribeToPolicyChanges wiring, chrome.tabs broadcast of policy-forced profile) + `popup/App.tsx` (lockedKeys state, 10 s polling of `ENTERPRISE_GET_LOCKDOWN`, `isLocked()` helper, managed-policy banner above TabNav, `locked={...}` on every relevant toggle/slider across SensoryTab / CognitiveTab / MotorTab / SettingsTab) + `popup/components/Toggle.tsx` + `popup/components/Slider.tsx` (`locked` / `lockedReason` props). All 16 feature-name → profile-dot-path mappings implemented per spec.
+- **Sonnet #2** — 8 enterprise template files under `deploy/enterprise/`: `admx/AccessBridge.admx` (9 policies across 5 categories), `admx/en-US/AccessBridge.adml`, `admx/hi-IN/AccessBridge.adml` (Hindi translation, parity with en-US string-id set), `chrome-extension/AccessBridge-ChromeExtension.admx` + `.adml`, `chrome-extension/updates.xml` (v0.19.0), `chrome-extension/AccessBridge.mobileconfig` (Apple plist, PayloadType `com.apple.ManagedClient.preferences`, Chrome bundle `com.google.Chrome`), `chrome-extension/chrome-policy.json`. All use placeholder extension ID `abcdefghijklmnopqrstuvwxyzabcdef` with REPLACE-WITH-PRODUCTION-ID comment at every occurrence. Never references raw IP — only `https://accessbridge.space`.
+- **Sonnet #3** — 5 new docs: `deploy/enterprise/README.md` (303 lines, deployment matrix × 4 platforms + phased rollout × 3 waves + rollback procedures + 6-question FAQ), `docs/deployment/enterprise-chrome.md` (284 lines, Windows/macOS/Linux steps + 6-item verification checklist + 5 common-problems-with-fixes), `docs/deployment/sccm-intune.md` (298 lines, SCCM Classic Application Model + Intune Win32 App + detection rules; every MSI-dependent step marked with a "Session 21" blockquote since the MSI artifact doesn't exist yet), `docs/deployment/group-policy.md` (326 lines, all 9 policies reference-documented, ADMX Central Store install, GPO precedence, 4 worked example configurations for realistic deployment personas), `docs/operations/signing.md` (319 lines, dev vs prod keys, CRX + MSI signing, production deploy pipeline, revocation flow, key rotation with 30-day overlap, CI env-var reference, Session 20 blockers for 250k-scale deploy).
+- **Sonnet #4** — Observatory `org_hash` wiring: `observatory-publisher.ts` (`org_hash?: string` added to `RawCounters` + `NoisyBundle`, module-level `_managedOrgHash` + exported `setManagedOrgHash()` setter, conditional-spread in `aggregateDailyBundle` that omits the key entirely when `undefined`), `background/index.ts` (imports `setManagedOrgHash`, calls it at both policy-load sites), `ops/observatory/enterprise-endpoint.js` (NEW: Express sub-router with orgHash-regex middleware, three GET routes returning 501 until Session 21 migration), `ops/observatory/server.js` (+4 lines mounting the router at `/api/observatory/enterprise`).
+
+#### Phase 2 — Pre-review gates (Claude, deterministic)
+
+`pnpm typecheck` surfaced ONE failure: `App.tsx:1740 Cannot find name 'isLocked'` — Sonnet #1 missed threading `isLocked` through `FusionSection` component (line 1686). Claude self-fixed in place (2-line edit, hot cache). Secrets-scan clean. TODO/FIXME scan clean in `enterprise/`. All 8 template files + 5 docs + `enterprise-endpoint.js` exist on disk. Re-ran typecheck → green across all 5 packages.
+
+#### Phase 3 — Opus diff review (load-bearing paths)
+
+Reviewed the 4 edited load-bearing files diff-only (`background/index.ts`, `popup/App.tsx`, `observatory-publisher.ts`, `server.js`) plus the new `policy.ts`. Traced `saveProfile()` side-effect to confirm `currentProfile` is updated before `agentBridge.syncProfileOut` reads it. Noted the "momentary storage/memory divergence on startup" as intentional (supports policy-revocation rollback). Zero blockers; accepted for Phase 4 adversarial pass.
+
+#### Phase 4 — codex:rescue adversarial pass → user redirected to Opus-solo
+
+User said "opus takeover"; ran the full 12-question threat checklist Opus-solo per `feedback_rescue_fallback` memory. **One real finding the diff review had missed** + two additional latent findings fixed before commit:
+
+| # | Severity | Issue | Resolution |
+| --- | --- | --- | --- |
+| F1 | MEDIUM (real, caught by test) | `FEATURE_NAME_MAP['__proto__']` returns Object.prototype (truthy) — bypasses `if (!path)` guard in `mergeWithProfile`, reaches `setProfilePath` which would `TypeError` at runtime. Same class as RCA BUG-015. | Converted `FEATURE_NAME_MAP` from `Record<string,string>` object literal to `ReadonlyMap<string,string>`. `.get('__proto__')` now returns `undefined` cleanly. Replaced `FEATURE_NAME_MAP[key]` with `.get(key)` + `if (path === undefined)` guard at both call sites. Added regression test `featureNameToProfilePath('__proto__') → null`. |
+| F2 | MEDIUM (latent, Session-21-consumer) | `customAPIEndpoint: 'javascript:alert(1)'` / `'file:///C:/passwords.txt'` / `'http://evil'` accepted by coerceString; Session 21 wires the value into fetch() / AIEngine providers. | Added `coerceHttpsUrl()`: rejects non-HTTPS, length > 1024, control chars, unparseable; only accepts `https://...` through `new URL()` validator. Swapped in at the customAPIEndpoint call site. 3 new regression tests (scheme rejection, control-char rejection, length rejection). |
+| F3 | MEDIUM (latent) | `minimumAgentVersion: '1.2.3; rm -rf /'` accepted; future command interpolation risk. | Added `coerceSemver()` validator: strict `^\d+\.\d+\.\d+(-…)?(+…)?$` regex, length ≤ 64. 2 new regression tests (metacharacter rejection, valid-semver acceptance). |
+| F4 | MEDIUM (latent) | `raw.org_hash ?? _managedOrgHash` — caller-supplied raw value would override Group-Policy-set managed hash. | Flipped precedence to `_managedOrgHash ?? raw.org_hash`. Managed is now authoritative; `raw.org_hash` only applies in tests when no managed value is set. |
+| F5 | LOW (doc) | signing.md didn't explain that in-extension lockdown is an honest contract, not a cryptographic boundary. | Added "Enterprise Lockdown Security Model" section documenting the three-layer enforcement recipe: `ExtensionInstallForcelist` + `minimum_version_required` + `DeveloperToolsAvailability=0`. Threat-model coverage + what's OUT of scope. |
+| F6 | LOW (doc) | signing.md didn't cover mobileconfig signing. | Added "macOS mobileconfig Signing" section with the `security cms -S` command, verification command, and what signing does NOT give you (user can still remove with sudo). |
+| F7 | LOW | subscribeToPolicyChanges promise-ordering race on rapid policy pushes. | **Deferred** to Session 21 hardening — narrow window, direction is safer-state. |
+
+All cleared: proto-pollution in `parseManagedPolicyRaw` (reads only 10 literal keys, never `Object.keys(raw)` or `Object.assign`), `setProfilePath` computed-property bracket access (doesn't modify prototype chain for `__proto__`), ReDoS on orgHash regex (anchored + fixed-length), ADMX XXE (GPMC parser disables external entities), Chrome `ExtensionSettings` JSON injection (JSON.parse-only path), SAVE_PROFILE bypass via APPLY_ADAPTATION / AGENT_* (don't write profile), 10 s polling battery/DoS (popup ephemeral, BG subscribes not polls).
+
+#### Phase 5 — Landing page + deploy.sh (Opus direct, hot cache)
+
+`deploy/index.html`: new `/enterprise` route between `/desktop-agent` and `/github`. Three canonical-palette cards (Group Policy + ADMX / SCCM + Intune / macOS + Linux), each with icon (24 px SVG, stroke-width 2.5), heading (15 px 700), body (13 px, line-height 1.6), and link row (primary-tinted pill + muted "guide →"). "Enterprise" nav link inserted after "Agent". CSS block added with new `.enterprise-*` tokens — all values from UI_GUIDELINES canonical palette (`--primary`, `--accent`, `--glow`, `--surface`, `rgba(123,104,238,0.15)` at documented alpha stops); responsive grid collapses to single-column ≤ 900 px. `.enterprise-note` warning blockquote at the bottom is styled with the accent-tinted left border pattern from the guidelines. Two hrefs updated to point at the actual file locations under `chrome-extension/` subdir.
+
+`deploy.sh`: new `WITH_ENTERPRISE` flag parsed from `--with-enterprise`. New `[1.7/6]` step packages `deploy/enterprise/admx/`, `chrome-extension/`, and `README.md` into `deploy/enterprise/admx-bundle.zip` via `zip -rq` with a PowerShell `Compress-Archive` fallback for Windows Git Bash. WARN-and-continue on failure (individual files still sync via rsync). Header doc-comment block updated with the flag's usage.
+
+#### Phase 6 — Tests
+
+Opus wrote `packages/extension/src/background/__tests__/enterprise-policy.test.ts` (30 vitest cases: 11 loadManagedPolicy — unavailability / throw / empty / full parse / DWORD coercion / JSON-string-array coercion / malformed drop / HTTPS URL rejection × 3 / length cap / metachar rejection / semver validation / enum allowlist. 11 mergeWithProfile — empty-unchanged / enabled / disabled / disabled-wins / obs-opt-in true/false/undef / allowCloudAITier shadow / defaultLanguage / unknown name / shadow keys. 4 subscribeToPolicyChanges — managed-fires / other-areas-skip / unsubscribe / no-storage-fallback. 2 featureNameToProfilePath — known-case-insensitive / unknown+__proto__ returns null). Opus wrote `packages/core/src/audit/__tests__/enterprise-templates-validation.test.ts` (16 cases: AccessBridge.admx well-formedness + 9-policy coverage + enum values; ADML en-US/hi-IN parity + empty-string rejection; Chrome-ext ADMX placeholder-id + HTTPS-only URL; mobileconfig plist + PayloadType + UUID format; chrome-policy.json JSON.parse + URL allowlist; updates.xml gupdate namespace + CRX codebase + version). Codex parallel task (`codex exec` via codex-companion) failed silently with status 1 no-touched-files — Opus wrote both suites. 46/46 green. Workspace total: 1098 (prior 992 from Session 19 + 46 new + 60 that appear to have landed in intervening Session 19 fixes).
+
+#### Phase 7 — Build + stale-data scan + version bump + docs
+
+- `pnpm -r typecheck` — all 5 packages clean
+- `pnpm -r test` — 91 ai-engine + 98 onnx-runtime + 688 core + 221 extension = 1098 tests pass
+- `pnpm build` — 543 modules transformed, 21.93 s
+- `node -c dist/src/content/index.js` → OK (BUG-008 guard)
+- `node -c dist/src/background/index.js` → OK (BUG-012 guard)
+- Stale-data grep across new files: no `72.61.227.64`, no `& Team`, no `v0.14.0`, no stale `CURRENT_VERSION` — clean
+- Version bump: 0.18.0 → **0.19.0** across `packages/extension/manifest.json`, `packages/{extension,core,ai-engine,onnx-runtime,desktop-agent}/package.json`, root `package.json`, plus the Chrome-extension ADMX's `minimum_version_required: "0.19.0"` and `updates.xml`'s `version='0.19.0'` (already shipped by Sonnet #2)
+- FEATURES.md: added "Enterprise Deployment (Session 20)" section with ENT-01 … ENT-09 feature IDs + test count row; Feature-count summary bumped from 34 → 43
+
+### Files Changed / Added
+
+**NEW:**
+- `packages/extension/src/background/enterprise/policy.ts` + `index.ts` (barrel)
+- `packages/extension/src/background/__tests__/enterprise-policy.test.ts` (30 tests)
+- `packages/core/src/audit/__tests__/enterprise-templates-validation.test.ts` (16 tests)
+- `deploy/enterprise/admx/AccessBridge.admx` + `en-US/AccessBridge.adml` + `hi-IN/AccessBridge.adml`
+- `deploy/enterprise/chrome-extension/AccessBridge-ChromeExtension.admx` + `.adml` + `updates.xml` + `chrome-policy.json` + `AccessBridge.mobileconfig`
+- `deploy/enterprise/README.md`
+- `docs/deployment/enterprise-chrome.md` + `sccm-intune.md` + `group-policy.md`
+- `docs/operations/signing.md`
+- `ops/observatory/enterprise-endpoint.js`
+
+**MODIFIED:**
+- `packages/extension/src/background/index.ts` — +75 LOC (imports, singletons, SAVE_PROFILE merge, two MessageType variants, startup wiring + subscribeToPolicyChanges)
+- `packages/extension/src/background/observatory-publisher.ts` — +28 LOC (`org_hash` field on both interfaces, `_managedOrgHash` + `setManagedOrgHash()`, conditional spread in `aggregateDailyBundle`)
+- `packages/extension/src/popup/App.tsx` — +62 LOC (lockedKeys state, polling, `isLocked()`, banner, `locked={...}` on ~16 controls, FusionSection threading fix)
+- `packages/extension/src/popup/components/Toggle.tsx` + `Slider.tsx` — `locked` / `lockedReason` props
+- `ops/observatory/server.js` — +4 LOC mounting enterprise router
+- `deploy/index.html` — new `/enterprise` route (3 cards + CTA + note block) + CSS + nav link
+- `deploy.sh` — `--with-enterprise` flag + `[1.7/6]` bundle-zip step
+- All 7 `package.json` + `manifest.json` — 0.18.0 → 0.19.0
+- `FEATURES.md` — Enterprise Deployment section + count 34 → 43
+- `HANDOFF.md` — this entry
+
+### Next Session (Session 21) Priorities
+
+1. **Production code-signing infrastructure** — EV cert procurement (user must supply), Azure Key Vault integration, `tools/sign-extension.sh` + `tools/sign-package.ps1`.
+2. **Desktop Agent MSI build** (requires Rust + MSVC + WiX on dev machine or CI runner).
+3. **MST transforms** — `accessbridge-silent.mst`, `accessbridge-nopair.mst`, `accessbridge-logging.mst` via WixToolset `torch` (Windows-only).
+4. **Intune packaging** — `tools/build-intunewin.sh` wrapping Microsoft's `IntuneWinAppUtil.exe`.
+5. **SCCM PowerShell deploy scripts** — `deploy.ps1`, `uninstall.ps1`, `detection.ps1` under `deploy/enterprise/sccm/`.
+6. **Observatory SQLite migration** — `org_hash TEXT` column on `attestations` + `aggregated_daily` tables; un-stub the three `/api/observatory/enterprise/*` endpoints; add k-anonymity floor of 10 devices per orgHash before any per-org stat is returned.
+7. **Phase-2 subscribe-to-policy-changes race** — version counter to prevent out-of-order callbacks (the one deferred Phase 4 finding).
+8. **Test Windows machine run-through** — import ADMX → GPO push → verify force-install + toolbar-pin on a test machine; mobileconfig signed with a dev cert + installed via `profiles install` on a test Mac.
+
+### Load Extension in Chrome
+
+1. chrome://extensions/
+2. Enable Developer Mode
+3. Load unpacked → `E:\code\AccessBridge\packages\extension\dist`
+4. (Enterprise preview) open `deploy/index.html` → Enterprise section → browse the ADMX templates + admin docs
+
+### Session 20 — Agent Utilization Footer
+
+Opus: Phase 0 warm-start reads, Phase 2 gate re-run + self-fix FusionSection typing, Phase 3 diff review, Phase 4 adversarial pass (caught real proto-pollution + 2 latent MEDIUMs), Phase 5 landing-page + deploy.sh, Phase 6 both vitest suites, Phase 7 version bump + docs + commit prep.
+Sonnet: Phase 1 four parallel subagents — enterprise policy module + extension wiring + popup lockdown UI; ADMX/ADML/mobileconfig/JSON templates (8 files); 5 admin + DevOps docs (~1500 lines); observatory org_hash propagation + enterprise endpoint stub.
+Haiku: n/a — no bulk-grep / log-triage / multi-file-one-fact work surfaced this session.
+codex:rescue: user redirected to opus-solo takeover per `feedback_rescue_fallback` memory; Opus-solo adversarial pass ran instead and caught 1 real + 2 latent MEDIUM findings, all fixed before commit.
+
+---
+
+## Session 19 — Desktop Agent MVP (Tauri 2 + Windows UIA) + extension↔agent IPC + cross-surface profile sync foundation (Layer 6 → 80%, Feature #4 → 60%) (2026-04-21)
 
 ### Headline
 

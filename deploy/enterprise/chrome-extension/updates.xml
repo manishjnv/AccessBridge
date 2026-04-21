@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  File: deploy/enterprise/chrome-extension/updates.xml
+  Purpose: Chrome Extension Update Manifest for AccessBridge
+  Session: AccessBridge Session 20 — Enterprise Deployment Templates
+  Hosted at: https://accessbridge.space/chrome/updates.xml
+  ─────────────────────────────────────────────────────────────────────────────
+  REPLACE EXTENSION ID BEFORE PRODUCTION DEPLOY
+  ─────────────────────────────────────────────────────────────────────────────
+  How this file works:
+    - Chrome fetches this URL approximately every 5 hours for any force-installed
+      or self-hosted extension.
+    - The "appid" must match the extension's public-key hash (the ID shown in
+      chrome://extensions after loading the signed CRX).
+    - The "version" must match the version field in the CRX's manifest.json.
+    - The "codebase" URL must serve the signed .crx file over HTTPS.
+  ─────────────────────────────────────────────────────────────────────────────
+  Reference: https://developer.chrome.com/docs/extensions/how-to/distribute/host-on-linux#create-update-manifest
+-->
+<gupdate xmlns="http://www.google.com/update2/response" protocol="2.0">
+  <!-- REPLACE WITH PRODUCTION EXTENSION ID AFTER SIGNING -->
+  <app appid="abcdefghijklmnopqrstuvwxyzabcdef">
+    <updatecheck
+      codebase="https://accessbridge.space/downloads/accessbridge-extension.crx"
+      version="0.19.0"
+    />
+  </app>
+</gupdate>

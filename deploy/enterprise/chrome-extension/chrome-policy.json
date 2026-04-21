@@ -1,0 +1,36 @@
+{
+	"_comment": [
+		"File: deploy/enterprise/chrome-extension/chrome-policy.json",
+		"Purpose: Linux Chrome managed policy for AccessBridge force-install",
+		"Session: AccessBridge Session 20 — Enterprise Deployment Templates",
+		"Deploy path: /etc/opt/chrome/policies/managed/accessbridge.json",
+		"Required Chrome version: >= 88",
+		"REPLACE EXTENSION ID BEFORE PRODUCTION DEPLOY",
+		"",
+		"To deploy on Linux:",
+		"  sudo mkdir -p /etc/opt/chrome/policies/managed",
+		"  sudo cp accessbridge.json /etc/opt/chrome/policies/managed/accessbridge.json",
+		"  sudo chmod 644 /etc/opt/chrome/policies/managed/accessbridge.json",
+		"Restart Chrome for policies to take effect (or wait for policy refresh cycle).",
+		"Verify with: chrome://policy",
+		"",
+		"For Chromium-based browsers, the path is:",
+		"  /etc/chromium/policies/managed/accessbridge.json"
+	],
+
+	"ExtensionInstallForcelist": [
+		"abcdefghijklmnopqrstuvwxyzabcdef;https://accessbridge.space/chrome/updates.xml"
+	],
+
+	"ExtensionSettings": {
+		"abcdefghijklmnopqrstuvwxyzabcdef": {
+			"installation_mode": "force_installed",
+			"update_url": "https://accessbridge.space/chrome/updates.xml",
+			"toolbar_pin": "force_pinned",
+			"blocked_permissions": [],
+			"runtime_allowed_hosts": ["*"],
+			"runtime_blocked_hosts": [],
+			"minimum_version_required": "0.19.0"
+		}
+	}
+}

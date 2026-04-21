@@ -43,6 +43,8 @@ export interface RawCounters {
   onnx_inferences?: Record<string, number>;
   /** Session 17: voice STT tier usage counts. Keys: 'a' (Web Speech), 'b' (IndicWhisper ONNX), 'c' (cloud). */
   voice_tier_counts?: Record<string, number>;
+  /** Session 20: orgHash — opaque Merkle hash of org device ring, set by Group Policy. Never transmitted when absent. */
+  org_hash?: string;
 }
 
 export interface NoisyBundle {
@@ -59,6 +61,8 @@ export interface NoisyBundle {
   voice_tier_counts: Record<string, number>;
   merkle_root: string;
   schema_version: 1;
+  /** Session 20: orgHash — opaque Merkle hash of org device ring, set by Group Policy. Never transmitted when absent. */
+  org_hash?: string;
 }
 
 export interface PublishResult {
@@ -209,6 +213,25 @@ function canonicalLines(bundle: {
   return lines;
 }
 
+// ---------- Session 20: org_hash wiring ----------
+
+/**
+ * Module-level org_hash set by background/index.ts after the managed policy
+ * loads. The value originates from Group Policy (Chrome managed storage) and
+ * is an opaque 64-hex Merkle hash identifying the enterprise device ring.
+ * When absent (non-managed installs), the field is omitted from published
+ * bundles entirely — `undefined` serialises as absence in JSON.stringify.
+ */
+let _managedOrgHash: string | undefined;
+
+/**
+ * Called by background/index.ts once the managed policy has loaded (and again
+ * whenever the policy changes). Pass `undefined` to clear.
+ */
+export function setManagedOrgHash(hash: string | undefined): void {
+  _managedOrgHash = hash;
+}
+
 /**
  * Apply Laplace noise (ε=1, sensitivity=1) to every numeric counter and
  * compute a Merkle commitment over the canonicalized noised bundle.
@@ -274,10 +297,18 @@ export async function aggregateDailyBundle(
   const lines = canonicalLines(partial);
   const merkle_root = await merkleRoot(lines);
 
+  // Session 20: include org_hash only when present — undefined omits the key
+  // entirely from the JSON payload so non-managed bundles are unchanged.
+  // Managed (Group-Policy-supplied) value is authoritative: if a caller ever
+  // passes raw.org_hash (e.g. in tests), managed still wins. Prevents a
+  // compromised counter-producer from overriding the enterprise device-ring.
+  const org_hash = _managedOrgHash ?? raw.org_hash;
+
   return {
     ...partial,
     merkle_root,
     schema_version: 1,
+    ...(org_hash !== undefined ? { org_hash } : {}),
   };
 }
 

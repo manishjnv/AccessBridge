@@ -1,0 +1,332 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  File: deploy/enterprise/admx/AccessBridge.admx
+  Purpose: Windows Group Policy ADMX — AccessBridge application policies (9 policies)
+  Session: AccessBridge Session 20 — Enterprise Deployment Templates
+  Registry path: HKLM\SOFTWARE\Policies\AccessBridge
+  Schema version: 1.0
+  Copy this file (and the matching .adml) to:
+    %SystemRoot%\PolicyDefinitions\AccessBridge.admx
+    %SystemRoot%\PolicyDefinitions\en-US\AccessBridge.adml
+  Or to the SYSVOL central store:
+    \\<domain>\SYSVOL\<domain>\Policies\PolicyDefinitions\AccessBridge.admx
+    \\<domain>\SYSVOL\<domain>\Policies\PolicyDefinitions\en-US\AccessBridge.adml
+-->
+<policyDefinitions
+  xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions"
+  xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  revision="1.0"
+  schemaVersion="1.0">
+
+  <policyNamespaces>
+    <target prefix="accessbridge" namespace="urn:accessbridge:policy" />
+    <using prefix="windows" namespace="Microsoft.Policies.Windows" />
+  </policyNamespaces>
+
+  <resources minRequiredRevision="1.0" />
+
+  <supportedOn>
+    <definitions>
+      <definition name="AccessBridge_Support"
+        displayName="$(string.AccessBridge_Support)" />
+    </definitions>
+  </supportedOn>
+
+  <!--
+    Category tree:
+      AccessBridge
+        Accessibility
+        Privacy
+        AIEngine
+        Profile
+        Agent
+  -->
+  <categories>
+    <category name="AccessBridge" displayName="$(string.Cat_AccessBridge)">
+      <parentCategory ref="windows:WindowsComponents" />
+    </category>
+    <category name="Accessibility" displayName="$(string.Cat_Accessibility)">
+      <parentCategory ref="AccessBridge" />
+    </category>
+    <category name="Privacy" displayName="$(string.Cat_Privacy)">
+      <parentCategory ref="AccessBridge" />
+    </category>
+    <category name="AIEngine" displayName="$(string.Cat_AIEngine)">
+      <parentCategory ref="AccessBridge" />
+    </category>
+    <category name="Profile" displayName="$(string.Cat_Profile)">
+      <parentCategory ref="AccessBridge" />
+    </category>
+    <category name="Agent" displayName="$(string.Cat_Agent)">
+      <parentCategory ref="AccessBridge" />
+    </category>
+  </categories>
+
+  <policies>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════
+         CATEGORY: Accessibility
+         Policies: EnabledFeaturesLockdown, DisabledFeaturesLockdown
+         ═══════════════════════════════════════════════════════════════════════ -->
+
+    <!--
+      Policy: EnabledFeaturesLockdown
+      Type: REG_MULTI_SZ (multiText)
+      Registry: HKLM\SOFTWARE\Policies\AccessBridge\EnabledFeaturesLockdown
+      Description: Feature names that the administrator mandates ON.
+    -->
+    <policy
+      name="EnabledFeaturesLockdown"
+      class="Machine"
+      displayName="$(string.EnabledFeaturesLockdown_DisplayName)"
+      explainText="$(string.EnabledFeaturesLockdown_Description)"
+      presentation="$(presentation.EnabledFeaturesLockdown)"
+      key="SOFTWARE\Policies\AccessBridge">
+      <parentCategory ref="Accessibility" />
+      <supportedOn ref="AccessBridge_Support" />
+      <elements>
+        <multiText
+          id="EnabledFeaturesLockdown_MultiText"
+          valueName="EnabledFeaturesLockdown"
+        />
+      </elements>
+    </policy>
+
+    <!--
+      Policy: DisabledFeaturesLockdown
+      Type: REG_MULTI_SZ (multiText)
+      Registry: HKLM\SOFTWARE\Policies\AccessBridge\DisabledFeaturesLockdown
+      Description: Feature names that the administrator mandates OFF.
+    -->
+    <policy
+      name="DisabledFeaturesLockdown"
+      class="Machine"
+      displayName="$(string.DisabledFeaturesLockdown_DisplayName)"
+      explainText="$(string.DisabledFeaturesLockdown_Description)"
+      presentation="$(presentation.DisabledFeaturesLockdown)"
+      key="SOFTWARE\Policies\AccessBridge">
+      <parentCategory ref="Accessibility" />
+      <supportedOn ref="AccessBridge_Support" />
+      <elements>
+        <multiText
+          id="DisabledFeaturesLockdown_MultiText"
+          valueName="DisabledFeaturesLockdown"
+        />
+      </elements>
+    </policy>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════
+         CATEGORY: Privacy
+         Policies: ObservatoryOptInRequired, TelemetryLevel
+         ═══════════════════════════════════════════════════════════════════════ -->
+
+    <!--
+      Policy: ObservatoryOptInRequired
+      Type: REG_DWORD (boolean)
+      Registry: HKLM\SOFTWARE\Policies\AccessBridge\ObservatoryOptInRequired
+      Values: 1 = force opt-in, 0 = force opt-out, (not configured) = user choice
+    -->
+    <policy
+      name="ObservatoryOptInRequired"
+      class="Machine"
+      displayName="$(string.ObservatoryOptInRequired_DisplayName)"
+      explainText="$(string.ObservatoryOptInRequired_Description)"
+      presentation="$(presentation.ObservatoryOptInRequired)"
+      key="SOFTWARE\Policies\AccessBridge"
+      valueName="ObservatoryOptInRequired">
+      <parentCategory ref="Privacy" />
+      <supportedOn ref="AccessBridge_Support" />
+      <enabledValue>
+        <decimal value="1" />
+      </enabledValue>
+      <disabledValue>
+        <decimal value="0" />
+      </disabledValue>
+    </policy>
+
+    <!--
+      Policy: TelemetryLevel
+      Type: REG_SZ (enum)
+      Registry: HKLM\SOFTWARE\Policies\AccessBridge\TelemetryLevel
+      Values: "none" | "aggregated" | "full"
+    -->
+    <policy
+      name="TelemetryLevel"
+      class="Machine"
+      displayName="$(string.TelemetryLevel_DisplayName)"
+      explainText="$(string.TelemetryLevel_Description)"
+      presentation="$(presentation.TelemetryLevel)"
+      key="SOFTWARE\Policies\AccessBridge">
+      <parentCategory ref="Privacy" />
+      <supportedOn ref="AccessBridge_Support" />
+      <elements>
+        <enum
+          id="TelemetryLevel_Enum"
+          valueName="TelemetryLevel"
+          required="true">
+          <item displayName="$(string.TelemetryLevel_None)">
+            <value><string>none</string></value>
+          </item>
+          <item displayName="$(string.TelemetryLevel_Aggregated)">
+            <value><string>aggregated</string></value>
+          </item>
+          <item displayName="$(string.TelemetryLevel_Full)">
+            <value><string>full</string></value>
+          </item>
+        </enum>
+      </elements>
+    </policy>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════
+         CATEGORY: AIEngine
+         Policies: AllowCloudAITier, CustomAPIEndpoint
+         ═══════════════════════════════════════════════════════════════════════ -->
+
+    <!--
+      Policy: AllowCloudAITier
+      Type: REG_DWORD (boolean)
+      Registry: HKLM\SOFTWARE\Policies\AccessBridge\AllowCloudAITier
+      Values: 1 = permit Tier 2 API providers, 0 = block (default)
+    -->
+    <policy
+      name="AllowCloudAITier"
+      class="Machine"
+      displayName="$(string.AllowCloudAITier_DisplayName)"
+      explainText="$(string.AllowCloudAITier_Description)"
+      presentation="$(presentation.AllowCloudAITier)"
+      key="SOFTWARE\Policies\AccessBridge"
+      valueName="AllowCloudAITier">
+      <parentCategory ref="AIEngine" />
+      <supportedOn ref="AccessBridge_Support" />
+      <enabledValue>
+        <decimal value="1" />
+      </enabledValue>
+      <disabledValue>
+        <decimal value="0" />
+      </disabledValue>
+    </policy>
+
+    <!--
+      Policy: CustomAPIEndpoint
+      Type: REG_SZ (text)
+      Registry: HKLM\SOFTWARE\Policies\AccessBridge\CustomAPIEndpoint
+      Description: Override the default AI provider URL with a custom endpoint.
+    -->
+    <policy
+      name="CustomAPIEndpoint"
+      class="Machine"
+      displayName="$(string.CustomAPIEndpoint_DisplayName)"
+      explainText="$(string.CustomAPIEndpoint_Description)"
+      presentation="$(presentation.CustomAPIEndpoint)"
+      key="SOFTWARE\Policies\AccessBridge">
+      <parentCategory ref="AIEngine" />
+      <supportedOn ref="AccessBridge_Support" />
+      <elements>
+        <text
+          id="CustomAPIEndpoint_Text"
+          valueName="CustomAPIEndpoint"
+          required="false"
+          maxLength="2048"
+        />
+      </elements>
+    </policy>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════
+         CATEGORY: Profile
+         Policies: DefaultLanguage, ProfileSyncMode
+         ═══════════════════════════════════════════════════════════════════════ -->
+
+    <!--
+      Policy: DefaultLanguage
+      Type: REG_SZ (text)
+      Registry: HKLM\SOFTWARE\Policies\AccessBridge\DefaultLanguage
+      Description: BCP-47 language tag for the extension's default language.
+    -->
+    <policy
+      name="DefaultLanguage"
+      class="Machine"
+      displayName="$(string.DefaultLanguage_DisplayName)"
+      explainText="$(string.DefaultLanguage_Description)"
+      presentation="$(presentation.DefaultLanguage)"
+      key="SOFTWARE\Policies\AccessBridge">
+      <parentCategory ref="Profile" />
+      <supportedOn ref="AccessBridge_Support" />
+      <elements>
+        <text
+          id="DefaultLanguage_Text"
+          valueName="DefaultLanguage"
+          required="false"
+          maxLength="35"
+        />
+      </elements>
+    </policy>
+
+    <!--
+      Policy: ProfileSyncMode
+      Type: REG_SZ (enum)
+      Registry: HKLM\SOFTWARE\Policies\AccessBridge\ProfileSyncMode
+      Values: "off" | "local-only" | "relay"
+    -->
+    <policy
+      name="ProfileSyncMode"
+      class="Machine"
+      displayName="$(string.ProfileSyncMode_DisplayName)"
+      explainText="$(string.ProfileSyncMode_Description)"
+      presentation="$(presentation.ProfileSyncMode)"
+      key="SOFTWARE\Policies\AccessBridge">
+      <parentCategory ref="Profile" />
+      <supportedOn ref="AccessBridge_Support" />
+      <elements>
+        <enum
+          id="ProfileSyncMode_Enum"
+          valueName="ProfileSyncMode"
+          required="true">
+          <item displayName="$(string.ProfileSyncMode_Off)">
+            <value><string>off</string></value>
+          </item>
+          <item displayName="$(string.ProfileSyncMode_LocalOnly)">
+            <value><string>local-only</string></value>
+          </item>
+          <item displayName="$(string.ProfileSyncMode_Relay)">
+            <value><string>relay</string></value>
+          </item>
+        </enum>
+      </elements>
+    </policy>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════
+         CATEGORY: Agent
+         Policies: MinimumAgentVersion
+         ═══════════════════════════════════════════════════════════════════════ -->
+
+    <!--
+      Policy: MinimumAgentVersion
+      Type: REG_SZ (text)
+      Registry: HKLM\SOFTWARE\Policies\AccessBridge\MinimumAgentVersion
+      Description: Minimum semver for the AccessBridge desktop agent.
+                   Extension will warn (or block, per future policy) when the
+                   companion agent version is below this threshold.
+    -->
+    <policy
+      name="MinimumAgentVersion"
+      class="Machine"
+      displayName="$(string.MinimumAgentVersion_DisplayName)"
+      explainText="$(string.MinimumAgentVersion_Description)"
+      presentation="$(presentation.MinimumAgentVersion)"
+      key="SOFTWARE\Policies\AccessBridge">
+      <parentCategory ref="Agent" />
+      <supportedOn ref="AccessBridge_Support" />
+      <elements>
+        <text
+          id="MinimumAgentVersion_Text"
+          valueName="MinimumAgentVersion"
+          required="false"
+          maxLength="30"
+        />
+      </elements>
+    </policy>
+
+  </policies>
+
+</policyDefinitions>

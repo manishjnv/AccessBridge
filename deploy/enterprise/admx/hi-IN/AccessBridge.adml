@@ -1,0 +1,299 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  File: deploy/enterprise/admx/hi-IN/AccessBridge.adml
+  Purpose: Hindi (hi-IN) ADML localization for AccessBridge.admx (9 policies)
+  Session: AccessBridge Session 20 — Enterprise Deployment Templates
+  Language: hi-IN (Hindi, India)
+  Note: String IDs must match en-US exactly. Translations are faithful and professional.
+-->
+<policyDefinitionResources
+  xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions"
+  xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  revision="1.0"
+  schemaVersion="1.0">
+
+  <displayName>AccessBridge — एप्लिकेशन समूह नीति</displayName>
+  <description>
+    AccessBridge एम्बिएंट एक्सेसिबिलिटी प्लेटफ़ॉर्म के लिए समूह नीति परिभाषाएँ।
+    ये नीतियाँ IT व्यवस्थापकों को सुविधाएँ लॉक करने, गोपनीयता/टेलीमेट्री नियंत्रित
+    करने, AI इंजन पहुँच कॉन्फ़िगर करने, प्रोफ़ाइल सिंक प्रबंधित करने और डेस्कटॉप
+    एजेंट संस्करण आवश्यकताएँ लागू करने की अनुमति देती हैं।
+    रजिस्ट्री पथ: HKLM\SOFTWARE\Policies\AccessBridge
+  </description>
+
+  <resources>
+    <stringTable>
+
+      <!-- ── Supported-on strings ───────────────────────────────────────────── -->
+      <string id="AccessBridge_Support">
+        AccessBridge 0.19.0 या बाद का संस्करण, Windows 10 (20H2) या बाद का
+      </string>
+
+      <!-- ── Category display names ─────────────────────────────────────────── -->
+      <string id="Cat_AccessBridge">AccessBridge</string>
+      <string id="Cat_Accessibility">सुगम्यता</string>
+      <string id="Cat_Privacy">गोपनीयता</string>
+      <string id="Cat_AIEngine">AI इंजन</string>
+      <string id="Cat_Profile">प्रोफ़ाइल</string>
+      <string id="Cat_Agent">डेस्कटॉप एजेंट</string>
+
+      <!-- ══════════════════════════════════════════════════════════════════════
+           Policy 1: EnabledFeaturesLockdown
+           ══════════════════════════════════════════════════════════════════════ -->
+      <string id="EnabledFeaturesLockdown_DisplayName">
+        सुगम्यता सुविधाएँ — अनिवार्य रूप से चालू
+      </string>
+      <string id="EnabledFeaturesLockdown_Description">
+        उन AccessBridge सुविधाओं के नाम निर्दिष्ट करता है जिन्हें इस मशीन के
+        सभी उपयोगकर्ताओं के लिए अनिवार्य रूप से चालू रखा जाएगा। उपयोगकर्ता
+        इन सुविधाओं को एक्सटेंशन पॉपअप से बंद नहीं कर सकते।
+
+        प्रत्येक पंक्ति में एक सुविधा का नाम दर्ज करें (केस-असंवेदनशील)।
+        उदाहरण: HighContrast, FocusIndicator, TextZoom, ScreenReader
+
+        यदि कोई सुविधा का नाम EnabledFeaturesLockdown और
+        DisabledFeaturesLockdown दोनों में है, तो EnabledFeaturesLockdown
+        को प्राथमिकता मिलती है।
+
+        जब यह नीति कॉन्फ़िगर नहीं की गई हो, तो सभी सुविधाएँ उपयोगकर्ता की
+        व्यक्तिगत प्राथमिकताओं का पालन करती हैं।
+      </string>
+
+      <!-- ══════════════════════════════════════════════════════════════════════
+           Policy 2: DisabledFeaturesLockdown
+           ══════════════════════════════════════════════════════════════════════ -->
+      <string id="DisabledFeaturesLockdown_DisplayName">
+        सुगम्यता सुविधाएँ — अनिवार्य रूप से बंद
+      </string>
+      <string id="DisabledFeaturesLockdown_Description">
+        उन AccessBridge सुविधाओं के नाम निर्दिष्ट करता है जिन्हें इस मशीन के
+        सभी उपयोगकर्ताओं के लिए अनिवार्य रूप से बंद रखा जाएगा। उपयोगकर्ता
+        इन सुविधाओं को एक्सटेंशन पॉपअप से चालू नहीं कर सकते।
+
+        प्रत्येक पंक्ति में एक सुविधा का नाम दर्ज करें (केस-असंवेदनशील)।
+        उदाहरण: HighContrast, FocusIndicator, TextZoom, ScreenReader
+
+        यदि कोई सुविधा का नाम EnabledFeaturesLockdown और
+        DisabledFeaturesLockdown दोनों में है, तो EnabledFeaturesLockdown
+        को प्राथमिकता मिलती है।
+
+        जब यह नीति कॉन्फ़िगर नहीं की गई हो, तो सभी सुविधाएँ उपयोगकर्ता की
+        व्यक्तिगत प्राथमिकताओं का पालन करती हैं।
+      </string>
+
+      <!-- ══════════════════════════════════════════════════════════════════════
+           Policy 3: ObservatoryOptInRequired
+           ══════════════════════════════════════════════════════════════════════ -->
+      <string id="ObservatoryOptInRequired_DisplayName">
+        अनुपालन वेधशाला ऑप्ट-इन
+      </string>
+      <string id="ObservatoryOptInRequired_Description">
+        नियंत्रित करता है कि AccessBridge अनुपालन वेधशाला एंटरप्राइज़ रिले को
+        गुमनाम एक्सेसिबिलिटी मेट्रिक्स प्रकाशित करती है या नहीं।
+
+        सक्षम होने पर: उपयोगकर्ता की व्यक्तिगत प्राथमिकता की परवाह किए बिना
+        वेधशाला को मेट्रिक्स प्रकाशित करने के लिए बाध्य करता है। विनियमित
+        परिवेशों में अनुपालन लेखा-परीक्षण के लिए उपयोगी है।
+
+        अक्षम होने पर: उपयोगकर्ता प्राथमिकता की परवाह किए बिना वेधशाला को
+        बंद करने के लिए बाध्य करता है। सख्त डेटा-न्यूनीकरण आवश्यकताओं को
+        पूरा करने के लिए इस सेटिंग का उपयोग करें।
+
+        कॉन्फ़िगर न होने पर: पॉपअप में उपयोगकर्ता की व्यक्तिगत वेधशाला
+        प्राथमिकता सेटिंग लागू होती है।
+      </string>
+
+      <!-- ══════════════════════════════════════════════════════════════════════
+           Policy 4: TelemetryLevel
+           ══════════════════════════════════════════════════════════════════════ -->
+      <string id="TelemetryLevel_DisplayName">टेलीमेट्री स्तर</string>
+      <string id="TelemetryLevel_Description">
+        AccessBridge द्वारा एकत्र और प्रसारित किए जाने वाले अधिकतम टेलीमेट्री
+        स्तर को निर्धारित करता है। उपयोगकर्ता यहाँ कॉन्फ़िगर किए गए स्तर से
+        कम स्तर चुन सकते हैं लेकिन इससे ऊपर नहीं जा सकते।
+
+        कोई नहीं — कोई टेलीमेट्री डेटा एकत्र या प्रसारित नहीं किया जाता।
+
+        एकत्रित — केवल गुमनाम, एकत्रित मेट्रिक्स एकत्र किए जाते हैं (जैसे
+        सुविधा उपयोग गणना, सत्र अवधि)।
+
+        पूर्ण — सभी टेलीमेट्री श्रेणियाँ सक्षम हैं। केवल आंतरिक परीक्षण
+        प्रणालियों के लिए अनुशंसित।
+
+        कॉन्फ़िगर न होने पर: उपयोगकर्ता अपनी टेलीमेट्री प्राथमिकता स्वयं
+        नियंत्रित करता है।
+      </string>
+      <string id="TelemetryLevel_None">कोई नहीं — कोई टेलीमेट्री नहीं</string>
+      <string id="TelemetryLevel_Aggregated">एकत्रित — केवल गुमनाम मेट्रिक्स</string>
+      <string id="TelemetryLevel_Full">पूर्ण — सभी टेलीमेट्री श्रेणियाँ</string>
+
+      <!-- ══════════════════════════════════════════════════════════════════════
+           Policy 5: AllowCloudAITier
+           ══════════════════════════════════════════════════════════════════════ -->
+      <string id="AllowCloudAITier_DisplayName">
+        क्लाउड AI प्रदाता (Tier 2) की अनुमति दें
+      </string>
+      <string id="AllowCloudAITier_Description">
+        नियंत्रित करता है कि AccessBridge सुगम्यता सहायता के लिए Tier 2
+        (क्लाउड-होस्टेड) AI प्रदाताओं का उपयोग कर सकती है या नहीं।
+
+        सक्षम होने पर: एक्सटेंशन कॉन्फ़िगर किए गए क्लाउड AI एंडपॉइंट पर
+        अनुरोध पेलोड भेज सकता है।
+
+        अक्षम होने पर (डिफ़ॉल्ट): सभी AI अनुमान Tier 1 (स्थानीय/ऑन-डिवाइस)
+        प्रदाताओं तक सीमित है। कोई एक्सेसिबिलिटी सामग्री बाहरी AI सेवाओं को
+        प्रसारित नहीं की जाती। उच्च-सुरक्षा परिवेशों के लिए अनुशंसित।
+
+        कॉन्फ़िगर न होने पर: क्लाउड AI पहुँच डिफ़ॉल्ट रूप से अक्षम है।
+      </string>
+
+      <!-- ══════════════════════════════════════════════════════════════════════
+           Policy 6: CustomAPIEndpoint
+           ══════════════════════════════════════════════════════════════════════ -->
+      <string id="CustomAPIEndpoint_DisplayName">
+        कस्टम AI प्रदाता एंडपॉइंट URL
+      </string>
+      <string id="CustomAPIEndpoint_Description">
+        डिफ़ॉल्ट AI प्रदाता URL को कस्टम HTTPS एंडपॉइंट से बदलता है। इस नीति
+        का उपयोग AccessBridge को किसी आंतरिक AI अनुमान सर्वर या एंटरप्राइज़
+        API गेटवे पर निर्देशित करने के लिए करें।
+
+        मान एक पूर्ण-योग्य HTTPS URL होना चाहिए, उदाहरण:
+          https://ai-gateway.corp.example.com/v1/accessibility
+
+        यदि AllowCloudAITier अक्षम है, तो इस नीति का कोई प्रभाव नहीं होता।
+
+        कॉन्फ़िगर न होने पर: AccessBridge अपने अंतर्निर्मित डिफ़ॉल्ट AI
+        प्रदाता एंडपॉइंट का उपयोग करता है।
+      </string>
+
+      <!-- ══════════════════════════════════════════════════════════════════════
+           Policy 7: DefaultLanguage
+           ══════════════════════════════════════════════════════════════════════ -->
+      <string id="DefaultLanguage_DisplayName">डिफ़ॉल्ट इंटरफ़ेस भाषा</string>
+      <string id="DefaultLanguage_Description">
+        AccessBridge एक्सटेंशन इंटरफ़ेस और एक्सेसिबिलिटी आउटपुट के लिए
+        डिफ़ॉल्ट BCP-47 भाषा टैग सेट करता है।
+
+        मान्य मानों के उदाहरण:
+          en-US  — अंग्रेज़ी (संयुक्त राज्य)
+          hi-IN  — हिंदी (भारत)
+          fr-FR  — फ़्रेंच (फ़्रांस)
+          ar-SA  — अरबी (सऊदी अरब)
+          ja-JP  — जापानी (जापान)
+
+        इस नीति के कॉन्फ़िगर होने पर, निर्दिष्ट भाषा प्रारंभिक डिफ़ॉल्ट के
+        रूप में उपयोग की जाती है।
+
+        कॉन्फ़िगर न होने पर: AccessBridge ब्राउज़र की भाषा प्राथमिकता
+        (navigator.language) का उपयोग करता है।
+      </string>
+
+      <!-- ══════════════════════════════════════════════════════════════════════
+           Policy 8: ProfileSyncMode
+           ══════════════════════════════════════════════════════════════════════ -->
+      <string id="ProfileSyncMode_DisplayName">प्रोफ़ाइल सिंक मोड</string>
+      <string id="ProfileSyncMode_Description">
+        नियंत्रित करता है कि उपयोगकर्ता की AccessBridge एक्सेसिबिलिटी प्रोफ़ाइल
+        डिवाइसों के बीच कैसे सिंक्रनाइज़ की जाती है।
+
+        बंद — प्रोफ़ाइल सिंक्रनाइज़ेशन अक्षम है। सभी प्राथमिकताएँ स्थानीय
+        रूप से संग्रहीत हैं।
+
+        केवल स्थानीय — प्रोफ़ाइल केवल स्थानीय WebSocket IPC चैनल के माध्यम से
+        उसी मशीन पर Chrome एक्सटेंशन और AccessBridge डेस्कटॉप एजेंट के बीच
+        सिंक्रनाइज़ की जाती है।
+
+        क्लाउड रिले — प्रोफ़ाइल AccessBridge रिले सेवा के माध्यम से सिंक्रनाइज़
+        की जाती है, जिससे डिवाइसों के बीच एक्सेसिबिलिटी प्राथमिकताओं की
+        रोमिंग सक्षम होती है।
+
+        कॉन्फ़िगर न होने पर: डिफ़ॉल्ट "केवल स्थानीय" है।
+      </string>
+      <string id="ProfileSyncMode_Off">बंद — सिंक्रनाइज़ेशन अक्षम</string>
+      <string id="ProfileSyncMode_LocalOnly">केवल स्थानीय — डेस्कटॉप एजेंट के माध्यम से</string>
+      <string id="ProfileSyncMode_Relay">क्लाउड रिले — क्रॉस-डिवाइस प्रोफ़ाइल रोमिंग</string>
+
+      <!-- ══════════════════════════════════════════════════════════════════════
+           Policy 9: MinimumAgentVersion
+           ══════════════════════════════════════════════════════════════════════ -->
+      <string id="MinimumAgentVersion_DisplayName">
+        न्यूनतम डेस्कटॉप एजेंट संस्करण
+      </string>
+      <string id="MinimumAgentVersion_Description">
+        AccessBridge डेस्कटॉप एजेंट का न्यूनतम सेमवर संस्करण निर्दिष्ट करता
+        है जो एजेंट-निर्भर सुविधाओं के कार्य करने के लिए स्थापित होना चाहिए।
+        यदि पहचाना गया एजेंट संस्करण इस सीमा से कम है, तो एक्सटेंशन उपयोगकर्ता
+        को अपडेट करने के लिए प्रेरित करने वाला एक चेतावनी बैनर प्रदर्शित करेगा।
+
+        मान एक तीन-भाग का सेमवर स्ट्रिंग होना चाहिए, उदाहरण: 0.19.0
+
+        यह नीति केवल चेतावनी लागू करती है — यह एजेंट की आवश्यकता न रखने
+        वाली सुविधाओं को नहीं रोकती।
+
+        कॉन्फ़िगर न होने पर: कोई न्यूनतम संस्करण लागू नहीं होता।
+      </string>
+
+    </stringTable>
+
+    <presentationTable>
+
+      <presentation id="EnabledFeaturesLockdown">
+        <multiTextBox refId="EnabledFeaturesLockdown_MultiText">
+          अनिवार्य चालू सुविधाएँ (प्रति पंक्ति एक, केस-असंवेदनशील)
+        </multiTextBox>
+      </presentation>
+
+      <presentation id="DisabledFeaturesLockdown">
+        <multiTextBox refId="DisabledFeaturesLockdown_MultiText">
+          अनिवार्य बंद सुविधाएँ (प्रति पंक्ति एक, केस-असंवेदनशील)
+        </multiTextBox>
+      </presentation>
+
+      <presentation id="ObservatoryOptInRequired">
+        <!-- Boolean policy — no additional presentation elements needed -->
+      </presentation>
+
+      <presentation id="TelemetryLevel">
+        <dropdownList refId="TelemetryLevel_Enum" defaultItem="0">
+          टेलीमेट्री स्तर
+        </dropdownList>
+      </presentation>
+
+      <presentation id="AllowCloudAITier">
+        <!-- Boolean policy — no additional presentation elements needed -->
+      </presentation>
+
+      <presentation id="CustomAPIEndpoint">
+        <textBox refId="CustomAPIEndpoint_Text">
+          <label>कस्टम AI प्रदाता एंडपॉइंट URL (HTTPS)</label>
+          <defaultValue>https://</defaultValue>
+        </textBox>
+      </presentation>
+
+      <presentation id="DefaultLanguage">
+        <textBox refId="DefaultLanguage_Text">
+          <label>BCP-47 भाषा टैग (जैसे en-US, hi-IN, fr-FR)</label>
+          <defaultValue>hi-IN</defaultValue>
+        </textBox>
+      </presentation>
+
+      <presentation id="ProfileSyncMode">
+        <dropdownList refId="ProfileSyncMode_Enum" defaultItem="1">
+          प्रोफ़ाइल सिंक मोड
+        </dropdownList>
+      </presentation>
+
+      <presentation id="MinimumAgentVersion">
+        <textBox refId="MinimumAgentVersion_Text">
+          <label>न्यूनतम एजेंट संस्करण (सेमवर, जैसे 0.19.0)</label>
+          <defaultValue>0.19.0</defaultValue>
+        </textBox>
+      </presentation>
+
+    </presentationTable>
+
+  </resources>
+
+</policyDefinitionResources>

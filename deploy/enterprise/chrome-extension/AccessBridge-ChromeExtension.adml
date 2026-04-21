@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  File: deploy/enterprise/chrome-extension/AccessBridge-ChromeExtension.adml
+  Purpose: English (en-US) ADML localization for AccessBridge-ChromeExtension.admx
+  Session: AccessBridge Session 20 — Enterprise Deployment Templates
+  Language: en-US
+  REPLACE EXTENSION ID BEFORE PRODUCTION DEPLOY
+-->
+<policyDefinitionResources
+  xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions"
+  xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  revision="1.0"
+  schemaVersion="1.0">
+
+  <displayName>AccessBridge Chrome Extension Group Policy</displayName>
+  <description>
+    Group Policy definitions for deploying and configuring the AccessBridge
+    Chrome extension in enterprise environments. These policies control
+    force-installation and detailed extension settings via Chrome's
+    ExtensionInstallForcelist and ExtensionSettings mechanisms.
+  </description>
+
+  <resources>
+    <stringTable>
+
+      <!-- Support definition -->
+      <string id="AccessBridge_Chrome_Support">
+        Google Chrome 88 or later with Group Policy support
+      </string>
+
+      <!-- Category display names -->
+      <string id="Cat_Google">Google</string>
+      <string id="Cat_GoogleChrome">Google Chrome</string>
+      <string id="Cat_Extensions">Extensions</string>
+      <string id="Cat_AccessBridge">AccessBridge Accessibility Extension</string>
+
+      <!-- Policy 1: AccessBridgeForcedInstall -->
+      <string id="AccessBridgeForcedInstall_DisplayName">
+        Force-Install AccessBridge Extension
+      </string>
+      <string id="AccessBridgeForcedInstall_Description">
+        Adds the AccessBridge accessibility extension to Chrome's
+        ExtensionInstallForcelist. When this policy is enabled, Chrome will
+        silently install the extension from the enterprise update server
+        (https://accessbridge.space/chrome/updates.xml) without requiring
+        user interaction.
+
+        The value format is: &lt;extension-id&gt;;&lt;update-url&gt;
+
+        IMPORTANT: Replace the placeholder extension ID
+        "abcdefghijklmnopqrstuvwxyzabcdef" with the production-signed extension
+        ID before deploying. The production ID is derived from the CRX public
+        key hash and is visible in chrome://extensions after loading the signed
+        package.
+
+        When this policy is not configured, AccessBridge will not be
+        force-installed and users may install it voluntarily from the
+        Chrome Web Store.
+      </string>
+
+      <!-- Policy 2: AccessBridgeExtensionSettings -->
+      <string id="AccessBridgeExtensionSettings_DisplayName">
+        Configure AccessBridge Extension Settings
+      </string>
+      <string id="AccessBridgeExtensionSettings_Description">
+        Sets detailed configuration for the AccessBridge extension via Chrome's
+        ExtensionSettings policy. This JSON blob controls installation mode,
+        toolbar pinning, minimum required version, and network access rules.
+
+        The configured JSON structure:
+        {
+          "installation_mode": "force_installed",
+          "update_url": "https://accessbridge.space/chrome/updates.xml",
+          "toolbar_pin": "force_pinned",
+          "blocked_permissions": [],
+          "runtime_allowed_hosts": ["*"],
+          "runtime_blocked_hosts": [],
+          "minimum_version_required": "0.19.0"
+        }
+
+        IMPORTANT: The value name (registry entry key) must be the production
+        extension ID. Replace "abcdefghijklmnopqrstuvwxyzabcdef" with the
+        actual signed extension ID before deploying to production.
+
+        When this policy is not configured, the extension operates with
+        its built-in default settings.
+      </string>
+
+    </stringTable>
+
+    <presentationTable>
+
+      <presentation id="AccessBridgeForcedInstall">
+        <listBox refId="AccessBridgeForcedInstall_List">
+          Force-Install List Entry (format: extension-id;update-url)
+        </listBox>
+      </presentation>
+
+      <presentation id="AccessBridgeExtensionSettings">
+        <textBox refId="AccessBridgeExtensionSettings_Value">
+          <label>
+            Extension Settings JSON for extension ID
+            "abcdefghijklmnopqrstuvwxyzabcdef"
+            (REPLACE WITH PRODUCTION EXTENSION ID)
+          </label>
+        </textBox>
+      </presentation>
+
+    </presentationTable>
+
+  </resources>
+
+</policyDefinitionResources>

@@ -766,6 +766,10 @@ app.get('/api/compliance-report', (req, res) => {
   }
 });
 
+// ---------- Session 20: Enterprise endpoints (stub — 501 until Session 21 migration) ----------
+const { createEnterpriseRouter } = require('./enterprise-endpoint');
+app.use('/api/observatory/enterprise', createEnterpriseRouter());
+
 // ---------- Static dashboard + verifier ----------
 // Pretty URL for the auditor verifier tool (the HTML file is
 // public/verifier.html; this alias saves auditors from typing .html).

@@ -193,11 +193,35 @@ Docs: [docs/features/desktop-agent.md](docs/features/desktop-agent.md).
 | Tier | Tool | Count | Scope |
 |------|------|-------|-------|
 | Structural | TypeScript strict | all packages | typecheck via `pnpm typecheck` |
-| Unit | Vitest 2 | 992 tests | pure logic, audit rules, axe mapper, crypto, fusion, i18n |
+| Unit | Vitest 2 | 1098 tests | pure logic, audit rules, axe mapper, crypto, fusion, i18n, enterprise policy, template validation |
 | E2E | Playwright + Chromium | ~20 tests in 6 spec files | popup/sidepanel lifecycle, audit + axe + PDF, sensory, reload recovery, cognitive simplifier |
 | Dev tool | Pa11y batch scan | deferred | reserved for future `tools/pa11y/` addition |
 
 See [docs/testing.md](docs/testing.md) for the full test pyramid.
+
+---
+
+## Enterprise Deployment (Session 20 — Track B)
+
+Group-Policy-driven admin lockdown for 250k-scale enterprise rollouts. Extension reads `chrome.storage.managed` and locks the subset of profile keys an admin has configured. Shipped templates for Windows ADMX + macOS mobileconfig + Linux JSON. MSI/MST/Intune packaging + production code-signing deferred to Session 21 — see [docs/operations/signing.md](docs/operations/signing.md) for the enforcement recipe (force-install + version-pin + `DeveloperToolsAvailability=0`).
+
+| ID | Component | File | Role |
+| ---- | ----------- | ------ | ------ |
+| ENT-01 | Managed-policy reader + profile-merge | [packages/extension/src/background/enterprise/policy.ts](packages/extension/src/background/enterprise/policy.ts) | Reads `chrome.storage.managed`, coerces Windows-registry values, merges policy into profile, exposes `lockedKeys` set. Uses `Map<>` for feature-name lookup to block `__proto__` / `constructor` attacks (same remediation as RCA BUG-015). |
+| ENT-02 | Popup lockdown UI | [packages/extension/src/popup/App.tsx](packages/extension/src/popup/App.tsx) | Banner "N settings managed by your organization"; locked toggles / sliders render visually-disabled with tooltip; `ENTERPRISE_GET_LOCKDOWN` polled every 10 s. |
+| ENT-03 | Background policy wiring | [packages/extension/src/background/index.ts](packages/extension/src/background/index.ts) | Loads managed policy on startup; subscribes to `chrome.storage.onChanged`; re-applies merge on every `SAVE_PROFILE` so locked keys survive user saves. |
+| ENT-04 | Observatory `org_hash` propagation | [packages/extension/src/background/observatory-publisher.ts](packages/extension/src/background/observatory-publisher.ts) | Managed Merkle-hash included in daily bundles when Group Policy sets `orgHash`; omitted for non-managed installs (`undefined` → absent in JSON). Managed value is authoritative vs caller-supplied `raw.org_hash`. |
+| ENT-05 | ADMX templates (Windows Group Policy) | [deploy/enterprise/admx/AccessBridge.admx](deploy/enterprise/admx/AccessBridge.admx) + en-US / hi-IN ADMLs | 9 admin policies across 5 categories (Accessibility / Privacy / AIEngine / Profile / Agent); registry `HKLM\SOFTWARE\Policies\AccessBridge\*`. |
+| ENT-06 | Chrome force-install ADMX | [deploy/enterprise/chrome-extension/AccessBridge-ChromeExtension.admx](deploy/enterprise/chrome-extension/AccessBridge-ChromeExtension.admx) | Configures Chrome's `ExtensionInstallForcelist` + `ExtensionSettings` to force-install + toolbar-pin the AccessBridge extension from `https://accessbridge.space/chrome/updates.xml`. |
+| ENT-07 | macOS mobileconfig + Linux policy JSON | [deploy/enterprise/chrome-extension/AccessBridge.mobileconfig](deploy/enterprise/chrome-extension/AccessBridge.mobileconfig) + [chrome-policy.json](deploy/enterprise/chrome-extension/chrome-policy.json) | Same Chrome policy surface for macOS MDM (Jamf/Kandji) and Linux `/etc/opt/chrome/policies/managed/`. |
+| ENT-08 | Enterprise Observatory endpoints (stub) | [ops/observatory/enterprise-endpoint.js](ops/observatory/enterprise-endpoint.js) | `/api/observatory/enterprise/{summary,trends,compliance}` — validates `orgHash` query param (64-hex), returns 501 until Session 21 adds `org_hash` column to SQLite. |
+| ENT-09 | Deployment documentation | [deploy/enterprise/README.md](deploy/enterprise/README.md) + [docs/deployment/](docs/deployment/) + [docs/operations/signing.md](docs/operations/signing.md) | Admin-facing guides for ADMX install, GPO linking, SCCM/Intune, phased rollout, signing strategy, enforcement recipe. |
+
+Docs: [deploy/enterprise/README.md](deploy/enterprise/README.md), [docs/deployment/group-policy.md](docs/deployment/group-policy.md), [docs/deployment/enterprise-chrome.md](docs/deployment/enterprise-chrome.md), [docs/deployment/sccm-intune.md](docs/deployment/sccm-intune.md), [docs/operations/signing.md](docs/operations/signing.md).
+
+Tests: 46 (30 in [`enterprise-policy.test.ts`](packages/extension/src/background/__tests__/enterprise-policy.test.ts) + 16 in [`enterprise-templates-validation.test.ts`](packages/core/src/audit/__tests__/enterprise-templates-validation.test.ts)).
+
+---
 
 ## Feature-count summary
 
@@ -211,7 +235,8 @@ See [docs/testing.md](docs/testing.md) for the full test pyramid.
 | Core engine components | 5 |
 | Observatory + ZK Attestation | 12 (OBS-01..07 + ZK-01..05) |
 | Desktop Agent | 5 (DA-01..DA-05) |
-| **Total user-facing features** | **34** |
+| Enterprise Deployment | 9 (ENT-01..ENT-09) |
+| **Total user-facing features** | **43** |
 
 ---
 

@@ -1963,9 +1963,108 @@
       color: var(--muted);
     }
     .muted { color: var(--muted); }
+
+    /* ---------- Session 20: Enterprise Deployment ---------- */
+    .enterprise-section { padding: 72px 0; background: linear-gradient(180deg, var(--bg) 0%, var(--bg-alt) 100%); }
+    .enterprise-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+      margin-top: 28px;
+    }
+    .enterprise-card {
+      background: var(--surface);
+      border: 1px solid rgba(123, 104, 238, 0.18);
+      border-radius: 16px;
+      padding: 24px;
+      transition: transform 0.25s, border-color 0.25s, box-shadow 0.25s;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .enterprise-card:hover {
+      transform: translateY(-4px);
+      border-color: var(--primary);
+      box-shadow: 0 8px 24px var(--glow);
+    }
+    .enterprise-card-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .enterprise-card-heading {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .enterprise-card-body {
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--muted);
+      flex: 1;
+    }
+    .enterprise-card-body code {
+      background: rgba(123, 104, 238, 0.15);
+      color: var(--accent);
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+    .enterprise-card-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      margin-top: 4px;
+    }
+    .enterprise-link {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--accent);
+      text-decoration: none;
+      padding: 6px 12px;
+      border-radius: 8px;
+      background: rgba(123, 104, 238, 0.15);
+      transition: background 0.2s;
+    }
+    .enterprise-link:hover { background: rgba(123, 104, 238, 0.25); }
+    .enterprise-link-muted {
+      font-size: 12px;
+      color: var(--muted);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    .enterprise-link-muted:hover { color: var(--accent); }
+    .enterprise-cta {
+      margin-top: 32px;
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+    .enterprise-note {
+      margin-top: 24px;
+      font-size: 12px;
+      line-height: 1.6;
+      padding: 14px 18px;
+      border-left: 3px solid var(--accent);
+      background: rgba(123, 104, 238, 0.08);
+      border-radius: 0 8px 8px 0;
+    }
+    .enterprise-note a { color: var(--accent); }
+    @media (max-width: 900px) {
+      .enterprise-grid { grid-template-columns: 1fr; }
+    }
     @media (max-width: 600px) {
       .agent-cta { flex-direction: column; align-items: flex-start; }
       .section-heading { font-size: 24px; }
+      .enterprise-cta { flex-direction: column; align-items: flex-start; }
     }
   </style>
 </head>
@@ -1998,6 +2097,7 @@
         <a href="#/observatory" data-route="/observatory">Observatory</a>
         <a href="#/roadmap" data-route="/roadmap">Roadmap</a>
         <a href="#/desktop-agent" data-route="/desktop-agent">Agent</a>
+        <a href="#/enterprise" data-route="/enterprise">Enterprise</a>
         <a href="#/github" data-route="/github">GitHub</a>
         <span class="app-version navbar-version" aria-label="Current version">v…</span>
         <a href="#install" class="navbar-cta">
@@ -2809,6 +2909,59 @@
   </section>
 
   </div><!-- /route /desktop-agent -->
+
+  <!-- =============== ROUTE: /enterprise =============== -->
+  <div class="route" data-route="/enterprise">
+    <section class="enterprise-section" id="enterprise">
+      <div class="container">
+        <div class="section-label">IT &amp; compliance</div>
+        <h2 class="section-heading">Enterprise Deployment <span class="pill pill-new">Session 20</span></h2>
+        <p class="section-sub fade-in">Deploy AccessBridge across your organization with Group Policy force-install, signed MSI for the desktop agent, and admin-locked feature profiles. Built for 250,000-employee scale.</p>
+        <div class="enterprise-grid">
+          <div class="enterprise-card">
+            <div class="enterprise-card-icon" aria-hidden="true">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+            </div>
+            <div class="enterprise-card-heading">Group Policy + ADMX</div>
+            <div class="enterprise-card-body">Force-install the Chrome extension via <code>ExtensionInstallForcelist</code>. Lock down features per-org with 9 admin-controlled policies (observatory telemetry, AI tier, language, feature enable/disable, minimum agent version, org-hash).</div>
+            <div class="enterprise-card-links">
+              <a href="/enterprise/admx-bundle.zip" class="enterprise-link" id="enterprise-admx-link">Download ADMX bundle</a>
+              <a href="https://github.com/manishjnv/AccessBridge/blob/main/docs/deployment/group-policy.md" class="enterprise-link-muted">Admin guide →</a>
+            </div>
+          </div>
+          <div class="enterprise-card">
+            <div class="enterprise-card-icon" aria-hidden="true">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+            </div>
+            <div class="enterprise-card-heading">SCCM / Intune MSI</div>
+            <div class="enterprise-card-body">Deploy the Desktop Agent MSI silently via SCCM Configuration Manager or Microsoft Intune. MST transforms available for silent install, no-pair mode, and verbose logging. Detection rules ship with the bundle.</div>
+            <div class="enterprise-card-links">
+              <span class="enterprise-link-muted" title="MSI + MST + PowerShell deploy scripts — production build ships in Session 21">Package bundle: Session 21</span>
+              <a href="https://github.com/manishjnv/AccessBridge/blob/main/docs/deployment/sccm-intune.md" class="enterprise-link-muted">SCCM / Intune guide →</a>
+            </div>
+          </div>
+          <div class="enterprise-card">
+            <div class="enterprise-card-icon" aria-hidden="true">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            </div>
+            <div class="enterprise-card-heading">macOS &amp; Linux policy</div>
+            <div class="enterprise-card-body">Deploy the same Chrome-extension policies via Apple configuration profile (mobileconfig) for macOS MDM (Jamf / Kandji / Intune) or drop a JSON policy file into Linux Chrome's managed policy directory.</div>
+            <div class="enterprise-card-links">
+              <a href="/enterprise/chrome-extension/AccessBridge.mobileconfig" class="enterprise-link" id="enterprise-mobileconfig-link">macOS mobileconfig</a>
+              <a href="/enterprise/chrome-extension/chrome-policy.json" class="enterprise-link" id="enterprise-linux-link">Linux policy JSON</a>
+            </div>
+          </div>
+        </div>
+        <div class="enterprise-cta">
+          <a href="https://github.com/manishjnv/AccessBridge/blob/main/deploy/enterprise/README.md" class="btn btn-primary">Full admin guide</a>
+          <a href="mailto:enterprise@accessbridge.space?subject=AccessBridge%20enterprise%20deployment" class="enterprise-link-muted">enterprise@accessbridge.space</a>
+        </div>
+        <div class="enterprise-note muted">
+          <strong>Session 20 status:</strong> ADMX / ADML / mobileconfig / JSON policy templates ship unsigned in this release for pilot deployments. Production-grade signing (EV cert for MSI, production CRX signing key, signed mobileconfig) lands in Session 21. See <a href="https://github.com/manishjnv/AccessBridge/blob/main/docs/operations/signing.md">signing.md</a> for the enforcement recipe (force-install + version-pin + DeveloperToolsAvailability=0).
+        </div>
+      </div>
+    </section>
+  </div><!-- /route /enterprise -->
 
   <!-- =============== ROUTE: /github =============== -->
   <div class="route" data-route="/github">

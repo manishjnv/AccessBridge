@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  File: deploy/enterprise/chrome-extension/AccessBridge.mobileconfig
+  Purpose: Apple Configuration Profile for macOS/iOS Chrome managed policy
+  Session: AccessBridge Session 20 — Enterprise Deployment Templates
+  Deploy via: Apple Configurator 2, Jamf Pro, or Mosyle MDM
+  Target: Google Chrome (com.google.Chrome) on macOS 10.14+ / iOS 14+
+  REPLACE EXTENSION ID BEFORE PRODUCTION DEPLOY
+  ─────────────────────────────────────────────────────────────────────────────
+  Installation instructions:
+    macOS: sudo profiles install -path AccessBridge.mobileconfig
+    MDM:   Upload to your MDM payload library and assign to device/user groups
+  Verify: Open Chrome and navigate to chrome://policy
+  ─────────────────────────────────────────────────────────────────────────────
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+
+    <key>PayloadContent</key>
+    <array>
+      <dict>
+
+        <key>PayloadType</key>
+        <string>com.apple.ManagedClient.preferences</string>
+
+        <key>PayloadVersion</key>
+        <integer>1</integer>
+
+        <key>PayloadIdentifier</key>
+        <string>com.accessbridge.chrome-policy.preferences</string>
+
+        <key>PayloadUUID</key>
+        <!-- UUID generated for this profile payload — do not reuse across profiles -->
+        <string>7A3F2C91-4B8E-4D56-9E1A-0C5F7B2D8A4E</string>
+
+        <key>PayloadDisplayName</key>
+        <string>AccessBridge Chrome Extension Policy</string>
+
+        <key>PayloadDescription</key>
+        <string>
+          Configures Google Chrome to force-install the AccessBridge
+          accessibility extension and pin it to the toolbar. Enforces a
+          minimum version requirement of 0.19.0.
+          REPLACE EXTENSION ID BEFORE PRODUCTION DEPLOY.
+        </string>
+
+        <!-- Target Chrome's preference domain -->
+        <key>PayloadEnabled</key>
+        <true/>
+
+        <key>com.google.Chrome</key>
+        <dict>
+
+          <!--
+            ExtensionInstallForcelist
+            Format: <extension-id>;<update-url>
+            REPLACE WITH PRODUCTION EXTENSION ID AFTER SIGNING
+          -->
+          <key>ExtensionInstallForcelist</key>
+          <array>
+            <string>abcdefghijklmnopqrstuvwxyzabcdef;https://accessbridge.space/chrome/updates.xml</string>
+          </array>
+
+          <!--
+            ExtensionSettings
+            Per-extension configuration for AccessBridge.
+            REPLACE WITH PRODUCTION EXTENSION ID AFTER SIGNING
+          -->
+          <key>ExtensionSettings</key>
+          <dict>
+            <!-- REPLACE WITH PRODUCTION EXTENSION ID AFTER SIGNING -->
+            <key>abcdefghijklmnopqrstuvwxyzabcdef</key>
+            <dict>
+              <key>installation_mode</key>
+              <string>force_installed</string>
+
+              <key>update_url</key>
+              <string>https://accessbridge.space/chrome/updates.xml</string>
+
+              <key>toolbar_pin</key>
+              <string>force_pinned</string>
+
+              <key>blocked_permissions</key>
+              <array/>
+
+              <key>runtime_allowed_hosts</key>
+              <array>
+                <string>*</string>
+              </array>
+
+              <key>runtime_blocked_hosts</key>
+              <array/>
+
+              <key>minimum_version_required</key>
+              <string>0.19.0</string>
+            </dict>
+          </dict>
+
+        </dict>
+
+      </dict>
+    </array>
+
+    <!-- Top-level profile metadata -->
+
+    <key>PayloadDisplayName</key>
+    <string>AccessBridge Chrome Policy</string>
+
+    <key>PayloadDescription</key>
+    <string>
+      Deploys the AccessBridge ambient accessibility extension to Google Chrome
+      via MDM managed preferences. Forces installation, pins the extension to
+      the Chrome toolbar, and enforces a minimum version requirement of 0.19.0.
+      This profile targets com.google.Chrome on macOS and iOS.
+      REPLACE EXTENSION ID BEFORE PRODUCTION DEPLOY.
+    </string>
+
+    <key>PayloadIdentifier</key>
+    <string>com.accessbridge.chrome-policy</string>
+
+    <key>PayloadType</key>
+    <string>Configuration</string>
+
+    <key>PayloadUUID</key>
+    <!-- Top-level profile UUID — unique per profile; do not duplicate -->
+    <string>3D9C1B47-8F2A-4E7D-B953-1A6E0D4C2F85</string>
+
+    <key>PayloadVersion</key>
+    <integer>1</integer>
+
+    <key>PayloadOrganization</key>
+    <string>Manish Kumar — AccessBridge</string>
+
+    <key>PayloadScope</key>
+    <string>System</string>
+
+    <key>PayloadRemovalDisallowed</key>
+    <false/>
+
+  </dict>
+</plist>

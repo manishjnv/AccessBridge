@@ -45,12 +45,22 @@ import {
   installDailyAlarm,
 } from './observatory-collector.js';
 // Session 16: ZK attestation helpers
+// Session 20: org_hash propagation
 import {
   rotateDeviceKeypair,
   getOrRefreshRing,
+  setManagedOrgHash,
 } from './observatory-publisher.js';
 // --- Session 19: Desktop Agent Bridge ---
 import { agentBridge } from './agent-bridge.js';
+// --- Session 20: Enterprise Managed Policy ---
+import {
+  loadManagedPolicy,
+  mergeWithProfile,
+  subscribeToPolicyChanges,
+  type ManagedPolicy,
+  type LockdownResult,
+} from './enterprise/index.js';
 
 const observatoryCollector = new ObservatoryCollector();
 observatoryCollector.hydrateFromStorage().catch(() => {});
@@ -338,6 +348,9 @@ const struggleDetector = new StruggleDetector();
 let decisionEngine: DecisionEngine | null = null;
 let latestStruggleScore: StruggleScore | null = null;
 const activeAdaptations: Map<string, Adaptation> = new Map();
+// --- Session 20: Enterprise Managed Policy ---
+let currentManagedPolicy: ManagedPolicy = {};
+let currentLockdown: LockdownResult | null = null;
 
 function getOrCreateEngine(): DecisionEngine {
   if (!decisionEngine) {
@@ -497,7 +510,10 @@ type MessageType =
   | 'AGENT_CLEAR_PSK'
   | 'AGENT_INSPECT_NATIVE'
   | 'AGENT_APPLY_NATIVE'
-  | 'AGENT_REVERT_NATIVE';
+  | 'AGENT_REVERT_NATIVE'
+  // --- Session 20: Enterprise Managed Policy ---
+  | 'ENTERPRISE_GET_POLICY'
+  | 'ENTERPRISE_GET_LOCKDOWN';
 
 interface Message {
   type: MessageType;
@@ -533,12 +549,16 @@ async function handleMessage(
     }
 
     case 'SAVE_PROFILE': {
-      const profile = message.payload as AccessibilityProfile;
-      await saveProfile(profile);
+      const incomingProfile = message.payload as AccessibilityProfile;
+      // --- Session 20: Re-apply managed policy so locked keys cannot be overridden ---
+      const mergeResult = mergeWithProfile(incomingProfile, currentManagedPolicy);
+      currentLockdown = mergeResult;
+      const profileToSave = mergeResult.profile;
+      await saveProfile(profileToSave);
       const tabs = await chrome.tabs.query({});
       for (const tab of tabs) {
         if (tab.id) {
-          chrome.tabs.sendMessage(tab.id, { type: 'PROFILE_UPDATED', payload: profile }).catch(() => {});
+          chrome.tabs.sendMessage(tab.id, { type: 'PROFILE_UPDATED', payload: profileToSave }).catch(() => {});
         }
       }
       agentBridge.syncProfileOut(currentProfile!).catch(() => {});
@@ -1041,6 +1061,15 @@ async function handleMessage(
       return { ok };
     }
 
+    // --- Session 20: Enterprise Managed Policy ---
+    case 'ENTERPRISE_GET_POLICY': {
+      return currentManagedPolicy;
+    }
+
+    case 'ENTERPRISE_GET_LOCKDOWN': {
+      return { lockedKeys: currentLockdown ? Array.from(currentLockdown.lockedKeys) : [] };
+    }
+
     default: {
       // Handle voice command messages (format: { action: 'nextTab' })
       const msg = message as unknown as Record<string, string>;
@@ -1207,3 +1236,41 @@ agentBridge.start({
     capabilities: ['profile-sync'],
   },
 }).catch((err) => console.warn('[background] agentBridge.start failed', err));
+
+// --- Session 20: Load enterprise managed policy on startup + subscribe to changes ---
+loadManagedPolicy().then(async (policy) => {
+  currentManagedPolicy = policy;
+  // Session 20: push org_hash into the observatory publisher so daily bundles
+  // carry the enterprise device-ring hash when managed policy provides it.
+  setManagedOrgHash(policy.orgHash);
+  if (currentProfile) {
+    currentLockdown = mergeWithProfile(currentProfile, policy);
+    // Broadcast any policy-forced profile updates to content scripts
+    if (currentLockdown.lockedKeys.size > 0) {
+      currentProfile = currentLockdown.profile;
+      const tabs = await chrome.tabs.query({});
+      for (const tab of tabs) {
+        if (tab.id !== undefined) {
+          chrome.tabs.sendMessage(tab.id, { type: 'PROFILE_UPDATED', payload: currentProfile }).catch(() => {});
+        }
+      }
+    }
+  }
+}).catch(() => {});
+
+subscribeToPolicyChanges((newPolicy) => {
+  currentManagedPolicy = newPolicy;
+  // Session 20: keep observatory publisher in sync with policy changes.
+  setManagedOrgHash(newPolicy.orgHash);
+  if (currentProfile) {
+    currentLockdown = mergeWithProfile(currentProfile, newPolicy);
+    currentProfile = currentLockdown.profile;
+    chrome.tabs.query({}, (tabs) => {
+      for (const tab of tabs) {
+        if (tab.id !== undefined) {
+          chrome.tabs.sendMessage(tab.id, { type: 'PROFILE_UPDATED', payload: currentProfile }).catch(() => {});
+        }
+      }
+    });
+  }
+});

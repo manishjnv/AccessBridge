@@ -1,0 +1,307 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  File: deploy/enterprise/admx/en-US/AccessBridge.adml
+  Purpose: English (en-US) ADML localization for AccessBridge.admx (9 policies)
+  Session: AccessBridge Session 20 — Enterprise Deployment Templates
+  Language: en-US
+-->
+<policyDefinitionResources
+  xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions"
+  xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  revision="1.0"
+  schemaVersion="1.0">
+
+  <displayName>AccessBridge — Application Group Policy</displayName>
+  <description>
+    Group Policy definitions for the AccessBridge ambient accessibility
+    platform. These policies allow IT administrators to lock down features,
+    control privacy/telemetry, configure AI engine access, manage profile sync,
+    and enforce desktop agent version requirements across a managed fleet.
+    Registry root: HKLM\SOFTWARE\Policies\AccessBridge
+  </description>
+
+  <resources>
+    <stringTable>
+
+      <!-- ── Supported-on strings ───────────────────────────────────────────── -->
+      <string id="AccessBridge_Support">
+        AccessBridge 0.19.0 or later on Windows 10 (20H2) or later
+      </string>
+
+      <!-- ── Category display names ─────────────────────────────────────────── -->
+      <string id="Cat_AccessBridge">AccessBridge</string>
+      <string id="Cat_Accessibility">Accessibility</string>
+      <string id="Cat_Privacy">Privacy</string>
+      <string id="Cat_AIEngine">AI Engine</string>
+      <string id="Cat_Profile">Profile</string>
+      <string id="Cat_Agent">Desktop Agent</string>
+
+      <!-- ══════════════════════════════════════════════════════════════════════
+           Policy 1: EnabledFeaturesLockdown
+           ══════════════════════════════════════════════════════════════════════ -->
+      <string id="EnabledFeaturesLockdown_DisplayName">
+        Accessibility Features — Forced On
+      </string>
+      <string id="EnabledFeaturesLockdown_Description">
+        Specifies a list of AccessBridge feature names that are mandated ON
+        for all users on this machine. Users cannot disable these features
+        from the extension popup.
+
+        Enter one feature name per line (case-insensitive). Feature names
+        correspond to the internal feature catalog (e.g. "HighContrast",
+        "FocusIndicator", "TextZoom", "ScreenReader").
+
+        If a feature name appears in both EnabledFeaturesLockdown and
+        DisabledFeaturesLockdown, EnabledFeaturesLockdown takes precedence.
+
+        When this policy is not configured, all features follow the user's
+        personal preferences.
+      </string>
+
+      <!-- ══════════════════════════════════════════════════════════════════════
+           Policy 2: DisabledFeaturesLockdown
+           ══════════════════════════════════════════════════════════════════════ -->
+      <string id="DisabledFeaturesLockdown_DisplayName">
+        Accessibility Features — Forced Off
+      </string>
+      <string id="DisabledFeaturesLockdown_Description">
+        Specifies a list of AccessBridge feature names that are mandated OFF
+        for all users on this machine. Users cannot enable these features
+        from the extension popup.
+
+        Enter one feature name per line (case-insensitive). Feature names
+        correspond to the internal feature catalog (e.g. "HighContrast",
+        "FocusIndicator", "TextZoom", "ScreenReader").
+
+        If a feature name appears in both EnabledFeaturesLockdown and
+        DisabledFeaturesLockdown, EnabledFeaturesLockdown takes precedence.
+
+        When this policy is not configured, all features follow the user's
+        personal preferences.
+      </string>
+
+      <!-- ══════════════════════════════════════════════════════════════════════
+           Policy 3: ObservatoryOptInRequired
+           ══════════════════════════════════════════════════════════════════════ -->
+      <string id="ObservatoryOptInRequired_DisplayName">
+        Compliance Observatory Opt-In
+      </string>
+      <string id="ObservatoryOptInRequired_Description">
+        Controls whether the AccessBridge Compliance Observatory publishes
+        anonymous accessibility metrics to the enterprise relay.
+
+        When Enabled: Forces the Observatory to publish metrics regardless of
+        the user's individual preference. Useful for compliance auditing in
+        regulated environments.
+
+        When Disabled: Forces the Observatory off regardless of user preference.
+        Use this setting to satisfy strict data-minimization requirements.
+
+        When Not Configured: The user's personal Observatory preference
+        setting in the extension popup applies.
+      </string>
+
+      <!-- ══════════════════════════════════════════════════════════════════════
+           Policy 4: TelemetryLevel
+           ══════════════════════════════════════════════════════════════════════ -->
+      <string id="TelemetryLevel_DisplayName">Telemetry Level</string>
+      <string id="TelemetryLevel_Description">
+        Sets the maximum telemetry level that AccessBridge may collect and
+        transmit. This policy acts as a ceiling: users may choose a lower level
+        but cannot exceed the level configured here.
+
+        None — No telemetry data is collected or transmitted. Disables all
+        usage analytics, crash reporting, and performance counters.
+
+        Aggregated — Only anonymized, aggregated metrics are collected (e.g.
+        feature usage counts, session lengths). No personally identifiable
+        information or per-user data leaves the device.
+
+        Full — All telemetry categories are enabled, including session replay
+        fragments and detailed performance traces for diagnostics. Only
+        recommended for internal test fleets.
+
+        When this policy is not configured, the user controls their own
+        telemetry preference within the extension popup.
+      </string>
+      <string id="TelemetryLevel_None">None — No telemetry</string>
+      <string id="TelemetryLevel_Aggregated">Aggregated — Anonymous metrics only</string>
+      <string id="TelemetryLevel_Full">Full — All telemetry categories</string>
+
+      <!-- ══════════════════════════════════════════════════════════════════════
+           Policy 5: AllowCloudAITier
+           ══════════════════════════════════════════════════════════════════════ -->
+      <string id="AllowCloudAITier_DisplayName">
+        Allow Cloud AI Provider (Tier 2)
+      </string>
+      <string id="AllowCloudAITier_Description">
+        Controls whether AccessBridge may use Tier 2 (cloud-hosted) AI
+        providers such as external LLM APIs for accessibility assistance.
+
+        When Enabled: The extension may send request payloads to configured
+        cloud AI endpoints (subject to the CustomAPIEndpoint policy).
+
+        When Disabled (default): All AI inference is restricted to Tier 1
+        (local/on-device) providers. No accessibility content is transmitted
+        to external AI services. Recommended for high-security environments
+        and air-gapped networks.
+
+        When this policy is not configured, cloud AI access defaults to
+        disabled (same as the Disabled state).
+      </string>
+
+      <!-- ══════════════════════════════════════════════════════════════════════
+           Policy 6: CustomAPIEndpoint
+           ══════════════════════════════════════════════════════════════════════ -->
+      <string id="CustomAPIEndpoint_DisplayName">
+        Custom AI Provider Endpoint URL
+      </string>
+      <string id="CustomAPIEndpoint_Description">
+        Overrides the default AI provider URL with a custom HTTPS endpoint.
+        Use this policy to point AccessBridge at an internal AI inference
+        server or enterprise API gateway instead of the public default.
+
+        The value must be a fully-qualified HTTPS URL, for example:
+          https://ai-gateway.corp.example.com/v1/accessibility
+
+        If AllowCloudAITier is Disabled, this policy has no effect.
+
+        When this policy is not configured, AccessBridge uses its built-in
+        default AI provider endpoint.
+      </string>
+
+      <!-- ══════════════════════════════════════════════════════════════════════
+           Policy 7: DefaultLanguage
+           ══════════════════════════════════════════════════════════════════════ -->
+      <string id="DefaultLanguage_DisplayName">Default Interface Language</string>
+      <string id="DefaultLanguage_Description">
+        Sets the default BCP-47 language tag for the AccessBridge extension
+        interface and accessibility narration output.
+
+        Examples of valid values:
+          en-US  — English (United States)
+          hi-IN  — Hindi (India)
+          fr-FR  — French (France)
+          ar-SA  — Arabic (Saudi Arabia)
+          ja-JP  — Japanese (Japan)
+
+        When this policy is configured, the specified language is used as
+        the initial default. Users may still change the language in the
+        extension settings if the language picker is not locked down.
+
+        When this policy is not configured, AccessBridge inherits the
+        browser's language preference (navigator.language).
+      </string>
+
+      <!-- ══════════════════════════════════════════════════════════════════════
+           Policy 8: ProfileSyncMode
+           ══════════════════════════════════════════════════════════════════════ -->
+      <string id="ProfileSyncMode_DisplayName">Profile Sync Mode</string>
+      <string id="ProfileSyncMode_Description">
+        Controls how the user's AccessBridge accessibility profile
+        (feature preferences, AI configurations, custom rules) is synchronized
+        across devices.
+
+        Off — Profile synchronization is disabled. All preferences are stored
+        locally on the device and are not shared with other machines.
+
+        Local only — Profile is synchronized only between the Chrome extension
+        and the AccessBridge desktop agent on the same machine via the local
+        WebSocket IPC channel. No data leaves the device.
+
+        Cloud relay — Profile is synchronized via the AccessBridge relay
+        service, enabling cross-device roaming of accessibility preferences.
+        Requires network access to https://accessbridge.space.
+
+        When this policy is not configured, the default behavior is
+        "local-only" to maximize privacy.
+      </string>
+      <string id="ProfileSyncMode_Off">Off — Synchronization disabled</string>
+      <string id="ProfileSyncMode_LocalOnly">Local only — Same-device sync via desktop agent</string>
+      <string id="ProfileSyncMode_Relay">Cloud relay — Cross-device profile roaming</string>
+
+      <!-- ══════════════════════════════════════════════════════════════════════
+           Policy 9: MinimumAgentVersion
+           ══════════════════════════════════════════════════════════════════════ -->
+      <string id="MinimumAgentVersion_DisplayName">
+        Minimum Desktop Agent Version
+      </string>
+      <string id="MinimumAgentVersion_Description">
+        Specifies the minimum semantic version (semver) of the AccessBridge
+        desktop agent that must be installed for agent-dependent features to
+        function. If the detected agent version is lower than this threshold,
+        the extension will display a warning banner prompting the user (or IT
+        administrator) to update.
+
+        The value must be a three-part semver string, for example: 0.19.0
+
+        This policy enforces a warning only — it does not block extension
+        functionality for features that do not require the agent.
+
+        When this policy is not configured, no minimum version is enforced
+        and the extension works with any installed agent version.
+      </string>
+
+    </stringTable>
+
+    <presentationTable>
+
+      <presentation id="EnabledFeaturesLockdown">
+        <multiTextBox refId="EnabledFeaturesLockdown_MultiText">
+          Feature names to force ON (one per line, case-insensitive)
+        </multiTextBox>
+      </presentation>
+
+      <presentation id="DisabledFeaturesLockdown">
+        <multiTextBox refId="DisabledFeaturesLockdown_MultiText">
+          Feature names to force OFF (one per line, case-insensitive)
+        </multiTextBox>
+      </presentation>
+
+      <presentation id="ObservatoryOptInRequired">
+        <!-- Boolean policy — no additional presentation elements needed -->
+      </presentation>
+
+      <presentation id="TelemetryLevel">
+        <dropdownList refId="TelemetryLevel_Enum" defaultItem="0">
+          Telemetry level
+        </dropdownList>
+      </presentation>
+
+      <presentation id="AllowCloudAITier">
+        <!-- Boolean policy — no additional presentation elements needed -->
+      </presentation>
+
+      <presentation id="CustomAPIEndpoint">
+        <textBox refId="CustomAPIEndpoint_Text">
+          <label>Custom AI provider endpoint URL (HTTPS)</label>
+          <defaultValue>https://</defaultValue>
+        </textBox>
+      </presentation>
+
+      <presentation id="DefaultLanguage">
+        <textBox refId="DefaultLanguage_Text">
+          <label>BCP-47 language tag (e.g. en-US, hi-IN, fr-FR)</label>
+          <defaultValue>en-US</defaultValue>
+        </textBox>
+      </presentation>
+
+      <presentation id="ProfileSyncMode">
+        <dropdownList refId="ProfileSyncMode_Enum" defaultItem="1">
+          Profile sync mode
+        </dropdownList>
+      </presentation>
+
+      <presentation id="MinimumAgentVersion">
+        <textBox refId="MinimumAgentVersion_Text">
+          <label>Minimum agent version (semver, e.g. 0.19.0)</label>
+          <defaultValue>0.19.0</defaultValue>
+        </textBox>
+      </presentation>
+
+    </presentationTable>
+
+  </resources>
+
+</policyDefinitionResources>

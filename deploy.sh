@@ -14,6 +14,12 @@
 #                 and stage it into deploy/downloads/ before the VPS sync step.
 #                 Requires Rust + MSVC + WiX toolchain; safe to omit when not shipping
 #                 a new agent build — the existing MSI in deploy/downloads/ is synced.
+#   --with-enterprise  Session 20: package deploy/enterprise/ into admx-bundle.zip
+#                      alongside the existing ADMX/ADML/mobileconfig/JSON template files.
+#                      The landing page Enterprise section links to the zip for admins
+#                      who want one download, and to individual files for surgical deploys.
+#                      Safe to omit when enterprise templates haven't changed — the
+#                      existing bundle + templates in deploy/enterprise/ still sync.
 #
 # Pipeline: bump → typecheck+build+test → re-zip → push → sync → VPS-verify → health
 # SSH alias: a11yos-vps
@@ -33,16 +39,18 @@ SKIP_CHECK=false
 SKIP_BUMP=false
 NO_CACHE=false
 WITH_AGENT=0
+WITH_ENTERPRISE=0
 
 for arg in "$@"; do
   case "$arg" in
-    --skip-build)  SKIP_BUILD=true  ;;
-    --skip-push)   SKIP_PUSH=true   ;;
-    --skip-tests)  SKIP_TESTS=true  ;;
-    --no-check)    SKIP_CHECK=true  ;;
-    --skip-bump)   SKIP_BUMP=true   ;;
-    --no-cache)    NO_CACHE=true    ;;  # restore the old stateless pipeline
-    --with-agent)  WITH_AGENT=1     ;;
+    --skip-build)      SKIP_BUILD=true     ;;
+    --skip-push)       SKIP_PUSH=true      ;;
+    --skip-tests)      SKIP_TESTS=true     ;;
+    --no-check)        SKIP_CHECK=true     ;;
+    --skip-bump)       SKIP_BUMP=true      ;;
+    --no-cache)        NO_CACHE=true       ;;  # restore the old stateless pipeline
+    --with-agent)      WITH_AGENT=1        ;;
+    --with-enterprise) WITH_ENTERPRISE=1   ;;  # Session 20: zip ADMX bundle + sync enterprise templates
     *) echo "Unknown arg: $arg" >&2; exit 2 ;;
   esac
 done
@@ -290,6 +298,41 @@ if [ "${WITH_AGENT}" = "1" ]; then
   fi
 else
   echo "[1.6/6] Skipping desktop-agent MSI build (pass --with-agent to enable)"
+fi
+
+# ─────────────────────────────────────────────────────────
+# [1.7/6] (optional) Package enterprise ADMX/ADML/mobileconfig bundle — only with --with-enterprise
+# Session 20: zips every file under deploy/enterprise/ into
+# deploy/enterprise/admx-bundle.zip so the landing page Enterprise section
+# can link one download for Windows GP admins. The individual files
+# (mobileconfig, chrome-policy.json, etc.) remain individually linkable.
+# ─────────────────────────────────────────────────────────
+if [ "${WITH_ENTERPRISE}" = "1" ]; then
+  echo "[1.7/6] Packaging enterprise deployment bundle (--with-enterprise)..."
+  ENTERPRISE_DIR="deploy/enterprise"
+  if [ ! -d "$ENTERPRISE_DIR" ]; then
+    echo "  ✗ $ENTERPRISE_DIR not found — skipping enterprise bundle"
+  else
+    # Remove stale bundle so size diffs are visible post-build
+    rm -f "$ENTERPRISE_DIR/admx-bundle.zip"
+    if command -v zip >/dev/null 2>&1; then
+      (cd "$ENTERPRISE_DIR" && zip -rq admx-bundle.zip \
+        admx/ chrome-extension/ README.md -x "admx-bundle.zip")
+    else
+      # Windows Git Bash without zip — fall back to PowerShell Compress-Archive
+      powershell -NoProfile -Command \
+        "Compress-Archive -Path '$ENTERPRISE_DIR\\admx\\','$ENTERPRISE_DIR\\chrome-extension\\','$ENTERPRISE_DIR\\README.md' -DestinationPath '$ENTERPRISE_DIR\\admx-bundle.zip' -Force" \
+        >/dev/null
+    fi
+    if [ -f "$ENTERPRISE_DIR/admx-bundle.zip" ]; then
+      ADMX_SIZE=$(stat -c%s "$ENTERPRISE_DIR/admx-bundle.zip" 2>/dev/null || wc -c < "$ENTERPRISE_DIR/admx-bundle.zip")
+      echo "  ✓ admx-bundle.zip packaged (${ADMX_SIZE} bytes)"
+    else
+      echo "  ⚠ admx-bundle.zip packaging failed — individual files still ship via rsync"
+    fi
+  fi
+else
+  echo "[1.7/6] Skipping enterprise bundle (pass --with-enterprise to enable)"
 fi
 
 # ─────────────────────────────────────────────────────────

@@ -8,11 +8,22 @@ interface SliderProps {
   step: number;
   onChange: (value: number) => void;
   unit?: string;
+  /** When true, renders the slider disabled and ignores change events. */
+  locked?: boolean;
+  /** Tooltip text shown when locked. Defaults to "Managed by your organization". */
+  lockedReason?: string;
 }
 
-export function Slider({ label, value, min, max, step, onChange, unit }: SliderProps) {
+export function Slider({ label, value, min, max, step, onChange, unit, locked, lockedReason }: SliderProps) {
+  const isDisabled = locked;
+  const titleAttr = locked ? (lockedReason ?? 'Managed by your organization') : undefined;
+
   return (
-    <div className="space-y-1">
+    <div
+      className="space-y-1"
+      style={isDisabled ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}
+      title={titleAttr}
+    >
       <div className="flex justify-between items-center">
         <label className="text-xs text-a11y-muted">{label}</label>
         <span className="text-xs font-mono text-a11y-text">
@@ -26,7 +37,8 @@ export function Slider({ label, value, min, max, step, onChange, unit }: SliderP
         max={max}
         step={step}
         value={value}
-        onChange={(e) => onChange(parseFloat(e.target.value))}
+        disabled={isDisabled}
+        onChange={isDisabled ? undefined : (e) => onChange(parseFloat(e.target.value))}
         className="w-full h-1.5 bg-a11y-primary/40 rounded-full appearance-none cursor-pointer
                    [&::-webkit-slider-thumb]:appearance-none
                    [&::-webkit-slider-thumb]:w-3.5
@@ -35,6 +47,7 @@ export function Slider({ label, value, min, max, step, onChange, unit }: SliderP
                    [&::-webkit-slider-thumb]:bg-a11y-accent
                    [&::-webkit-slider-thumb]:shadow-sm
                    [&::-webkit-slider-thumb]:cursor-pointer"
+        style={isDisabled ? { cursor: 'not-allowed' } : undefined}
       />
     </div>
   );

@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  File: deploy/enterprise/chrome-extension/AccessBridge-ChromeExtension.admx
+  Purpose: Windows Group Policy ADMX template — Chrome Extension force-install for AccessBridge
+  Session: AccessBridge Session 20 — Enterprise Deployment Templates
+  Registry path: HKLM\SOFTWARE\Policies\Google\Chrome
+  Schema version: 1.0
+  REPLACE EXTENSION ID BEFORE PRODUCTION DEPLOY
+-->
+<policyDefinitions
+  xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions"
+  xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  revision="1.0"
+  schemaVersion="1.0">
+
+  <policyNamespaces>
+    <target prefix="accessbridge_chrome" namespace="urn:accessbridge:chrome-extension-policy" />
+    <using prefix="google" namespace="Google.Policies.Chrome" />
+    <using prefix="windows" namespace="Microsoft.Policies.Windows" />
+  </policyNamespaces>
+
+  <resources minRequiredRevision="1.0" />
+
+  <supportedOn>
+    <definitions>
+      <definition name="AccessBridge_Chrome_Support"
+        displayName="$(string.AccessBridge_Chrome_Support)" />
+    </definitions>
+  </supportedOn>
+
+  <categories>
+    <!--
+      We nest under the standard "Google/Google Chrome/Extensions" tree so that
+      AccessBridge policies appear naturally alongside other Chrome extension
+      policies in the Group Policy Management Editor.
+    -->
+    <category name="Google" displayName="$(string.Cat_Google)">
+      <parentCategory ref="windows:WindowsComponents" />
+    </category>
+    <category name="GoogleChrome" displayName="$(string.Cat_GoogleChrome)">
+      <parentCategory ref="Google" />
+    </category>
+    <category name="GoogleChromeExtensions" displayName="$(string.Cat_Extensions)">
+      <parentCategory ref="GoogleChrome" />
+    </category>
+    <category name="AccessBridgeChromeExtension" displayName="$(string.Cat_AccessBridge)">
+      <parentCategory ref="GoogleChromeExtensions" />
+    </category>
+  </categories>
+
+  <policies>
+
+    <!--
+      Policy 1: AccessBridgeForcedInstall
+      Adds AccessBridge to Chrome's ExtensionInstallForcelist.
+      Format: <extension-id>;<update-url>
+      Registry: HKLM\SOFTWARE\Policies\Google\Chrome\ExtensionInstallForcelist
+    -->
+    <policy
+      name="AccessBridgeForcedInstall"
+      class="Machine"
+      displayName="$(string.AccessBridgeForcedInstall_DisplayName)"
+      explainText="$(string.AccessBridgeForcedInstall_Description)"
+      presentation="$(presentation.AccessBridgeForcedInstall)"
+      key="SOFTWARE\Policies\Google\Chrome\ExtensionInstallForcelist"
+      >
+      <parentCategory ref="AccessBridgeChromeExtension" />
+      <supportedOn ref="AccessBridge_Chrome_Support" />
+      <elements>
+        <!--
+          REPLACE WITH PRODUCTION EXTENSION ID AFTER SIGNING
+          Value format: abcdefghijklmnopqrstuvwxyzabcdef;https://accessbridge.space/chrome/updates.xml
+        -->
+        <list
+          id="AccessBridgeForcedInstall_List"
+          key="SOFTWARE\Policies\Google\Chrome\ExtensionInstallForcelist"
+          explicitValue="true"
+          additive="true"
+        />
+      </elements>
+    </policy>
+
+    <!--
+      Policy 2: AccessBridgeExtensionSettings
+      Configures detailed ExtensionSettings for AccessBridge (JSON blob in REG_SZ).
+      Registry: HKLM\SOFTWARE\Policies\Google\Chrome\ExtensionSettings
+      The JSON structure enforces: force_installed, toolbar_pin, minimum_version_required.
+    -->
+    <policy
+      name="AccessBridgeExtensionSettings"
+      class="Machine"
+      displayName="$(string.AccessBridgeExtensionSettings_DisplayName)"
+      explainText="$(string.AccessBridgeExtensionSettings_Description)"
+      presentation="$(presentation.AccessBridgeExtensionSettings)"
+      key="SOFTWARE\Policies\Google\Chrome\ExtensionSettings"
+      >
+      <parentCategory ref="AccessBridgeChromeExtension" />
+      <supportedOn ref="AccessBridge_Chrome_Support" />
+      <elements>
+        <!--
+          REPLACE WITH PRODUCTION EXTENSION ID AFTER SIGNING
+          The value name must be the actual extension ID.
+          The JSON blob enforces installation_mode, update_url, toolbar_pin,
+          blocked_permissions, runtime_allowed_hosts, and minimum_version_required.
+        -->
+        <text
+          id="AccessBridgeExtensionSettings_Value"
+          valueName="abcdefghijklmnopqrstuvwxyzabcdef"
+          required="true"
+        />
+      </elements>
+    </policy>
+
+  </policies>
+
+</policyDefinitions>

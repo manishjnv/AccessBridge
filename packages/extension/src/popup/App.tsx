@@ -45,6 +45,8 @@ export default function App() {
   const [showPairDialog, setShowPairDialog] = useState(false);
   const [pskInput, setPskInput] = useState('');
   const [pairError, setPairError] = useState<string | null>(null);
+  // --- Session 20: Enterprise Managed Policy ---
+  const [lockedKeys, setLockedKeys] = useState<Set<string>>(new Set());
 
   // Load profile and poll struggle score
   useEffect(() => {
@@ -83,6 +85,20 @@ export default function App() {
     };
     poll();
     const id = setInterval(poll, 2000);
+    return () => clearInterval(id);
+  }, []);
+
+  // --- Session 20: Enterprise Managed Policy lockdown polling ---
+  useEffect(() => {
+    const pollLockdown = () => {
+      chrome.runtime.sendMessage({ type: 'ENTERPRISE_GET_LOCKDOWN' }).then((res) => {
+        if (res && typeof res === 'object' && Array.isArray((res as { lockedKeys: string[] }).lockedKeys)) {
+          setLockedKeys(new Set((res as { lockedKeys: string[] }).lockedKeys));
+        }
+      }).catch(() => {});
+    };
+    pollLockdown();
+    const id = setInterval(pollLockdown, 10_000);
     return () => clearInterval(id);
   }, []);
 
@@ -224,6 +240,11 @@ export default function App() {
     }, 500);
   }, []);
 
+  // --- Session 20: Enterprise policy helper ---
+  function isLocked(key: string): boolean {
+    return lockedKeys.has(key);
+  }
+
   return (
     <div className="bg-a11y-bg text-a11y-text min-h-[300px] flex flex-col">
       {/* --- Session 19: Desktop Agent Pair Dialog --- */}
@@ -343,6 +364,12 @@ export default function App() {
         <Toggle value={enabled} onChange={handleToggleAll} size="sm" />
       </div>
 
+      {/* --- Session 20: Enterprise managed-policy banner --- */}
+      {lockedKeys.size > 0 && (
+        <div style={{ padding: '8px 12px', background: 'rgba(123, 104, 238, 0.15)', color: 'var(--accent, #bb86fc)', fontSize: 12, borderBottom: '1px solid rgba(123, 104, 238, 0.3)' }} role="status" aria-live="polite">
+          {lockedKeys.size} setting{lockedKeys.size === 1 ? '' : 's'} managed by your organization
+        </div>
+      )}
       {/* Tab navigation */}
       <TabNav tabs={TABS} active={tab} onChange={(id) => setTab(id as Tab)} />
 
@@ -362,13 +389,13 @@ export default function App() {
           <OverviewTab score={struggleScore} activeCount={activeCount} agentStatus={agentStatus} onPairClick={() => setShowPairDialog(true)} />
         )}
         {enabled && tab === 'sensory' && (
-          <SensoryTab sensory={profile.sensory} onChange={updateSensory} />
+          <SensoryTab sensory={profile.sensory} onChange={updateSensory} isLocked={isLocked} />
         )}
         {enabled && tab === 'cognitive' && (
-          <CognitiveTab cognitive={profile.cognitive} onChange={updateCognitive} />
+          <CognitiveTab cognitive={profile.cognitive} onChange={updateCognitive} isLocked={isLocked} />
         )}
         {enabled && tab === 'motor' && (
-          <MotorTab motor={profile.motor} onChange={updateMotor} />
+          <MotorTab motor={profile.motor} onChange={updateMotor} isLocked={isLocked} />
         )}
         {enabled && tab === 'settings' && (
           <SettingsTab
@@ -379,6 +406,7 @@ export default function App() {
             onCheckUpdate={handleCheckUpdate}
             checkingUpdate={checkingUpdate}
             updateInfo={updateInfo}
+            isLocked={isLocked}
           />
         )}
       </div>
@@ -471,9 +499,11 @@ function OverviewTab({ score, activeCount, agentStatus, onPairClick }: {
 function SensoryTab({
   sensory,
   onChange,
+  isLocked,
 }: {
   sensory: SensoryProfile;
   onChange: (patch: Partial<SensoryProfile>) => void;
+  isLocked: (key: string) => boolean;
 }) {
   return (
     <>
@@ -533,17 +563,20 @@ function SensoryTab({
         label="Reduced Motion"
         value={sensory.reducedMotion}
         onChange={(v) => onChange({ reducedMotion: v })}
+        locked={isLocked('sensory.reducedMotion')}
       />
       <Toggle
         label="High Contrast"
         value={sensory.highContrast}
         onChange={(v) => onChange({ highContrast: v })}
+        locked={isLocked('sensory.highContrast')}
       />
       {/* --- Priority 1: Captions + Actions --- */}
       <Toggle
         label="Live Captions"
         value={sensory.liveCaptionsEnabled}
         onChange={(v) => onChange({ liveCaptionsEnabled: v })}
+        locked={isLocked('sensory.liveCaptionsEnabled')}
       />
       {sensory.liveCaptionsEnabled && (
         <>
@@ -621,6 +654,7 @@ function SensoryTab({
           label="Enable Vision Recovery"
           value={sensory.visionRecoveryEnabled}
           onChange={(v) => onChange({ visionRecoveryEnabled: v })}
+          locked={isLocked('sensory.visionRecoveryEnabled')}
         />
         {sensory.visionRecoveryEnabled && (
           <>
@@ -712,9 +746,11 @@ function toggleFeature(feature: string, enabled: boolean): void {
 function CognitiveTab({
   cognitive,
   onChange,
+  isLocked,
 }: {
   cognitive: CognitiveProfile;
   onChange: (patch: Partial<CognitiveProfile>) => void;
+  isLocked: (key: string) => boolean;
 }) {
   return (
     <>
@@ -725,6 +761,7 @@ function CognitiveTab({
           onChange({ focusModeEnabled: v });
           toggleFeature('focus-mode', v);
         }}
+        locked={isLocked('cognitive.focusModeEnabled')}
       />
       <Toggle
         label="Reading Mode"
@@ -733,6 +770,7 @@ function CognitiveTab({
           onChange({ readingModeEnabled: v });
           toggleFeature('reading-mode', v);
         }}
+        locked={isLocked('cognitive.readingModeEnabled')}
       />
       <div className="space-y-1">
         <label className="text-xs text-a11y-muted">Text Simplification</label>
@@ -774,6 +812,7 @@ function CognitiveTab({
           onChange({ autoSummarize: v });
           toggleFeature('auto-summarize', v);
         }}
+        locked={isLocked('cognitive.autoSummarize')}
       />
       <Toggle
         label="Distraction Shield"
@@ -782,12 +821,14 @@ function CognitiveTab({
           onChange({ distractionShield: v });
           toggleFeature('distraction-shield', v);
         }}
+        locked={isLocked('cognitive.distractionShield')}
       />
       {/* --- Priority 1: Captions + Actions --- */}
       <Toggle
         label="Action Items"
         value={cognitive.actionItemsEnabled}
         onChange={(v) => onChange({ actionItemsEnabled: v })}
+        locked={isLocked('cognitive.actionItemsEnabled')}
       />
       {cognitive.actionItemsEnabled && (
         <>
@@ -813,9 +854,11 @@ function CognitiveTab({
 function MotorTab({
   motor,
   onChange,
+  isLocked,
 }: {
   motor: MotorProfile;
   onChange: (patch: Partial<MotorProfile>) => void;
+  isLocked: (key: string) => boolean;
 }) {
   const [showLibrary, setShowLibrary] = useState(false);
   return (
@@ -827,6 +870,7 @@ function MotorTab({
           onChange({ voiceNavigationEnabled: v });
           toggleFeature('voice-nav', v);
         }}
+        locked={isLocked('motor.voiceNavigationEnabled')}
       />
       {/* --- Session 17: Voice Tier Selection --- */}
       <VoiceTierPanel motor={motor} onChange={onChange} />
@@ -837,6 +881,7 @@ function MotorTab({
           onChange({ eyeTrackingEnabled: v });
           toggleFeature('eye-tracking', v);
         }}
+        locked={isLocked('motor.eyeTrackingEnabled')}
       />
       <Toggle
         label="Smart Click Targets"
@@ -860,6 +905,7 @@ function MotorTab({
             }
           });
         }}
+        locked={isLocked('motor.keyboardOnlyMode')}
       />
       <Toggle
         label="Predictive Input"
@@ -875,6 +921,7 @@ function MotorTab({
             }
           });
         }}
+        locked={isLocked('motor.predictiveInput')}
       />
       <Toggle
         label="Dwell Click"
@@ -891,6 +938,7 @@ function MotorTab({
             }
           });
         }}
+        locked={isLocked('motor.dwellClickEnabled')}
       />
       {motor.dwellClickEnabled && (
         <Slider
@@ -919,6 +967,7 @@ function MotorTab({
           label="Enable gesture shortcuts"
           value={motor.gestureShortcutsEnabled}
           onChange={(v) => onChange({ gestureShortcutsEnabled: v })}
+          locked={isLocked('motor.gestureShortcutsEnabled')}
         />
         {motor.gestureShortcutsEnabled && (
           <>
@@ -1161,6 +1210,7 @@ function SettingsTab({
   onCheckUpdate,
   checkingUpdate,
   updateInfo,
+  isLocked,
 }: {
   profile: AccessibilityProfile;
   onSave: (p: AccessibilityProfile) => void;
@@ -1169,6 +1219,7 @@ function SettingsTab({
   onCheckUpdate: () => void;
   checkingUpdate: boolean;
   updateInfo: UpdateInfo | null;
+  isLocked: (key: string) => boolean;
 }) {
   const [lastPublish, setLastPublish] = useState<number | null>(null);
   const [daysContributed, setDaysContributed] = useState<number>(0);
@@ -1479,7 +1530,7 @@ function SettingsTab({
       </div>
 
       {/* --- Session 11: Multi-Modal Fusion --- */}
-      <FusionSection profile={profile} onSave={onSave} />
+      <FusionSection profile={profile} onSave={onSave} isLocked={isLocked} />
 
       {/* --- Session 12: On-Device ONNX Models --- */}
       <OnnxModelsSection profile={profile} onSave={onSave} />
@@ -1635,9 +1686,11 @@ interface FusionStatsResponse {
 function FusionSection({
   profile,
   onSave,
+  isLocked,
 }: {
   profile: AccessibilityProfile;
   onSave: (p: AccessibilityProfile) => void;
+  isLocked: (key: string) => boolean;
 }) {
   const [stats, setStats] = useState<FusionStatsResponse | null>(null);
 
@@ -1686,6 +1739,7 @@ function FusionSection({
         label="Enable fusion"
         value={profile.fusionEnabled}
         onChange={(v) => update({ fusionEnabled: v })}
+        locked={isLocked('fusionEnabled')}
       />
       {profile.fusionEnabled && (
         <>

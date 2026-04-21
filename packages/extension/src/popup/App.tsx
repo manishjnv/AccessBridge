@@ -40,6 +40,11 @@ export default function App() {
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [updateStep, setUpdateStep] = useState<'idle' | 'downloading' | 'downloaded' | 'reloading'>('idle');
+  // --- Session 19: Desktop Agent ---
+  const [agentStatus, setAgentStatus] = useState<{ connected: boolean; state: string; server: { version: string } | null }>({ connected: false, state: 'idle', server: null });
+  const [showPairDialog, setShowPairDialog] = useState(false);
+  const [pskInput, setPskInput] = useState('');
+  const [pairError, setPairError] = useState<string | null>(null);
 
   // Load profile and poll struggle score
   useEffect(() => {
@@ -67,6 +72,18 @@ export default function App() {
     const interval = setInterval(pollScore, 3000);
 
     return () => clearInterval(interval);
+  }, []);
+
+  // --- Session 19: Desktop Agent status polling ---
+  useEffect(() => {
+    const poll = () => {
+      chrome.runtime.sendMessage({ type: 'AGENT_GET_STATUS' }, (status) => {
+        if (status && typeof status === 'object') setAgentStatus(status as typeof agentStatus);
+      });
+    };
+    poll();
+    const id = setInterval(poll, 2000);
+    return () => clearInterval(id);
   }, []);
 
   const saveProfile = useCallback(
@@ -209,6 +226,54 @@ export default function App() {
 
   return (
     <div className="bg-a11y-bg text-a11y-text min-h-[300px] flex flex-col">
+      {/* --- Session 19: Desktop Agent Pair Dialog --- */}
+      {showPairDialog && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(10, 10, 26, 0.85)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+        }} onClick={() => setShowPairDialog(false)}>
+          <div onClick={(e) => e.stopPropagation()} style={{
+            background: 'var(--surface, #1a1a2e)',
+            border: '1px solid rgba(123, 104, 238, 0.3)',
+            borderRadius: 14, padding: 24, minWidth: 320, maxWidth: 420,
+          }}>
+            <h3 style={{ color: '#e2e8f0', fontSize: 16, margin: '0 0 8px 0' }}>Pair Desktop Agent</h3>
+            <p style={{ color: '#94a3b8', fontSize: 12, margin: '0 0 12px 0', lineHeight: 1.5 }}>
+              Open the Desktop Agent then Settings then Overview, copy the Pair Key, paste it here.
+            </p>
+            <textarea
+              value={pskInput}
+              onChange={(e) => { setPskInput(e.target.value); setPairError(null); }}
+              placeholder="Paste base64 pair key..."
+              style={{
+                width: '100%', minHeight: 80, padding: 10,
+                background: '#0a0a1a', color: '#e2e8f0',
+                border: '1px solid rgba(123, 104, 238, 0.2)',
+                borderRadius: 8, fontFamily: 'monospace', fontSize: 11, resize: 'vertical',
+                boxSizing: 'border-box',
+              }}
+            />
+            {pairError && <div style={{ color: '#ef4444', fontSize: 11, marginTop: 6 }}>{pairError}</div>}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
+              <button
+                onClick={() => setShowPairDialog(false)}
+                style={{ padding: '8px 14px', background: 'transparent', color: '#94a3b8', border: '1px solid rgba(148, 163, 184, 0.3)', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}
+              >Cancel</button>
+              <button
+                onClick={() => {
+                  const trimmed = pskInput.trim();
+                  if (trimmed.length < 40) { setPairError('Pair key looks too short'); return; }
+                  chrome.runtime.sendMessage({ type: 'AGENT_SET_PSK', pskB64: trimmed }, (res) => {
+                    if (res?.ok) { setShowPairDialog(false); setPskInput(''); }
+                    else setPairError(res?.error ?? 'Pairing failed');
+                  });
+                }}
+                style={{ padding: '8px 14px', background: 'linear-gradient(135deg, #7b68ee, #bb86fc)', color: '#fff', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+              >Pair</button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Update banner — 2-step: Download then Reload */}
       {updateInfo?.hasUpdate && (
         <div style={{
@@ -294,7 +359,7 @@ export default function App() {
           </div>
         )}
         {enabled && tab === 'overview' && (
-          <OverviewTab score={struggleScore} activeCount={activeCount} />
+          <OverviewTab score={struggleScore} activeCount={activeCount} agentStatus={agentStatus} onPairClick={() => setShowPairDialog(true)} />
         )}
         {enabled && tab === 'sensory' && (
           <SensoryTab sensory={profile.sensory} onChange={updateSensory} />
@@ -323,7 +388,12 @@ export default function App() {
 
 // ---------- Tab panels ----------
 
-function OverviewTab({ score, activeCount }: { score: number; activeCount: number }) {
+function OverviewTab({ score, activeCount, agentStatus, onPairClick }: {
+  score: number;
+  activeCount: number;
+  agentStatus: { connected: boolean; state: string; server: { version: string } | null };
+  onPairClick: () => void;
+}) {
   const scoreColor =
     score < 30 ? 'text-green-400' : score < 60 ? 'text-yellow-400' : 'text-red-400';
 
@@ -343,6 +413,56 @@ function OverviewTab({ score, activeCount }: { score: number; activeCount: numbe
           <div className="text-lg font-semibold">{score < 30 ? 'Low' : score < 60 ? 'Medium' : 'High'}</div>
           <div className="text-xs text-a11y-muted">Struggle Level</div>
         </div>
+      </div>
+      {/* --- Session 19: Desktop Agent --- */}
+      <div style={{
+        marginTop: 12,
+        padding: '10px 14px',
+        background: 'var(--surface, #1a1a2e)',
+        border: '1px solid rgba(123, 104, 238, 0.18)',
+        borderRadius: 10,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 8,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{
+            width: 8,
+            height: 8,
+            borderRadius: '50%',
+            background: agentStatus.connected ? '#10b981' : (agentStatus.state === 'handshaking' || agentStatus.state === 'connecting' ? '#f59e0b' : '#94a3b8'),
+            boxShadow: agentStatus.connected ? '0 0 6px rgba(16, 185, 129, 0.5)' : 'none',
+            display: 'inline-block',
+          }} />
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0' }}>Desktop Agent</div>
+            <div style={{ fontSize: 11, color: '#94a3b8' }}>
+              {agentStatus.connected ? `Connected (v${agentStatus.server?.version ?? '?'})` :
+               agentStatus.state === 'handshaking' ? 'Pairing...' :
+               agentStatus.state === 'connecting' ? 'Connecting...' :
+               agentStatus.state === 'error' ? 'Error' :
+               'Not installed'}
+            </div>
+          </div>
+        </div>
+        {!agentStatus.connected && (
+          <button
+            onClick={onPairClick}
+            style={{
+              padding: '6px 12px',
+              fontSize: 11,
+              fontWeight: 600,
+              background: 'linear-gradient(135deg, #7b68ee, #bb86fc)',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 8,
+              cursor: 'pointer',
+            }}
+          >
+            Pair
+          </button>
+        )}
       </div>
     </>
   );

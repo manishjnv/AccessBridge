@@ -69,7 +69,7 @@ Deploy script ships artifacts only (no VPS-side build). Dependency install on VP
 
 ## Session Binding (global orchestration hooks)
 
-**Phase 0 warm-start reads (parallel):** `CLAUDE.md`, `FEATURES.md`, `ARCHITECTURE.md`, `ROADMAP.md`, `UI_GUIDELINES.md`, `HANDOFF.md`, `RCA.md`, `~/.claude/projects/e--code-AccessBridge/memory/MEMORY.md`
+**Phase 0 warm-start reads (parallel):** `CLAUDE.md`, `FEATURES.md`, `ARCHITECTURE.md`, `ROADMAP.md`, `UI_GUIDELINES.md`, `HANDOFF.md`, `RCA.md`, `docs/features/desktop-agent.md`, `~/.claude/projects/e--code-AccessBridge/memory/MEMORY.md`
 
 **Load-bearing paths** (Opus diff review required in Phase 3):
 
@@ -79,12 +79,19 @@ Deploy script ships artifacts only (no VPS-side build). Dependency install on VP
 - `packages/extension/manifest.json` — permissions + version bump (RCA BUG-003)
 - `packages/extension/vite.config.ts` — `base: ''` invariant (RCA BUG-001)
 - `deploy/index.html` + `deploy.sh` — landing page + VPS (RCA BUG-002, BUG-004)
+- `packages/desktop-agent/src-tauri/src/ipc_server.rs` — loopback WS listener + PSK handshake
+- `packages/desktop-agent/src-tauri/src/crypto.rs` — PSK generation + handshake hashing
+- `packages/extension/src/background/agent-bridge.ts` — agent pairing + profile sync
+- `packages/core/src/ipc/client.ts` — shared WS protocol client (also used by future desktop surfaces)
 
 **Security-adjacent paths** (require `codex:rescue` sign-off before push):
 
 - New/changed `permissions` or `host_permissions` in `manifest.json`
 - Content-script injection logic changes (RCA BUG-008 pattern)
 - Any new cross-origin fetch in `background/**`
+- New `permissions` or `host_permissions` in `packages/desktop-agent/src-tauri/tauri.conf.json`
+- Changes to `ipc_server::serve` auth / handshake flow
+- Any new network listener, unix socket, or named pipe bound by the agent
 
 **HANDOFF.md agent-utilization footer** (last 4 lines, every session exit):
 

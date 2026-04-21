@@ -1,0 +1,54 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "AccessBridge Desktop Agent",
+  "version": "0.1.0",
+  "identifier": "com.accessbridge.desktop",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "pnpm dev",
+    "beforeBuildCommand": "pnpm build"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "settings",
+        "title": "AccessBridge Desktop Agent",
+        "width": 760,
+        "height": 540,
+        "resizable": true,
+        "fullscreen": false,
+        "visible": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self' tauri: ws://127.0.0.1:* http://127.0.0.1:*"
+    },
+    "trayIcon": {
+      "id": "main",
+      "iconPath": "icons/icon.png",
+      "iconAsTemplate": false,
+      "tooltip": "AccessBridge Desktop Agent"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["msi"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico",
+      "icons/icon.png"
+    ],
+    "publisher": "Manish Kumar",
+    "copyright": "Copyright (c) 2026 Manish Kumar",
+    "windows": {
+      "wix": {
+        "language": "en-US",
+        "template": null
+      }
+    },
+    "resources": []
+  }
+}

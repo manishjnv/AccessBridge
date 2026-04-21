@@ -28,6 +28,7 @@ Completed items move to [HANDOFF.md](HANDOFF.md) + closed here.
 ## Current State (2026-04-21)
 
 - 🟢 Chrome extension — shipped v0.16.0 with 29 features across 6 modules (see [FEATURES.md](FEATURES.md))
+- 🟡 **Desktop Agent MVP (Session 19)** — Tauri 2 + Windows UIA foundation shipped; font scaling adapter pending Phase 2 DPI shim.
 - 🟢 Landing page + self-update pipeline — live at `https://accessbridge.space`
 - 🟢 Core engine + AI engine packages — extracted, tested, reusable
 - 🟢 Monorepo structured for multi-surface expansion (see [ARCHITECTURE.md](ARCHITECTURE.md))
@@ -77,7 +78,7 @@ Transformers.js `all-MiniLM-L6-v2` semantic cache (L2) with IndexedDB index, exp
 
 Reuse `@accessbridge/core` + `@accessbridge/ai-engine`, add surface-specific adapters.
 
-### R1-01 ⚪ Desktop companion (Tauri)
+### R1-01 🟡 Desktop companion (Tauri)
 
 Cross-platform desktop app (Windows/macOS/Linux) that overlays AccessBridge on native apps: Word, Excel, PowerPoint, Teams, Slack, VS Code, native browsers.
 
@@ -86,6 +87,8 @@ Cross-platform desktop app (Windows/macOS/Linux) that overlays AccessBridge on n
 - **Dependencies:** None — uses existing core + ai-engine
 - **Key tech:** Tauri (Rust + webview), OS-level accessibility APIs (UIAutomation on Windows, AXUIElement on macOS, AT-SPI on Linux)
 - **MVP scope:** Font scaling, contrast, focus mode, simplify-selected-text working in any app
+
+- **Status (2026-04-21):** Session 19 shipped the MVP foundation — Tauri 2 scaffold + IPC protocol (TS ↔ Rust) + loopback WS server with PSK handshake + Windows UIA inspection + extension bridge + cross-surface profile sync groundwork. Not yet functional: per-process DPI font-scaling (needs a shim DLL, Phase 2). macOS + Linux dispatchers stubbed. MSI installer configured but not yet built in CI (requires Rust + MSVC + WiX on the build agent). See [docs/features/desktop-agent.md](docs/features/desktop-agent.md).
 
 ### R1-02 ⚪ Android accessibility service
 

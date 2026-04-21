@@ -29,3 +29,6 @@ test-results/
 playwright-report/
 blob-report/
 .last-run.json
+# Desktop Agent MSI installer — large binary, built by tools/build-agent-installer.sh
+deploy/downloads/accessbridge-desktop-agent.msi
+deploy/downloads/accessbridge-desktop-agent.msi.sha256

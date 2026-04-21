@@ -1894,6 +1894,79 @@
       .gh-release { grid-template-columns: 1fr; gap: 6px; }
       .gh-release-tag, .gh-release-date { justify-self: start; }
     }
+
+    /* ---- Desktop Agent section ---- */
+    .desktop-agent-section { padding: 72px 0; }
+    .section-heading {
+      font-size: clamp(28px, 4vw, 40px);
+      font-weight: 700;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .pill-new {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      color: #fff;
+      box-shadow: 0 2px 8px var(--glow);
+      vertical-align: middle;
+    }
+    .agent-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+      margin: 32px 0;
+    }
+    .agent-card {
+      background: var(--surface);
+      border: 1px solid rgba(123, 104, 238, 0.22);
+      border-radius: 14px;
+      padding: 20px;
+      transition: transform 0.25s, border-color 0.25s, box-shadow 0.25s;
+    }
+    .agent-card:hover {
+      transform: translateY(-4px);
+      border-color: var(--primary);
+      box-shadow: 0 8px 24px var(--glow);
+    }
+    .agent-card-heading {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    .agent-card-body {
+      font-size: 14px;
+      color: var(--text);
+      line-height: 1.55;
+    }
+    .agent-cta {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+    .agent-version {
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .muted { color: var(--muted); }
+    @media (max-width: 600px) {
+      .agent-cta { flex-direction: column; align-items: flex-start; }
+      .section-heading { font-size: 24px; }
+    }
   </style>
 </head>
 <body>
@@ -1924,6 +1997,7 @@
         <a href="#/architecture" data-route="/architecture">Architecture</a>
         <a href="#/observatory" data-route="/observatory">Observatory</a>
         <a href="#/roadmap" data-route="/roadmap">Roadmap</a>
+        <a href="#/desktop-agent" data-route="/desktop-agent">Agent</a>
         <a href="#/github" data-route="/github">GitHub</a>
         <span class="app-version navbar-version" aria-label="Current version">v…</span>
         <a href="#install" class="navbar-cta">
@@ -2701,6 +2775,41 @@
 
   </div><!-- /route /roadmap -->
 
+  <!-- =============== ROUTE: /desktop-agent =============== -->
+  <div class="route" data-route="/desktop-agent">
+
+  <section class="desktop-agent-section" id="desktop-agent">
+    <div class="container">
+      <div class="section-label">Native Windows accessibility</div>
+      <h2 class="section-heading">Desktop Agent <span class="pill pill-new">New</span></h2>
+      <p class="section-sub fade-in">Extends AccessBridge to native Windows apps via the Windows UI Automation framework. Loopback-only IPC, zero network exposure, encrypted pairing.</p>
+      <div class="agent-grid">
+        <div class="agent-card">
+          <div class="agent-card-heading">Platform</div>
+          <div class="agent-card-body">Windows 10 / 11 (MVP). macOS and Linux in Phase 2.</div>
+        </div>
+        <div class="agent-card">
+          <div class="agent-card-heading">What it does</div>
+          <div class="agent-card-body">Syncs your AccessBridge profile into native apps; inspects window trees via UIA; adapts native elements where the platform permits.</div>
+        </div>
+        <div class="agent-card">
+          <div class="agent-card-heading">Privacy</div>
+          <div class="agent-card-body">No data leaves your machine. Listens only on 127.0.0.1, paired to the extension via a per-install secret.</div>
+        </div>
+        <div class="agent-card">
+          <div class="agent-card-heading">How to install</div>
+          <div class="agent-card-body">Download the MSI, double-click, unblock SmartScreen (self-signed MVP), reload the extension, paste the pair key.</div>
+        </div>
+      </div>
+      <div class="agent-cta">
+        <a href="/downloads/accessbridge-desktop-agent.msi" class="btn btn-primary" id="agent-download">Download Desktop Agent (MSI)</a>
+        <span class="agent-version muted" id="agent-version">v0.1.0 · <span id="agent-hash">sha256 pending</span></span>
+      </div>
+    </div>
+  </section>
+
+  </div><!-- /route /desktop-agent -->
+
   <!-- =============== ROUTE: /github =============== -->
   <div class="route" data-route="/github">
     <section class="github-section">
@@ -3216,6 +3325,20 @@
     }
     window.addEventListener('hashchange', activateRoute);
     activateRoute();
+  </script>
+  <script>
+    (async () => {
+      try {
+        const resp = await fetch('/downloads/accessbridge-desktop-agent.msi.sha256');
+        if (resp.ok) {
+          const text = (await resp.text()).trim();
+          const hash = text.split(/\s+/)[0];
+          if (hash && hash.length === 64) {
+            document.getElementById('agent-hash').textContent = 'sha256 ' + hash.slice(0, 16) + '\u2026';
+          }
+        }
+      } catch {}
+    })();
   </script>
 </body>
 </html>

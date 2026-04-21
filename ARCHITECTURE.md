@@ -13,6 +13,7 @@ Workspace: [pnpm-workspace.yaml](pnpm-workspace.yaml) — `packages/*`.
 | `@accessbridge/extension` | [packages/extension](packages/extension) | Chrome MV3 extension (UI + content script + SW) |
 | `@accessbridge/core` | [packages/core](packages/core) | Signal detection, decision engine, profile store |
 | `@accessbridge/ai-engine` | [packages/ai-engine](packages/ai-engine) | Tiered AI orchestration (local / Gemini / Claude) |
+| `@accessbridge/desktop-agent` | [packages/desktop-agent](packages/desktop-agent) | Tauri 2 Windows companion (Session 19 MVP) |
 
 Dependency flow: `extension` imports `core` and `ai-engine`. `core` and `ai-engine` have no inter-dependency.
 
@@ -294,6 +295,37 @@ IndexedDB, and exposes three thin wrapper classes — `StruggleClassifier`
 - Every ONNX-bearing method has a documented null-return path + heuristic fallback. No user-visible behaviour change when a model is absent.
 
 Docs: [docs/features/onnx-models.md](docs/features/onnx-models.md). Tests: ~70 (runtime 11 · classifier 15 · detector-blending 12 · local-provider-onnx 18 · cache-embedding 6 · registry 8).
+
+---
+
+---
+
+## 8d. Desktop Agent (Session 19)
+
+Tauri 2 Rust binary that pairs with the extension over a loopback WebSocket
+(127.0.0.1:8901) and, on Windows, exposes UIA for inspecting native apps.
+The extension works standalone if the agent is absent; the pairing is
+strictly opt-in via a user-copied PSK.
+
+- **Agent process** — [packages/desktop-agent/src-tauri/src/](packages/desktop-agent/src-tauri/src/). Rust 2021, axum WS server + tokio runtime + Tauri 2 UI shell. Windows-only UIA dispatcher via the `uiautomation` crate; macOS/Linux get a no-op stub (Phase 2 target).
+- **Shared wire protocol** — TypeScript discriminated union at [packages/core/src/ipc/types.ts](packages/core/src/ipc/types.ts); Rust serde mirror at [packages/desktop-agent/src-tauri/src/ipc_protocol.rs](packages/desktop-agent/src-tauri/src/ipc_protocol.rs). 15 message variants covering HELLO handshake, profile CRUD, UIA inspect, adaptation apply/revert, ping/pong, and error. camelCase over the wire, SCREAMING_SNAKE_CASE `type` discriminator.
+- **TS client** — [packages/core/src/ipc/client.ts](packages/core/src/ipc/client.ts). `AgentClient` class: PSK handshake (sha256(psk||nonce) hex over the wire; agent compares in constant time), exponential backoff reconnect, request/response with per-request timeout, push subscription for `PROFILE_UPDATED`. Never throws on connection failure — extension continues standalone.
+- **Extension bridge** — [packages/extension/src/background/agent-bridge.ts](packages/extension/src/background/agent-bridge.ts). `AgentBridge` singleton wraps `AgentClient` with chrome.storage.local-backed PSK + status persistence + profile push callback. Seven new background message types (`AGENT_GET_STATUS`, `AGENT_SET_PSK`, `AGENT_CLEAR_PSK`, `AGENT_HAS_PSK`, `AGENT_INSPECT_NATIVE`, `AGENT_APPLY_NATIVE`, `AGENT_REVERT_NATIVE`) surface the bridge to popup + sidepanel.
+- **Settings window** — [packages/desktop-agent/src/App.tsx](packages/desktop-agent/src/App.tsx). React 18 three-tab UI (Overview / Profile / Logs) served by Tauri; four Rust commands via `@tauri-apps/api/core#invoke`: `bridge_agent_info`, `bridge_get_pair_key_path`, `bridge_read_pair_key_b64`, `bridge_get_profile`.
+
+**Security invariants:**
+
+- Listener binds to `127.0.0.1` only — never `0.0.0.0`. No public exposure.
+- PSK is 32 random bytes (ring SystemRandom), stored at `%LOCALAPPDATA%\AccessBridge\pair.key`, readable only by the user who owns the agent process.
+- Handshake hash is `sha256(psk || nonce)`; agent side uses `constant_time_eq` (ring::constant_time) to prevent timing oracles.
+- AES-GCM payload encryption is defined but unused in MVP; reserved for future messages whose content is sensitive to a local packet sniffer.
+- No new extension-side host permissions. No new manifest permissions. The agent is a peer process, not a browser-granted capability.
+
+**Phase 2 upgrades:** macOS (NSAccessibility) and Linux (AT-SPI) dispatchers, SQLCipher-backed agent profile store, per-process DPI shim DLL for real font scaling on native Windows apps, code signing for the MSI, true cross-device profile sync via encrypted cloud relay, auto-update mechanism.
+
+Tests: Rust inline (~53 across ipc_protocol/ipc_server/crypto/profile_store/filters — authored this session, not yet run in CI because toolchain is not installed in CI image); TS vitest (AgentClient tests in `core/ipc/__tests__/` + `extension/background/__tests__/agent-bridge.test.ts`).
+
+Docs: [docs/features/desktop-agent.md](docs/features/desktop-agent.md).
 
 ---
 

@@ -10,6 +10,10 @@
 #   --no-cache    bypass all build-cache shortcuts — rebuild, retest from scratch.
 #                 Use when you don't trust the cache or are debugging a suspected
 #                 cache-related issue. Equivalent to the old stateless pipeline.
+#   --with-agent  also build the Desktop Agent MSI (via tools/build-agent-installer.sh)
+#                 and stage it into deploy/downloads/ before the VPS sync step.
+#                 Requires Rust + MSVC + WiX toolchain; safe to omit when not shipping
+#                 a new agent build — the existing MSI in deploy/downloads/ is synced.
 #
 # Pipeline: bump → typecheck+build+test → re-zip → push → sync → VPS-verify → health
 # SSH alias: a11yos-vps
@@ -28,6 +32,7 @@ SKIP_TESTS=false
 SKIP_CHECK=false
 SKIP_BUMP=false
 NO_CACHE=false
+WITH_AGENT=0
 
 for arg in "$@"; do
   case "$arg" in
@@ -37,6 +42,7 @@ for arg in "$@"; do
     --no-check)    SKIP_CHECK=true  ;;
     --skip-bump)   SKIP_BUMP=true   ;;
     --no-cache)    NO_CACHE=true    ;;  # restore the old stateless pipeline
+    --with-agent)  WITH_AGENT=1     ;;
     *) echo "Unknown arg: $arg" >&2; exit 2 ;;
   esac
 done
@@ -268,6 +274,23 @@ echo "  ✓ Zip re-packaged (v${VERSION}, $(stat -c%s accessbridge-extension.zip
 
 # Also sync to deploy/downloads for the local landing-page preview
 cp -f accessbridge-extension.zip deploy/downloads/accessbridge-extension.zip
+
+# ─────────────────────────────────────────────────────────
+# [1.6/6] (optional) Build Desktop Agent MSI  — only with --with-agent
+# ─────────────────────────────────────────────────────────
+if [ "${WITH_AGENT}" = "1" ]; then
+  echo "[1.6/6] Building desktop-agent MSI (--with-agent)..."
+  _AGENT_SCRIPT="$(pwd)/tools/build-agent-installer.sh"
+  if [ ! -f "$_AGENT_SCRIPT" ]; then
+    echo "  ✗ tools/build-agent-installer.sh not found — skipping agent build"
+  elif bash "$_AGENT_SCRIPT"; then
+    echo "  ✓ agent MSI built and staged into deploy/downloads/"
+  else
+    echo "  ⚠ agent MSI build failed — deploy continues without updated MSI"
+  fi
+else
+  echo "[1.6/6] Skipping desktop-agent MSI build (pass --with-agent to enable)"
+fi
 
 # ─────────────────────────────────────────────────────────
 # [2/6] Push to GitHub

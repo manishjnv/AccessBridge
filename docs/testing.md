@@ -98,6 +98,40 @@ Findings from (1) and (2) are merged in `mergeAuditFindings(customFindings, axeF
 
 See [features/accessibility-audit.md](features/accessibility-audit.md) for the full rule list + scoring methodology + axe mapping details.
 
+## Desktop Agent tests (Session 19)
+
+The Desktop Agent introduces two new test layers that sit outside the main Vitest + Playwright pyramid.
+
+### Rust inline tests (`cargo test`)
+
+Located inside each Rust source module as `#[cfg(test)] mod tests`. Not yet wired into CI — the CI image does not have the Rust toolchain, MSVC build tools, or WiX installed.
+
+To run locally:
+
+```bash
+cd packages/desktop-agent/src-tauri
+cargo test
+```
+
+| Module | Tests | Coverage |
+|--------|-------|----------|
+| `ipc_protocol` | 19 | Serde round-trips for all 15 message variants; camelCase wire field names; type discriminator values; error paths (malformed JSON, unknown type, missing required field) |
+| `ipc_server` | ~11 | `dispatch()` for all routed messages; PSK hash correct/wrong; profile get/set; ping/pong; UIA inspect routing; adaptation apply success/failure |
+| `crypto` | 16 | PSK generate/base64/wrong-length; `psk_hash` determinism; `constant_time_eq`; `PairKeyFile` round-trip/version/length/malformed; AES-GCM encrypt/decrypt/tamper/wrong-AAD/wrong-key/short-input/unique-nonce |
+| `profile_store` | 4 | Empty initial state; set-then-get; broadcast receive; multiple subscribers |
+
+### TypeScript AgentBridge tests (Vitest)
+
+`packages/extension/src/background/__tests__/agent-bridge.test.ts` — PSK set/clear/has; `start()` idle-when-no-PSK; `syncProfileOut` no-op when disconnected; `listNativeWindows` returns `[]` when disconnected.
+
+`packages/core/src/ipc/__tests__/` — `AgentClient` connection lifecycle, handshake success/failure, request/response matching, per-request timeout, push handler, reconnect scheduling, dispose; IPC type guards and `newRequestId`.
+
+### Playwright agent-pairing spec
+
+`e2e/specs/agent-pairing.spec.ts` covers the PSK entry dialog, status badge transition, and unpair flow. The spec is marked `test.skip` in CI until a Tauri binary is available in the CI environment.
+
+---
+
 ## CI workflows
 
 Two workflows, split so a flaky E2E doesn't block the cheap green path:

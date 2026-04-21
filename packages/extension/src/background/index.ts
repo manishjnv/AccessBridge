@@ -16,6 +16,7 @@ import type {
   StruggleScore,
   BehaviorSignal,
 } from '@accessbridge/core';
+import type { NativeTargetHint, NativeAdaptation } from '@accessbridge/core/ipc';
 
 // AI Engine — lazy-initialized to keep startup fast
 import { AIEngine, SummarizerService, SimplifierService } from '@accessbridge/ai-engine';
@@ -48,6 +49,8 @@ import {
   rotateDeviceKeypair,
   getOrRefreshRing,
 } from './observatory-publisher.js';
+// --- Session 19: Desktop Agent Bridge ---
+import { agentBridge } from './agent-bridge.js';
 
 const observatoryCollector = new ObservatoryCollector();
 observatoryCollector.hydrateFromStorage().catch(() => {});
@@ -486,7 +489,15 @@ type MessageType =
   | 'OBSERVATORY_ROTATE_KEY'
   // --- Session 17: Indic Whisper STT ---
   | 'INDIC_WHISPER_TRANSCRIBE'
-  | 'VOICE_TIER_RECORD';
+  | 'VOICE_TIER_RECORD'
+  // --- Session 19: Desktop Agent Bridge ---
+  | 'AGENT_GET_STATUS'
+  | 'AGENT_HAS_PSK'
+  | 'AGENT_SET_PSK'
+  | 'AGENT_CLEAR_PSK'
+  | 'AGENT_INSPECT_NATIVE'
+  | 'AGENT_APPLY_NATIVE'
+  | 'AGENT_REVERT_NATIVE';
 
 interface Message {
   type: MessageType;
@@ -530,6 +541,7 @@ async function handleMessage(
           chrome.tabs.sendMessage(tab.id, { type: 'PROFILE_UPDATED', payload: profile }).catch(() => {});
         }
       }
+      agentBridge.syncProfileOut(currentProfile!).catch(() => {});
       return { success: true };
     }
 
@@ -988,6 +1000,47 @@ async function handleMessage(
       }
     }
 
+    // --- Session 19: Desktop Agent Bridge ---
+    case 'AGENT_GET_STATUS': {
+      return agentBridge.getStatus();
+    }
+
+    case 'AGENT_HAS_PSK': {
+      const hasPsk = await agentBridge.hasPsk();
+      return { hasPsk };
+    }
+
+    case 'AGENT_SET_PSK': {
+      const pskB64 = (message as unknown as { type: string; pskB64: string }).pskB64;
+      try {
+        await agentBridge.setPskFromBase64(pskB64);
+        return { ok: true };
+      } catch (err) {
+        return { ok: false, error: (err as Error)?.message ?? 'unknown' };
+      }
+    }
+
+    case 'AGENT_CLEAR_PSK': {
+      await agentBridge.clearPsk();
+      return { ok: true };
+    }
+
+    case 'AGENT_INSPECT_NATIVE': {
+      const elements = await agentBridge.listNativeWindows();
+      return { elements };
+    }
+
+    case 'AGENT_APPLY_NATIVE': {
+      const { target, adaptation } = message as unknown as { type: string; target: NativeTargetHint; adaptation: NativeAdaptation };
+      return agentBridge.applyNativeAdaptation(target, adaptation);
+    }
+
+    case 'AGENT_REVERT_NATIVE': {
+      const { id } = message as unknown as { type: string; id: string };
+      const ok = await agentBridge.revertNativeAdaptation(id);
+      return { ok };
+    }
+
     default: {
       // Handle voice command messages (format: { action: 'nextTab' })
       const msg = message as unknown as Record<string, string>;
@@ -1131,3 +1184,26 @@ function compareVersions(a: string, b: string): number {
 }
 
 console.log('AccessBridge service worker initialized');
+
+// --- Session 19: Desktop Agent Bridge ---
+// Non-blocking, fail-silent. Extension works standalone if no agent present.
+agentBridge.start({
+  getLocalProfile: () => currentProfile,
+  onProfilePushFromAgent: (profile) => {
+    // Merge agent-pushed profile into local store + broadcast.
+    currentProfile = { ...currentProfile, ...profile, updatedAt: Date.now() } as typeof currentProfile;
+    chrome.storage.local.set({ profile: currentProfile }).catch(() => {});
+    chrome.tabs.query({}, (tabs) => {
+      for (const tab of tabs) {
+        if (tab.id !== undefined) {
+          chrome.tabs.sendMessage(tab.id, { type: 'PROFILE_UPDATED', profile: currentProfile }).catch(() => {});
+        }
+      }
+    });
+  },
+  clientInfo: {
+    version: chrome.runtime.getManifest().version,
+    platform: 'chrome',
+    capabilities: ['profile-sync'],
+  },
+}).catch((err) => console.warn('[background] agentBridge.start failed', err));

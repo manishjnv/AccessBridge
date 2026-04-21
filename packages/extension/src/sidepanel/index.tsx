@@ -12,7 +12,7 @@ import VisionPanel from './vision/VisionPanel.js';
 // --- Session 11: Multi-Modal Fusion ---
 import IntelligencePanel from './intelligence/IntelligencePanel.js';
 
-type SidePanelTab = 'dashboard' | 'audit' | 'actions' | 'vision' | 'intelligence' | 'compliance';
+type SidePanelTab = 'dashboard' | 'audit' | 'actions' | 'vision' | 'intelligence' | 'compliance' | 'native-apps';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -695,12 +695,17 @@ function SidePanel() {
         <TabButton label="Intelligence" active={tab === 'intelligence'} onClick={() => setTab('intelligence')} />
         {/* --- Session 16: ZK Attestation --- */}
         <TabButton label="Compliance" active={tab === 'compliance'} onClick={() => setTab('compliance')} />
+        {/* --- Session 19: Desktop Agent Native Apps --- */}
+        <TabButton label="Native Apps" active={tab === 'native-apps'} onClick={() => setTab('native-apps')} />
       </nav>
 
       {/* ── Body ───────────────────────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3">
         {/* --- Priority 1: Captions + Actions --- */}
-        {tab === 'compliance' ? (
+        {/* --- Session 19: Desktop Agent Native Apps --- */}
+        {tab === 'native-apps' ? (
+          <NativeAppsPanel />
+        ) : tab === 'compliance' ? (
           <CompliancePanel />
         ) : tab === 'intelligence' ? (
           <IntelligencePanel />
@@ -1711,6 +1716,220 @@ function CompliancePanel() {
         </p>
       </div>
     </div>
+  );
+}
+
+// ─── Session 19: Desktop Agent Native Apps Panel ─────────────────────────────
+
+interface NativeWindow {
+  processName: string;
+  windowTitle: string;
+  className: string;
+}
+
+interface ActiveNativeAdaptation {
+  id: string;
+  processName: string;
+  label: string;
+}
+
+function NativeAppsPanel() {
+  const [agentConnected, setAgentConnected] = React.useState(false);
+  const [windows, setWindows] = React.useState<NativeWindow[]>([]);
+  const [loading, setLoading] = React.useState(false);
+  const [selectedProcess, setSelectedProcess] = React.useState<string | null>(null);
+  const [activeAdaptations, setActiveAdaptations] = React.useState<ActiveNativeAdaptation[]>([]);
+  const [applying, setApplying] = React.useState(false);
+
+  // Poll agent status every 3s
+  React.useEffect(() => {
+    const poll = () => {
+      chrome.runtime.sendMessage({ type: 'AGENT_GET_STATUS' }, (status) => {
+        if (status && typeof status === 'object' && 'connected' in status) {
+          setAgentConnected(!!(status as { connected: boolean }).connected);
+        }
+      });
+    };
+    poll();
+    const iv = setInterval(poll, 3000);
+    return () => clearInterval(iv);
+  }, []);
+
+  const fetchWindows = React.useCallback(() => {
+    setLoading(true);
+    chrome.runtime.sendMessage({ type: 'AGENT_INSPECT_NATIVE' }, (res) => {
+      setLoading(false);
+      if (res && Array.isArray((res as { elements?: unknown[] }).elements)) {
+        setWindows((res as { elements: NativeWindow[] }).elements);
+      }
+    });
+  }, []);
+
+  const handleApplyFontScale = React.useCallback((processName: string) => {
+    setApplying(true);
+    const adaptationId = `font-scale-${processName}-${Date.now().toString(36)}`;
+    chrome.runtime.sendMessage({
+      type: 'AGENT_APPLY_NATIVE',
+      target: { processName },
+      adaptation: { id: adaptationId, kind: 'font-scale', value: 1.2 },
+    }, (res) => {
+      setApplying(false);
+      if (res && (res as { ok: boolean }).ok) {
+        setActiveAdaptations((prev) => [
+          ...prev,
+          { id: (res as { adaptationId: string }).adaptationId ?? adaptationId, processName, label: 'Font Scale +20%' },
+        ]);
+      }
+    });
+  }, []);
+
+  const handleRevert = React.useCallback((id: string) => {
+    chrome.runtime.sendMessage({ type: 'AGENT_REVERT_NATIVE', id }, (res) => {
+      if (res && (res as { ok: boolean }).ok) {
+        setActiveAdaptations((prev) => prev.filter((a) => a.id !== id));
+      }
+    });
+  }, []);
+
+  if (!agentConnected) {
+    return (
+      <section
+        className="bg-a11y-surface rounded-xl p-4"
+        aria-label="Native Apps"
+        style={{ marginTop: 8 }}
+      >
+        <h2 className="text-xs font-semibold uppercase tracking-widest text-a11y-muted mb-3">Native Apps</h2>
+        <div style={{
+          padding: '20px 16px',
+          textAlign: 'center',
+          color: '#94a3b8',
+          fontSize: 13,
+          lineHeight: 1.6,
+          background: 'rgba(123, 104, 238, 0.05)',
+          border: '1px dashed rgba(123, 104, 238, 0.2)',
+          borderRadius: 10,
+        }}>
+          <div style={{ fontSize: 15, fontWeight: 600, color: '#e2e8f0', marginBottom: 8 }}>Desktop Agent not connected</div>
+          <div>Install the AccessBridge Desktop Agent and pair it via the popup to adapt native Windows apps.</div>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section
+      className="bg-a11y-surface rounded-xl p-4"
+      aria-label="Native Apps"
+      style={{ marginTop: 8 }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <h2 className="text-xs font-semibold uppercase tracking-widest text-a11y-muted" style={{ margin: 0 }}>Native Apps</h2>
+        <button
+          onClick={fetchWindows}
+          disabled={loading}
+          style={{
+            padding: '5px 12px',
+            fontSize: 11,
+            fontWeight: 600,
+            background: loading ? 'rgba(123, 104, 238, 0.3)' : 'linear-gradient(135deg, #7b68ee, #bb86fc)',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 8,
+            cursor: loading ? 'not-allowed' : 'pointer',
+          }}
+        >
+          {loading ? 'Loading...' : 'Refresh'}
+        </button>
+      </div>
+
+      {windows.length === 0 && !loading && (
+        <div style={{ color: '#94a3b8', fontSize: 12, textAlign: 'center', padding: '12px 0' }}>
+          No windows detected. Click Refresh to scan.
+        </div>
+      )}
+
+      {windows.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {windows.map((w, i) => (
+            <div
+              key={`${w.processName}-${i}`}
+              onClick={() => setSelectedProcess(selectedProcess === w.processName ? null : w.processName)}
+              style={{
+                padding: '10px 12px',
+                background: selectedProcess === w.processName ? 'rgba(123, 104, 238, 0.15)' : 'rgba(255,255,255,0.04)',
+                border: `1px solid ${selectedProcess === w.processName ? 'rgba(123, 104, 238, 0.4)' : 'rgba(255,255,255,0.06)'}`,
+                borderRadius: 8,
+                cursor: 'pointer',
+              }}
+            >
+              <div style={{ fontSize: 12, fontWeight: 600, color: '#e2e8f0', marginBottom: 2 }}>{w.windowTitle || w.processName}</div>
+              <div style={{ fontSize: 11, color: '#94a3b8' }}>{w.processName} — {w.className}</div>
+              {selectedProcess === w.processName && (
+                <div style={{ marginTop: 10 }}>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleApplyFontScale(w.processName); }}
+                    disabled={applying}
+                    style={{
+                      padding: '6px 12px',
+                      fontSize: 11,
+                      fontWeight: 600,
+                      background: applying ? 'rgba(123, 104, 238, 0.3)' : 'linear-gradient(135deg, #7b68ee, #bb86fc)',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: 8,
+                      cursor: applying ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    Apply font-scale +20%
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {activeAdaptations.length > 0 && (
+        <div style={{ marginTop: 16 }}>
+          <div className="text-xs font-semibold uppercase tracking-widest text-a11y-muted" style={{ marginBottom: 8 }}>Active Native Adaptations</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {activeAdaptations.map((a) => (
+              <div
+                key={a.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '8px 12px',
+                  background: 'rgba(16, 185, 129, 0.08)',
+                  border: '1px solid rgba(16, 185, 129, 0.2)',
+                  borderRadius: 8,
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: '#e2e8f0' }}>{a.label}</div>
+                  <div style={{ fontSize: 11, color: '#94a3b8' }}>{a.processName}</div>
+                </div>
+                <button
+                  onClick={() => handleRevert(a.id)}
+                  style={{
+                    padding: '4px 10px',
+                    fontSize: 11,
+                    background: 'transparent',
+                    color: '#94a3b8',
+                    border: '1px solid rgba(148, 163, 184, 0.3)',
+                    borderRadius: 6,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Revert
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </section>
   );
 }
 

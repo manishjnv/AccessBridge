@@ -1,0 +1,590 @@
+/* =============================================================================
+   AccessBridge Desktop Agent — App Styles
+   All colors from UI_GUIDELINES.md canonical token set.
+   Spacing: 4px grid.
+   ============================================================================= */
+
+:root {
+  /* Brand */
+  --primary: #7b68ee;
+  --accent: #bb86fc;
+
+  /* Surfaces */
+  --bg: #0a0a1a;
+  --bg-alt: #0d0d22;
+  --surface: #1a1a2e;
+  --surface-hover: #222240;
+
+  /* Text */
+  --text: #e2e8f0;
+  --muted: #94a3b8;
+
+  /* Status */
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+
+  /* Effects */
+  --glow: rgba(123, 104, 238, 0.35);
+  --border-subtle: rgba(123, 104, 238, 0.18);
+  --border-faint: rgba(123, 104, 238, 0.12);
+
+  /* Shadows */
+  --shadow-sm: 0 2px 10px rgba(0, 0, 0, 0.15);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.25);
+
+  /* Typography */
+  --font-sans: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-mono: 'SF Mono', 'Fira Code', 'Consolas', 'Monaco', monospace;
+}
+
+/* ---------------------------------------------------------------------------
+   Reset
+--------------------------------------------------------------------------- */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* ---------------------------------------------------------------------------
+   Root / body
+--------------------------------------------------------------------------- */
+
+html,
+body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  height: 100%;
+}
+
+/* ---------------------------------------------------------------------------
+   App shell
+--------------------------------------------------------------------------- */
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ---------------------------------------------------------------------------
+   Header
+--------------------------------------------------------------------------- */
+
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border-subtle);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+  flex-shrink: 0;
+}
+
+.app-brand {
+  font-size: 14px;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.app-header-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+/* ---------------------------------------------------------------------------
+   Tab bar
+--------------------------------------------------------------------------- */
+
+.tab-bar {
+  display: flex;
+  gap: 4px;
+  padding: 8px 16px 0;
+  background: var(--bg-alt);
+  border-bottom: 1px solid var(--border-faint);
+  flex-shrink: 0;
+}
+
+.tab-btn {
+  position: relative;
+  padding: 8px 20px;
+  background: transparent;
+  color: var(--muted);
+  border: none;
+  border-radius: 6px 6px 0 0;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  transition: color 0.15s, background 0.15s;
+  outline: none;
+}
+
+.tab-btn::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--accent);
+  border-radius: 2px 2px 0 0;
+  transform: scaleX(0);
+  transition: transform 0.2s ease;
+}
+
+.tab-btn:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.tab-btn.active {
+  background: var(--surface);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.tab-btn.active::after {
+  transform: scaleX(1);
+}
+
+.tab-btn:focus-visible {
+  outline: 3px solid #e94560;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 6px rgba(233, 69, 96, 0.25);
+}
+
+/* ---------------------------------------------------------------------------
+   Tab pane (scrollable content area)
+--------------------------------------------------------------------------- */
+
+.tab-pane {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  background: var(--bg);
+  scrollbar-width: thin;
+  scrollbar-color: var(--surface-hover) transparent;
+}
+
+.tab-pane::-webkit-scrollbar {
+  width: 6px;
+}
+
+.tab-pane::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tab-pane::-webkit-scrollbar-thumb {
+  background: var(--surface-hover);
+  border-radius: 999px;
+}
+
+/* ---------------------------------------------------------------------------
+   Tab content wrapper
+--------------------------------------------------------------------------- */
+
+.tab-content {
+  max-width: 600px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ---------------------------------------------------------------------------
+   Card
+--------------------------------------------------------------------------- */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ---------------------------------------------------------------------------
+   Section label (card heading)
+--------------------------------------------------------------------------- */
+
+.section-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: 0.01em;
+}
+
+/* ---------------------------------------------------------------------------
+   Muted text
+--------------------------------------------------------------------------- */
+
+.muted {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* ---------------------------------------------------------------------------
+   Error badge
+--------------------------------------------------------------------------- */
+
+.error-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+/* ---------------------------------------------------------------------------
+   Overview — hero block
+--------------------------------------------------------------------------- */
+
+.overview-hero {
+  padding: 4px 0 8px;
+}
+
+.overview-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.overview-subtitle {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* ---------------------------------------------------------------------------
+   Overview — status grid (2×2)
+--------------------------------------------------------------------------- */
+
+.status-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.status-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.status-cell--wide {
+  grid-column: 1 / -1;
+}
+
+.status-cell-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.status-cell-value {
+  font-size: 13px;
+  color: var(--text);
+  word-break: break-all;
+}
+
+.status-cell-value.muted {
+  color: var(--muted);
+}
+
+/* ---------------------------------------------------------------------------
+   Copy path button (Pair Key File cell)
+--------------------------------------------------------------------------- */
+
+.copy-path-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(123, 104, 238, 0.08);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 4px 8px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  max-width: 100%;
+  overflow: hidden;
+  text-align: left;
+}
+
+.copy-path-btn:hover {
+  background: rgba(123, 104, 238, 0.15);
+  border-color: var(--primary);
+  color: var(--accent);
+}
+
+.copy-path-btn:focus-visible {
+  outline: 3px solid #e94560;
+  outline-offset: 2px;
+}
+
+.copy-path-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.copy-path-icon {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+
+/* ---------------------------------------------------------------------------
+   Pair Key card
+--------------------------------------------------------------------------- */
+
+.pair-key-hint {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.pair-key-error {
+  font-size: 12px;
+  color: #ef4444;
+}
+
+.pair-key-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.pair-key-input {
+  flex: 1;
+  background: var(--bg);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  outline: none;
+  min-width: 0;
+  transition: border-color 0.15s;
+}
+
+.pair-key-input:focus-visible {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(123, 104, 238, 0.18);
+}
+
+.pair-key-input::placeholder {
+  color: var(--muted);
+}
+
+/* ---------------------------------------------------------------------------
+   Primary button
+--------------------------------------------------------------------------- */
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 8px 20px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 12px var(--glow);
+  transition: transform 0.2s, box-shadow 0.2s, opacity 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px var(--glow);
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn-primary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn-primary:focus-visible {
+  outline: 3px solid #e94560;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 6px rgba(233, 69, 96, 0.25);
+}
+
+.copy-btn {
+  min-width: 72px;
+}
+
+/* ---------------------------------------------------------------------------
+   Connection card
+--------------------------------------------------------------------------- */
+
+.connection-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.connection-label {
+  font-size: 13px;
+  color: var(--text);
+}
+
+.polling-badge {
+  font-size: 11px;
+  color: var(--muted);
+  padding: 2px 8px;
+  background: rgba(123, 104, 238, 0.08);
+  border-radius: 999px;
+}
+
+.connection-note {
+  font-size: 11px;
+}
+
+/* ---------------------------------------------------------------------------
+   Profile tab
+--------------------------------------------------------------------------- */
+
+.profile-empty {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.profile-json {
+  background: var(--bg);
+  border: 1px solid var(--border-faint);
+  border-radius: 8px;
+  padding: 16px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text);
+  overflow-x: auto;
+  white-space: pre;
+  max-height: 360px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--surface-hover) transparent;
+}
+
+.profile-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* ---------------------------------------------------------------------------
+   Logs tab
+--------------------------------------------------------------------------- */
+
+.logs-note {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.inline-code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: rgba(123, 104, 238, 0.12);
+  color: var(--accent);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.log-path-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 16px;
+  background: var(--bg);
+  border: 1px solid var(--border-faint);
+  border-radius: 8px;
+}
+
+.log-path-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.log-path-value {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text);
+  word-break: break-all;
+}
+
+.log-path-note {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* ---------------------------------------------------------------------------
+   Footer
+--------------------------------------------------------------------------- */
+
+.app-footer {
+  padding: 8px 20px;
+  font-size: 11px;
+  color: var(--muted);
+  background: var(--surface);
+  border-top: 1px solid var(--border-faint);
+  text-align: center;
+  flex-shrink: 0;
+}
+
+/* ---------------------------------------------------------------------------
+   Reduced motion
+--------------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}

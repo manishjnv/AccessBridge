@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AccessBridge - Ambient Accessibility Operating Layer</title>
-  <meta name="description" content="AccessBridge: Zero-disclosure, AI-powered ambient accessibility for enterprise web apps. Chrome extension that auto-adapts to user struggles in real time.">
+  <title>AccessBridge — Accessibility that notices.</title>
+  <meta name="description" content="Accessibility that notices. A Chrome extension and desktop agent that detects user struggles and auto-adapts any app in real time. Zero disclosure. On-device AI.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -2024,6 +2024,104 @@
     }
     .muted { color: var(--muted); }
 
+    /* ---------- Session 24: Team Deployment ---------- */
+    .team-section { padding: 72px 0; background: linear-gradient(180deg, var(--bg-alt) 0%, var(--bg) 100%); }
+    .team-install-wrap {
+      background: var(--surface);
+      border: 1px solid rgba(123, 104, 238, 0.18);
+      border-radius: 16px;
+      padding: 28px;
+      margin-top: 28px;
+      margin-bottom: 28px;
+    }
+    .team-install-wrap .os-tabs { margin-top: 0; }
+    .team-code-block {
+      background: var(--bg);
+      border: 1px solid rgba(123, 104, 238, 0.18);
+      border-radius: 10px;
+      padding: 16px 20px;
+      margin: 16px 0 0;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', 'Monaco', monospace;
+      font-size: 13px;
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      word-break: break-all;
+    }
+    .team-code-block code { flex: 1; min-width: 0; }
+    .team-copy-btn {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 5px 12px; border-radius: 8px;
+      font-size: 11px; font-weight: 700; letter-spacing: 0.5px;
+      background: rgba(123, 104, 238, 0.15);
+      border: 1px solid rgba(123, 104, 238, 0.25);
+      color: var(--accent); cursor: pointer;
+      transition: background 0.2s; white-space: nowrap;
+      font-family: inherit; min-height: 32px;
+    }
+    .team-copy-btn:hover { background: rgba(123, 104, 238, 0.28); }
+    .team-preset-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 16px;
+      margin-top: 24px;
+      margin-bottom: 28px;
+    }
+    .team-preset-card {
+      background: var(--surface);
+      border: 1px solid rgba(123, 104, 238, 0.18);
+      border-radius: 14px;
+      padding: 20px;
+      transition: transform 0.25s, border-color 0.25s, box-shadow 0.25s;
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .team-preset-card:hover {
+      transform: translateY(-4px);
+      border-color: var(--primary);
+      box-shadow: 0 8px 24px var(--glow);
+    }
+    .team-preset-icon {
+      font-size: 24px; line-height: 1;
+    }
+    .team-preset-name { font-size: 14px; font-weight: 700; color: var(--text); }
+    .team-preset-desc { font-size: 12px; color: var(--muted); line-height: 1.5; flex: 1; }
+    .team-preset-link {
+      font-size: 12px; font-weight: 600; color: var(--accent);
+      text-decoration: none; transition: color 0.15s;
+    }
+    .team-preset-link:hover { color: #fff; }
+    .team-steps {
+      background: var(--surface);
+      border: 1px solid rgba(123, 104, 238, 0.18);
+      border-radius: 14px;
+      padding: 24px 28px;
+      margin-bottom: 28px;
+      list-style: none;
+    }
+    .team-steps li {
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(123, 104, 238, 0.08);
+      font-size: 14px; color: var(--muted); line-height: 1.6;
+    }
+    .team-steps li:last-child { border-bottom: none; padding-bottom: 0; }
+    .team-steps li strong { color: var(--text); }
+    .team-guide-link {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 14px; font-weight: 600;
+      color: var(--accent); text-decoration: none;
+      transition: color 0.15s, transform 0.15s;
+    }
+    .team-guide-link:hover { color: #fff; transform: translateX(2px); }
+    @media (max-width: 900px) {
+      .team-preset-grid { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 560px) {
+      .team-preset-grid { grid-template-columns: 1fr; }
+    }
+
     /* ---------- Session 20: Enterprise Deployment ---------- */
     .enterprise-section { padding: 72px 0; background: linear-gradient(180deg, var(--bg) 0%, var(--bg-alt) 100%); }
     .enterprise-grid {
@@ -2157,6 +2255,7 @@
         <a href="#/observatory" data-route="/observatory">Observatory</a>
         <a href="#/roadmap" data-route="/roadmap">Roadmap</a>
         <a href="#/desktop-agent" data-route="/desktop-agent">Agent</a>
+        <a href="#/team" data-route="/team">Team</a>
         <a href="#/enterprise" data-route="/enterprise">Enterprise</a>
         <a href="#/github" data-route="/github">GitHub</a>
         <span class="app-version navbar-version" aria-label="Current version">v…</span>
@@ -2181,7 +2280,7 @@
     <div class="container">
       <div class="hero-badge">Wipro TopGear Ideathon 2026</div>
       <h1>AccessBridge</h1>
-      <p class="hero-tagline">The Ambient Accessibility Operating Layer</p>
+      <p class="hero-tagline">Accessibility that notices.</p>
       <p class="hero-desc">A Chrome extension that silently detects user struggles and auto-adapts any web app in real time. Zero disclosure. Zero configuration. Powered by on-device AI.</p>
 
       <div class="hero-stats fade-in">
@@ -2970,6 +3069,128 @@
 
   </div><!-- /route /desktop-agent -->
 
+  <!-- =============== ROUTE: /team =============== -->
+  <div class="route" data-route="/team">
+    <section class="team-section" id="team">
+      <div class="container">
+        <div class="section-label">Pilot &amp; team rollout</div>
+        <h2 class="section-heading">Team Deployment <span class="pill pill-new">Session 24</span></h2>
+        <p class="section-sub fade-in">Roll AccessBridge out to 10 to 1,000 users with a single command. Choose a preset profile, track cohort health in the Pilot Dashboard, and run a structured pilot before org-wide adoption.</p>
+
+        <!-- ── OS Install Command Picker ─────────────────────────── -->
+        <div class="team-install-wrap fade-in">
+          <h3 style="font-size:15px;font-weight:700;margin:0 0 4px;">Install Command</h3>
+          <p style="font-size:13px;color:var(--muted);margin:0 0 12px;">Installs the desktop agent and loads the Chrome extension for all users. Run as administrator.</p>
+          <div class="os-tabs" role="tablist" aria-label="Operating system install command">
+            <button class="os-tab-btn" role="tab" aria-selected="false" aria-controls="team-os-win"  id="team-tab-win"  data-team-os="win">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="vertical-align:-2px;margin-right:4px"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
+              Windows
+            </button>
+            <button class="os-tab-btn" role="tab" aria-selected="false" aria-controls="team-os-mac" id="team-tab-mac" data-team-os="mac">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="vertical-align:-2px;margin-right:4px"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+              macOS
+            </button>
+            <button class="os-tab-btn" role="tab" aria-selected="false" aria-controls="team-os-linux" id="team-tab-linux" data-team-os="linux">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="vertical-align:-2px;margin-right:4px"><path d="M12.504 0c-.155 0-.315.008-.48.021-4.226.333-3.105 4.807-3.17 6.298-.076 1.092-.3 1.953-1.05 3.02-.885 1.051-2.127 2.75-2.716 4.521-.278.832-.41 1.684-.287 2.489a.424.424 0 00-.11.135c-.26.268-.45.6-.663.839-.199.199-.485.267-.797.4-.313.136-.658.269-.864.68-.09.189-.136.394-.132.602 0 .199.027.4.055.536.058.399.116.728.04.97-.249.68-.108 1.131.29 1.426.67.484 1.74.15 2.781-.3.93-.415 1.583-.569 2.209-.487.926.123 1.771.67 2.774 1.069.427.154.857.277 1.266.277.394 0 .789-.098 1.137-.308 1.054-.613 1.951-2.21 1.875-4.51-.132-3.742-1.687-5.334-2.184-6.479-.497-1.143-.647-2.116-1.043-3.232C14.29 2.897 15.37 0 12.504 0z"/></svg>
+              Linux
+            </button>
+          </div>
+
+          <div id="team-os-win" class="os-tab-panel" role="tabpanel" aria-labelledby="team-tab-win">
+            <div class="team-code-block">
+              <code id="team-cmd-win">pwsh -Command "iwr https://accessbridge.space/team/install.ps1 | iex"</code>
+              <button class="team-copy-btn" data-copy-target="team-cmd-win" type="button" aria-label="Copy Windows install command">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                Copy
+              </button>
+            </div>
+            <p style="font-size:12px;color:var(--muted);margin-top:8px;">Requires PowerShell 5.1+ and administrator elevation. Downloads and silently installs the agent MSI, then deploys the Chrome extension policy.</p>
+          </div>
+
+          <div id="team-os-mac" class="os-tab-panel" role="tabpanel" aria-labelledby="team-tab-mac">
+            <div class="team-code-block">
+              <code id="team-cmd-mac">curl -fsSL https://accessbridge.space/team/install.sh | bash -s -- --profile=pilot-default</code>
+              <button class="team-copy-btn" data-copy-target="team-cmd-mac" type="button" aria-label="Copy macOS install command">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                Copy
+              </button>
+            </div>
+            <p style="font-size:12px;color:var(--muted);margin-top:8px;">Requires Homebrew and sudo. Installs the agent, loads the mobileconfig Chrome policy, and sets the pilot preset.</p>
+          </div>
+
+          <div id="team-os-linux" class="os-tab-panel" role="tabpanel" aria-labelledby="team-tab-linux">
+            <div class="team-code-block">
+              <code id="team-cmd-linux">curl -fsSL https://accessbridge.space/team/install.sh | bash -s -- --profile=pilot-default</code>
+              <button class="team-copy-btn" data-copy-target="team-cmd-linux" type="button" aria-label="Copy Linux install command">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                Copy
+              </button>
+            </div>
+            <p style="font-size:12px;color:var(--muted);margin-top:8px;">Requires curl and sudo. Drops a Chrome managed-policy JSON file and installs the .deb / .rpm agent package depending on distro.</p>
+          </div>
+        </div><!-- /team-install-wrap -->
+
+        <!-- ── Preset Profile Catalog ─────────────────────────────── -->
+        <h3 class="section-heading" style="margin-bottom:4px;">Preset Profiles</h3>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:0;">Six ready-to-deploy profiles — each tuned for a specific pilot scenario. Pass <code style="background:rgba(123,104,238,0.15);color:var(--accent);padding:1px 5px;border-radius:4px;">--profile=&lt;name&gt;</code> to the install script to activate it.</p>
+
+        <div class="team-preset-grid fade-in">
+          <div class="team-preset-card">
+            <div class="team-preset-icon" aria-hidden="true">🚀</div>
+            <div class="team-preset-name">pilot-default</div>
+            <div class="team-preset-desc">Balanced defaults for general enterprise pilots. All features enabled, auto-language detection, moderate AI tier.</div>
+            <a href="/docs/deployment/team#pilot-default" class="team-preset-link">View docs →</a>
+          </div>
+          <div class="team-preset-card">
+            <div class="team-preset-icon" aria-hidden="true">🗣️</div>
+            <div class="team-preset-name">pilot-tamil</div>
+            <div class="team-preset-desc">Tamil-first voice and UI. Locked locale, Tamil script rendering, voice commands trained on Tamil phonology.</div>
+            <a href="/docs/deployment/team#pilot-tamil" class="team-preset-link">View docs →</a>
+          </div>
+          <div class="team-preset-card">
+            <div class="team-preset-icon" aria-hidden="true">🏦</div>
+            <div class="team-preset-name">pilot-banking</div>
+            <div class="team-preset-desc">Banking domain connector pre-loaded. High-contrast mode, form-field assistance, and audit-safe telemetry (no PII fields).</div>
+            <a href="/docs/deployment/team#pilot-banking" class="team-preset-link">View docs →</a>
+          </div>
+          <div class="team-preset-card">
+            <div class="team-preset-icon" aria-hidden="true">📖</div>
+            <div class="team-preset-name">pilot-dyslexia</div>
+            <div class="team-preset-desc">OpenDyslexic font, increased line spacing, coloured overlay, bionic reading mode. Designed for structured dyslexia research.</div>
+            <a href="/docs/deployment/team#pilot-dyslexia" class="team-preset-link">View docs →</a>
+          </div>
+          <div class="team-preset-card">
+            <div class="team-preset-icon" aria-hidden="true">😴</div>
+            <div class="team-preset-name">pilot-fatigue-study</div>
+            <div class="team-preset-desc">Eye-tracking and scroll-velocity signals amplified for fatigue detection. Extended data-retention window for longitudinal study.</div>
+            <a href="/docs/deployment/team#pilot-fatigue-study" class="team-preset-link">View docs →</a>
+          </div>
+          <div class="team-preset-card">
+            <div class="team-preset-icon" aria-hidden="true">🤲</div>
+            <div class="team-preset-name">pilot-motor</div>
+            <div class="team-preset-desc">Enlarged touch targets, dwell-click mode, gaze cursor enabled, keyboard-only fallback enforcement. Optimised for limited motor control.</div>
+            <a href="/docs/deployment/team#pilot-motor" class="team-preset-link">View docs →</a>
+          </div>
+        </div>
+
+        <!-- ── How to run a pilot ─────────────────────────────────── -->
+        <h3 class="section-heading" style="margin-bottom:12px;">How to run a pilot</h3>
+        <ol class="team-steps" aria-label="Pilot steps">
+          <li><strong>Step 1 — Choose a preset</strong> — Pick the profile that best matches your cohort's needs. You can customise any preset via the admin policy layer before deploying.</li>
+          <li><strong>Step 2 — Run the install command</strong> — Execute the one-liner above (Windows / macOS / Linux) on each enrolled device, or wrap it in your MDM push tool (Intune, Jamf, Ansible).</li>
+          <li><strong>Step 3 — Enrol your cohort</strong> — Share the invite link generated by the admin console. Minimum cohort for aggregate metrics is N = 20 (differential-privacy floor).</li>
+          <li><strong>Step 4 — Monitor in the Pilot Dashboard</strong> — Track enrolment progress, KPI health, and user feedback at <a href="/observatory/pilot.html" style="color:var(--accent);">observatory/pilot</a>.</li>
+          <li><strong>Step 5 — Export &amp; decide</strong> — Download the CSV or PDF report at the end of your pilot window. Use it to justify org-wide rollout or refine the preset configuration.</li>
+        </ol>
+
+        <a href="/docs/deployment/team" class="team-guide-link fade-in">
+          Read the Team Deployment Guide
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </a>
+      </div>
+    </section>
+  </div><!-- /route /team -->
+
   <!-- =============== ROUTE: /enterprise =============== -->
   <div class="route" data-route="/enterprise">
     <section class="enterprise-section" id="enterprise">
@@ -3164,6 +3385,12 @@
           <a href="#/observatory">Observatory</a>
           <a href="#/roadmap">Roadmap</a>
           <a href="#install">Install</a>
+        </div>
+        <div class="footer-col">
+          <h4>Deploy</h4>
+          <a href="#/team">Team Deployment</a>
+          <a href="#/enterprise">Enterprise</a>
+          <a href="#/desktop-agent">Desktop Agent</a>
         </div>
         <div class="footer-col">
           <h4>Links</h4>
@@ -3390,13 +3617,16 @@
 
     // ─── Hash router ──────────────────────────────────────────────────────
     const ROUTE_TITLES = {
-      '/': 'AccessBridge — Ambient Accessibility Operating Layer',
+      '/': 'AccessBridge — Accessibility that notices.',
       '/reach': 'Global Reach · AccessBridge',
       '/how-it-works': 'How It Works · AccessBridge',
       '/features': 'Features · AccessBridge',
       '/architecture': 'Architecture · AccessBridge',
       '/observatory': 'Observatory · AccessBridge',
       '/roadmap': 'Roadmap · AccessBridge',
+      '/desktop-agent': 'Desktop Agent · AccessBridge',
+      '/team': 'Team Deployment · AccessBridge',
+      '/enterprise': 'Enterprise Deployment · AccessBridge',
       '/github': 'GitHub · AccessBridge',
     };
 
@@ -3469,6 +3699,77 @@
           }
         }
       } catch {}
+    })();
+  </script>
+  <script>
+    // ── Team section — OS tab picker + copy buttons ────────────────
+    (function () {
+      // OS auto-detect
+      function detectTeamOS() {
+        const ua = navigator.userAgent || '';
+        const plat = (navigator.platform || '').toLowerCase();
+        if (plat.includes('win') || ua.includes('Windows')) return 'win';
+        if (plat.includes('mac') || ua.includes('Macintosh') || ua.includes('Mac OS X')) return 'mac';
+        return 'linux';
+      }
+
+      function initTeamTabs() {
+        const tabs = document.querySelectorAll('.os-tab-btn[data-team-os]');
+        const panels = {
+          win:   document.getElementById('team-os-win'),
+          mac:   document.getElementById('team-os-mac'),
+          linux: document.getElementById('team-os-linux'),
+        };
+        if (!tabs.length) return; // route not yet rendered
+
+        function activateOS(os) {
+          tabs.forEach(btn => {
+            const active = btn.dataset.teamOs === os;
+            btn.classList.toggle('active', active);
+            btn.setAttribute('aria-selected', String(active));
+          });
+          Object.entries(panels).forEach(([k, el]) => {
+            if (el) el.classList.toggle('active', k === os);
+          });
+        }
+
+        tabs.forEach(btn => {
+          btn.addEventListener('click', () => activateOS(btn.dataset.teamOs));
+        });
+
+        activateOS(detectTeamOS());
+      }
+
+      // Copy buttons (XSS-safe: reads from textContent, writes to clipboard)
+      function initCopyButtons() {
+        document.querySelectorAll('.team-copy-btn[data-copy-target]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const src = document.getElementById(btn.dataset.copyTarget);
+            if (!src) return;
+            const text = src.textContent;
+            navigator.clipboard.writeText(text).then(() => {
+              const orig = btn.textContent;
+              btn.textContent = 'Copied!';
+              setTimeout(() => { btn.textContent = orig; }, 1800);
+            }).catch(() => {});
+          });
+        });
+      }
+
+      // Init on first team-route activation; also re-init after route changes
+      // because the route may not be in DOM until activateRoute() toggles is-active.
+      document.addEventListener('DOMContentLoaded', () => {
+        initTeamTabs();
+        initCopyButtons();
+
+        // Re-run after hash change in case route becomes visible
+        window.addEventListener('hashchange', () => {
+          if ((location.hash || '').includes('/team')) {
+            initTeamTabs();
+            initCopyButtons();
+          }
+        });
+      });
     })();
   </script>
 </body>

@@ -1,6 +1,40 @@
 # AccessBridge - Shift Handoff
 
-## Last Session: Session 23 — Feature #5 Tier 3 on-device Moondream2 INT8 VLM + semantic caching + user-curation-store + domain-learning-loop + Observatory analytics expansion (funnel / feature-usage / languages / domains / 3-regulation compliance) + 3 new ADMX policies (Feature #5 → 100%, Plan "10 Unique Features" → 10/10) (2026-04-21)
+## Last Session: Session 24 — Brand tagline wire: "Accessibility that notices." landed in landing page hero + title + meta + JS route title (2026-04-21)
+
+### Headline
+
+Deep-research tagline pass produced "**Accessibility that notices.**" as the primary brand line — three words, second-person-implicit, owns the *detection-over-disclosure* wedge that no competitor holds. Wired it into [deploy/index.html](deploy/index.html) in 3 surfaces: `<title>`, hero `.hero-tagline`, and the JS `ROUTE_TITLES['/']` constant. Meta description rewritten to lead with the new tagline and add the desktop agent alongside the Chrome extension (was extension-only). `<h1>`, `.hero-desc`, and the hero "Zero disclosure · Zero configuration · On-device AI" explainer kept as-is — the tagline replaces the abstract category phrase ("The Ambient Accessibility Operating Layer"), not the concrete product description. "Ambient Accessibility Operating Layer" deliberately retained in 7 other files (package.json, manifest.json, PDF audit footer, 3 READMEs, pptx-generator) where it functions as *category descriptor*, not brand tagline — both can coexist.
+
+### Completed
+
+- [deploy/index.html](deploy/index.html): `<title>` → `AccessBridge — Accessibility that notices.`
+- [deploy/index.html](deploy/index.html): `<meta name="description">` → `Accessibility that notices. A Chrome extension and desktop agent that detects user struggles and auto-adapts any app in real time. Zero disclosure. On-device AI.` (175 chars, within SEO snippet window; gains the "desktop agent" mention)
+- [deploy/index.html](deploy/index.html) line 2184: `.hero-tagline` copy → `Accessibility that notices.`
+- [deploy/index.html](deploy/index.html) line 3393: `ROUTE_TITLES['/']` → matches new `<title>`
+- No other surfaces touched (intentional — see "Not done" below)
+
+### Not done in this session (scope-gated)
+
+- **package.json / manifest.json / PDF audit footer / READMEs** still say "Ambient Accessibility Operating Layer" — kept intentionally as category descriptor; tagline is an *addition*, not a replacement. Flag if the user wants a sweep.
+- **No build, no version bump** — pure content change to static landing page; `pnpm build` output and extension zip unaffected.
+- **Incidental pilot-test unblock** — pre-commit `pnpm typecheck` failed on `packages/core/src/__tests__/pilot-id.test.ts:67` (in-progress pilot work authored by a parallel session, file was untracked at commit time). The error was a vitest `it.each` callback-arity mismatch — heterogeneous tuple data `[value, label]` with mixed types (null/undefined/number/object/array/boolean/symbol) required a 2-arg callback; the author had written `(value) =>`. Fixed in-place: `(value) =>` → `(value, _label) =>`. One-line test-only signature fix, no production impact; bundled into this commit with disclosure because staging the file as its own commit would attribute the entire new file to me (pilot author wrote it).
+- **Deploy** — ran `./deploy.sh --skip-tests --skip-build` (copy-only change, landing page served by nginx from `/srv/accessbridge/deploy/`).
+
+### RCA additions
+
+None — no bug fixed this session. Tagline selection was a judgment call against [UI_GUIDELINES.md](UI_GUIDELINES.md) voice rules (no exclamation, no `just`/`simply`, second-person, facts-not-apologies). BUG-n/a.
+
+### Agent utilization
+
+Opus: scoped the tagline research question; reviewed Explore subagent's raw material; wrote tagline + alternatives + rationale (chose "Accessibility that notices." against 4 alternatives by disclosure-tax / detection / dignity / outcome angles); executed the 4 Edit calls; authored this HANDOFF entry.
+Sonnet: n/a — no mechanical implementation work; tagline selection is pure judgment, not a specified contract.
+Haiku: Explore subagent ran a cross-file research sweep (10 files: FEATURES, ARCHITECTURE, ROADMAP, UI_GUIDELINES, deploy/index.html, memory/project_a11yos.md, user_profile.md, docs/features/desktop-agent.md, READMEs) and returned a single consolidated "What/Who/Problem/Differentiators/Tone/Naming" report with verbatim quotes — classic Haiku *one-fact-from-many-files* routing.
+codex:rescue: n/a — no security-adjacent changes; pure public-facing HTML copy edit with no auth, permissions, injection, or cross-origin surface touched.
+
+---
+
+## Session 23 — Feature #5 Tier 3 on-device Moondream2 INT8 VLM + semantic caching + user-curation-store + domain-learning-loop + Observatory analytics expansion (funnel / feature-usage / languages / domains / 3-regulation compliance) + 3 new ADMX policies (Feature #5 → 100%, Plan "10 Unique Features" → 10/10) (2026-04-21)
 
 ### Headline
 

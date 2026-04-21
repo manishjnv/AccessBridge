@@ -129,6 +129,56 @@ else
   echo "WARN: indic-whisper language map missing (non-fatal): $IW_LANGMAP" >&2
 fi
 
+# ---------------------------------------------------------------------------
+# Session 23 — Moondream2 ONNX artifacts (Feature #5 Tier 3 Vision Recovery)
+# ---------------------------------------------------------------------------
+MD_DIR="$OUTPUT_DIR/moondream"
+MD_VISION="moondream2-vision-int8.onnx"
+MD_TEXT="moondream2-text-int8.onnx"
+MD_TOK="moondream2-tokenizer.json"
+MD_PREP="moondream2-image-preprocessor.json"
+
+MD_VISION_HASH=""; MD_VISION_SIZE=0
+MD_TEXT_HASH="";   MD_TEXT_SIZE=0
+MD_TOK_HASH="";    MD_TOK_SIZE=0
+MD_PREP_HASH="";   MD_PREP_SIZE=0
+
+if [[ -f "$MD_DIR/$MD_VISION" ]]; then
+  echo "Hashing moondream2 vision encoder..."
+  MD_VISION_HASH=$(sha256_of "$MD_DIR/$MD_VISION")
+  MD_VISION_SIZE=$(size_of "$MD_DIR/$MD_VISION")
+  echo "  moondream2-vision: sha256=$MD_VISION_HASH  bytes=$MD_VISION_SIZE"
+else
+  echo "WARN: moondream2 vision encoder missing (non-fatal): $MD_VISION" >&2
+fi
+
+if [[ -f "$MD_DIR/$MD_TEXT" ]]; then
+  echo "Hashing moondream2 text decoder..."
+  MD_TEXT_HASH=$(sha256_of "$MD_DIR/$MD_TEXT")
+  MD_TEXT_SIZE=$(size_of "$MD_DIR/$MD_TEXT")
+  echo "  moondream2-text: sha256=$MD_TEXT_HASH  bytes=$MD_TEXT_SIZE"
+else
+  echo "WARN: moondream2 text decoder missing (non-fatal): $MD_TEXT" >&2
+fi
+
+if [[ -f "$MD_DIR/$MD_TOK" ]]; then
+  echo "Hashing moondream2 tokenizer..."
+  MD_TOK_HASH=$(sha256_of "$MD_DIR/$MD_TOK")
+  MD_TOK_SIZE=$(size_of "$MD_DIR/$MD_TOK")
+  echo "  moondream2-tokenizer: sha256=$MD_TOK_HASH  bytes=$MD_TOK_SIZE"
+else
+  echo "WARN: moondream2 tokenizer missing (non-fatal): $MD_TOK" >&2
+fi
+
+if [[ -f "$MD_DIR/$MD_PREP" ]]; then
+  echo "Hashing moondream2 image preprocessor config..."
+  MD_PREP_HASH=$(sha256_of "$MD_DIR/$MD_PREP")
+  MD_PREP_SIZE=$(size_of "$MD_DIR/$MD_PREP")
+  echo "  moondream2-image-preprocessor: sha256=$MD_PREP_HASH  bytes=$MD_PREP_SIZE"
+else
+  echo "WARN: moondream2 image preprocessor config missing (non-fatal): $MD_PREP" >&2
+fi
+
 GENERATED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 # Emit manifest. Plain printf (no jq dependency).
@@ -148,6 +198,7 @@ GENERATED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     printf ' }'
   fi
   # indic-whisper block (Session 17)
+  # shellcheck disable=SC2166
   if [[ -n "$IW_CANONICAL_HASH" || -n "$IW_ENC_HASH" ]]; then
     printf ',\n    "indic-whisper-small-int8": {'
     printf ' "checkpoint": "openai/whisper-small", "quantization": "int8-dynamic", "loadTier": 2'
@@ -170,6 +221,28 @@ GENERATED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     if [[ -n "$IW_LANGMAP_HASH" ]]; then
       printf ', "languageMap": "%s", "languageMapSha256": "%s", "languageMapSizeBytes": %s' \
         "$IW_LANGMAP" "$IW_LANGMAP_HASH" "$IW_LANGMAP_SIZE"
+    fi
+    printf ' }'
+  fi
+  # moondream2 block (Session 23 — Feature #5 Tier 3 Vision Recovery)
+  if [[ -n "$MD_VISION_HASH" || -n "$MD_TEXT_HASH" ]]; then
+    printf ',\n    "moondream2-int8": {'
+    printf ' "checkpoint": "Xenova/moondream2", "quantization": "int8-dynamic", "loadTier": 4'
+    if [[ -n "$MD_VISION_HASH" ]]; then
+      printf ', "visionFile": "moondream/%s", "visionSha256": "%s", "visionSizeBytes": %s' \
+        "$MD_VISION" "$MD_VISION_HASH" "$MD_VISION_SIZE"
+    fi
+    if [[ -n "$MD_TEXT_HASH" ]]; then
+      printf ', "textFile": "moondream/%s", "textSha256": "%s", "textSizeBytes": %s' \
+        "$MD_TEXT" "$MD_TEXT_HASH" "$MD_TEXT_SIZE"
+    fi
+    if [[ -n "$MD_TOK_HASH" ]]; then
+      printf ', "tokenizer": "moondream/%s", "tokenizerSha256": "%s", "tokenizerSizeBytes": %s' \
+        "$MD_TOK" "$MD_TOK_HASH" "$MD_TOK_SIZE"
+    fi
+    if [[ -n "$MD_PREP_HASH" ]]; then
+      printf ', "imagePreprocessor": "moondream/%s", "imagePreprocessorSha256": "%s", "imagePreprocessorSizeBytes": %s' \
+        "$MD_PREP" "$MD_PREP_HASH" "$MD_PREP_SIZE"
     fi
     printf ' }'
   fi

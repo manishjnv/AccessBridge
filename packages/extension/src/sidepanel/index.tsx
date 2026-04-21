@@ -9,10 +9,12 @@ import { AuditPanel } from './audit/AuditPanel.js';
 import ActionsPanel from './actions/ActionsPanel.js';
 // --- Session 10: Vision Recovery ---
 import VisionPanel from './vision/VisionPanel.js';
+// --- Session 23: Vision Lab ---
+import VisionLabPanel from './vision/VisionLabPanel.js';
 // --- Session 11: Multi-Modal Fusion ---
 import IntelligencePanel from './intelligence/IntelligencePanel.js';
 
-type SidePanelTab = 'dashboard' | 'audit' | 'actions' | 'vision' | 'intelligence' | 'compliance' | 'native-apps';
+type SidePanelTab = 'dashboard' | 'audit' | 'actions' | 'vision' | 'vision-lab' | 'intelligence' | 'compliance' | 'native-apps';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -691,6 +693,8 @@ function SidePanel() {
         <TabButton label="Actions" active={tab === 'actions'} onClick={() => setTab('actions')} />
         {/* --- Session 10: Vision Recovery --- */}
         <TabButton label="Vision" active={tab === 'vision'} onClick={() => setTab('vision')} />
+        {/* --- Session 23: Vision Lab --- */}
+        <TabButton label="Vision Lab" active={tab === 'vision-lab'} onClick={() => setTab('vision-lab')} />
         {/* --- Session 11: Multi-Modal Fusion --- */}
         <TabButton label="Intelligence" active={tab === 'intelligence'} onClick={() => setTab('intelligence')} />
         {/* --- Session 16: ZK Attestation --- */}
@@ -709,6 +713,8 @@ function SidePanel() {
           <CompliancePanel />
         ) : tab === 'intelligence' ? (
           <IntelligencePanel />
+        ) : tab === 'vision-lab' ? (
+          <VisionLabPanel />
         ) : tab === 'vision' ? (
           <VisionPanel />
         ) : tab === 'actions' ? (

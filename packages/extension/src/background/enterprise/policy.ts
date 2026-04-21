@@ -38,6 +38,12 @@ export interface ManagedPolicy {
   minimumAgentVersion?: string;
   /** Opaque per-organization Merkle hash for tenant grouping in observatory. */
   orgHash?: string;
+  /** Session 23 — Tier 3 VLM mode. */
+  visionRecoveryTier3Mode?: 'Disabled' | 'AutoOnDemand' | 'PrefetchOnIdle';
+  /** Session 23 — Observatory analytics granularity. */
+  observatoryAnalyticsLevel?: 'Minimal' | 'Standard' | 'Full';
+  /** Session 23 — Daily cap on on-device VLM inferences. 0 disables; omitted = default. */
+  maxVisionInferencesPerDay?: number;
 }
 
 export interface LockdownResult {
@@ -234,7 +240,35 @@ function parseManagedPolicyRaw(raw: Record<string, unknown>): ManagedPolicy {
   const orgHash = coerceString(raw['orgHash']);
   if (orgHash !== undefined) policy.orgHash = orgHash;
 
+  // Session 23 — Vision Tier 3 + analytics policies
+  const visionTier3 = coerceString(raw['VisionRecoveryTier3Mode']);
+  if (visionTier3 === 'Disabled' || visionTier3 === 'AutoOnDemand' || visionTier3 === 'PrefetchOnIdle') {
+    policy.visionRecoveryTier3Mode = visionTier3;
+  }
+
+  const analyticsLevel = coerceString(raw['ObservatoryAnalyticsLevel']);
+  if (analyticsLevel === 'Minimal' || analyticsLevel === 'Standard' || analyticsLevel === 'Full') {
+    policy.observatoryAnalyticsLevel = analyticsLevel;
+  }
+
+  const maxInf = coerceBoundedInt(raw['MaxVisionInferencesPerDay'], 0, 10000);
+  if (maxInf !== undefined) policy.maxVisionInferencesPerDay = maxInf;
+
   return policy;
+}
+
+/**
+ * Coerce a value that may arrive as a DWORD, a string, or a number to an
+ * integer within [min, max]. Out-of-range or malformed inputs return
+ * undefined — callers treat that as "policy not configured".
+ */
+function coerceBoundedInt(raw: unknown, min: number, max: number): number | undefined {
+  let n: number | undefined;
+  if (typeof raw === 'number' && Number.isFinite(raw)) n = Math.trunc(raw);
+  else if (typeof raw === 'string' && /^-?\d+$/.test(raw)) n = parseInt(raw, 10);
+  if (n === undefined) return undefined;
+  if (n < min || n > max) return undefined;
+  return n;
 }
 
 /**
@@ -335,6 +369,17 @@ export function mergeWithProfile(
   }
   if (policy.orgHash !== undefined) {
     lockedKeys.add('orgHash');
+  }
+
+  // Session 23 shadow keys — no direct profile field, banner-only
+  if (policy.visionRecoveryTier3Mode !== undefined) {
+    lockedKeys.add('visionRecoveryTier3Mode');
+  }
+  if (policy.observatoryAnalyticsLevel !== undefined) {
+    lockedKeys.add('observatoryAnalyticsLevel');
+  }
+  if (policy.maxVisionInferencesPerDay !== undefined) {
+    lockedKeys.add('maxVisionInferencesPerDay');
   }
 
   return { profile: merged, lockedKeys };

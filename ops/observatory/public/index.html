@@ -28,8 +28,12 @@
     </div>
     <div class="nav-tabs">
       <a href="#overview" class="nav-tab" data-tab="overview">Overview</a>
+      <a href="#funnel" class="nav-tab" data-tab="funnel">Funnel</a>
+      <a href="#features" class="nav-tab" data-tab="features">Features</a>
+      <a href="#languages" class="nav-tab" data-tab="languages">Languages</a>
+      <a href="#domains" class="nav-tab" data-tab="domains">Domains</a>
       <a href="#trends" class="nav-tab" data-tab="trends">Trends</a>
-      <a href="#compliance" class="nav-tab" data-tab="compliance">Compliance Report</a>
+      <a href="#compliance" class="nav-tab" data-tab="compliance">Compliance</a>
     </div>
   </nav>
 
@@ -84,11 +88,86 @@
       </div>
     </section>
 
+    <!-- Funnel -->
+    <section id="page-funnel" class="page" hidden>
+      <h1>Adoption Funnel</h1>
+      <div class="dp-disclaimer" role="note">
+        <strong>Differential Privacy:</strong> Metrics include Laplace noise (ε = 1.0, sensitivity = 1).
+        Individual users cannot be identified. Schema version 1.
+      </div>
+      <div class="card">
+        <h2>Device Adoption Funnel (30 days)</h2>
+        <svg id="chart-funnel" class="funnel-chart" viewBox="0 0 800 360" aria-label="Adoption funnel chart"></svg>
+        <p class="chart-disclaimer">Funnel stages show cumulative drop-off from initial enrollment to sustained 30-day use.</p>
+      </div>
+    </section>
+
+    <!-- Features -->
+    <section id="page-features" class="page" hidden>
+      <h1>Feature Usage</h1>
+      <div class="dp-disclaimer" role="note">
+        <strong>Differential Privacy:</strong> Metrics include Laplace noise (ε = 1.0, sensitivity = 1).
+        Individual users cannot be identified. Schema version 1.
+      </div>
+      <div class="card">
+        <div class="features-toolbar">
+          <h2 style="margin:0">Top 10 Features Over Time</h2>
+          <div class="bucket-switcher" id="bucket-switcher">
+            <button class="bucket-btn active" data-bucket="day">Day</button>
+            <button class="bucket-btn" data-bucket="week">Week</button>
+            <button class="bucket-btn" data-bucket="month">Month</button>
+          </div>
+        </div>
+        <svg id="chart-features" class="line-chart" viewBox="0 0 800 300" aria-label="Feature usage multi-line chart"></svg>
+        <div id="features-legend" class="features-legend"></div>
+      </div>
+    </section>
+
+    <!-- Languages -->
+    <section id="page-languages" class="page" hidden>
+      <h1>Language Breakdown</h1>
+      <div class="dp-disclaimer" role="note">
+        <strong>Differential Privacy:</strong> Metrics include Laplace noise (ε = 1.0, sensitivity = 1).
+        Individual users cannot be identified. Schema version 1.
+      </div>
+      <div class="two-col">
+        <div class="card">
+          <h2>By Language</h2>
+          <div id="lang-table-wrap" class="lang-table-wrap"></div>
+        </div>
+        <div class="card">
+          <h2>By Script Family</h2>
+          <div id="script-family-bars" class="bar-chart"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Domains -->
+    <section id="page-domains" class="page" hidden>
+      <h1>Domain Penetration</h1>
+      <div class="dp-disclaimer" role="note">
+        <strong>Differential Privacy:</strong> Metrics include Laplace noise (ε = 1.0, sensitivity = 1).
+        Individual users cannot be identified. Schema version 1.
+      </div>
+      <div class="card">
+        <h2>Domain Penetration (30 days)</h2>
+        <div id="domain-bars" class="bar-chart"></div>
+      </div>
+    </section>
+
     <section id="page-compliance" class="page" hidden>
       <h1>Compliance Report</h1>
-      <div class="compliance-actions no-print">
-        <button id="btn-print" class="btn-primary">Generate PDF (Print)</button>
+      <div class="dp-disclaimer" role="note">
+        <strong>Differential Privacy:</strong> Metrics include Laplace noise (ε = 1.0, sensitivity = 1).
+        Individual users cannot be identified. Schema version 1.
       </div>
+      <div class="compliance-actions no-print" style="margin-bottom:16px;display:flex;gap:10px;flex-wrap:wrap">
+        <button id="btn-print" class="btn-primary">Generate PDF (Print)</button>
+        <button id="btn-compliance-report" class="btn-primary" style="background:linear-gradient(135deg,#4fd1c5,#63b3ed)">Generate Compliance Report</button>
+      </div>
+      <!-- Tri-column live compliance -->
+      <div id="compliance-tri" class="compliance-tri"></div>
+      <!-- Legacy compliance cards -->
       <div id="compliance-body"></div>
     </section>
   </main>

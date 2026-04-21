@@ -6,7 +6,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "seed": "node seed-demo-data.js"
+    "seed": "node seed-demo-data.js",
+    "test:new-endpoints": "node --test __tests__/new-endpoints.test.js"
   },
   "dependencies": {
     "express": "^4.19.2",

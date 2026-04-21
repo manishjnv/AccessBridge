@@ -5,7 +5,7 @@
  * this package without pulling in onnxruntime-web at type-check time.
  */
 
-export type ModelTier = 0 | 1 | 2 | 3;
+export type ModelTier = 0 | 1 | 2 | 3 | 4;
 
 export interface TokenizerMetadata {
   url: string;

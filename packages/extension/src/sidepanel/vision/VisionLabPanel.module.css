@@ -1,0 +1,359 @@
+/* VisionLabPanel.module.css — Session 23
+ * Uses existing color tokens where available; falls back to CSS custom
+ * properties from UI_GUIDELINES / sidepanel tokens.
+ */
+
+/* ── Root ──────────────────────────────────────────────────────────────────── */
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ── Header ────────────────────────────────────────────────────────────────── */
+.header {
+  background: var(--ab-surface, rgba(26,26,46,1));
+  border: 1px solid rgba(123, 104, 238, 0.2);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+.headerTitle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ab-accent, #bb86fc);
+  margin: 0;
+}
+.labBadge {
+  display: inline-block;
+  background: linear-gradient(135deg, #7b68ee, #bb86fc);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  text-transform: uppercase;
+}
+.featureBadge {
+  font-size: 9px;
+  color: var(--ab-muted, #94a3b8);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-weight: 700;
+}
+.desc {
+  font-size: 11px;
+  color: var(--ab-muted, #94a3b8);
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* ── Scan button ───────────────────────────────────────────────────────────── */
+.scanBtn {
+  width: 100%;
+  background: linear-gradient(135deg, var(--ab-primary, #7b68ee), var(--ab-accent, #bb86fc));
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.15s;
+  font-family: inherit;
+}
+.scanBtn:hover:not(:disabled) { opacity: 0.88; transform: translateY(-1px); }
+.scanBtn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* ── Progress bar ──────────────────────────────────────────────────────────── */
+.progressWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.progressTrack {
+  height: 4px;
+  background: rgba(123, 104, 238, 0.15);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.progressFill {
+  height: 100%;
+  background: linear-gradient(90deg, #7b68ee, #bb86fc);
+  border-radius: 4px;
+  transition: width 0.2s ease;
+}
+.progressLabel {
+  font-size: 10px;
+  color: var(--ab-muted, #94a3b8);
+  text-align: right;
+}
+
+/* ── Error banner ──────────────────────────────────────────────────────────── */
+.errorBanner {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 11px;
+  color: #fca5a5;
+}
+
+/* ── Stats row ─────────────────────────────────────────────────────────────── */
+.statsRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.statChip {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--ab-muted, #94a3b8);
+  background: rgba(123, 104, 238, 0.08);
+  border: 1px solid rgba(123, 104, 238, 0.15);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+/* ── Results grid ──────────────────────────────────────────────────────────── */
+.grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+@media (min-width: 800px) {
+  .grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* ── Result card ───────────────────────────────────────────────────────────── */
+.resultCard {
+  background: var(--ab-surface, rgba(26,26,46,1));
+  border: 1px solid rgba(123, 104, 238, 0.15);
+  border-left: 3px solid var(--ab-primary, #7b68ee);
+  border-radius: 10px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cardTop {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+/* Thumbnail */
+.thumbWrap {
+  flex-shrink: 0;
+  width: 80px;
+  height: 80px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(0,0,0,0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.thumb {
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+}
+.thumbPlaceholder {
+  width: 80px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  color: rgba(255,255,255,0.2);
+}
+
+/* Labels */
+.labels {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.labelRow {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+.labelTag {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--ab-muted, #94a3b8);
+  flex-shrink: 0;
+  width: 40px;
+}
+.labelBefore {
+  font-size: 11px;
+  color: var(--ab-muted, #94a3b8);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.labelAfter {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ab-text, #e2e8f0);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.noLabel {
+  font-style: italic;
+  opacity: 0.6;
+}
+.editInput {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ab-text, #e2e8f0);
+  background: rgba(123, 104, 238, 0.1);
+  border: 1px solid rgba(123, 104, 238, 0.5);
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-family: inherit;
+  outline: none;
+}
+
+/* Meta row (tier + source + confidence) */
+.metaRow {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 4px;
+}
+.tierBadge {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 800;
+  border-radius: 6px;
+  padding: 1px 5px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.tierT1 { background: rgba(148,163,184,0.2); color: #94a3b8; }
+.tierT2 { background: rgba(99,179,237,0.25); color: #63b3ed; }
+.tierT3 { background: rgba(79,209,197,0.25); color: #4fd1c5; }
+
+.sourceChip {
+  font-size: 9px;
+  color: var(--ab-muted, #94a3b8);
+  background: rgba(123, 104, 238, 0.08);
+  border-radius: 999px;
+  padding: 1px 5px;
+  max-width: 64px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.confBarTrack {
+  flex: 1;
+  height: 3px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.confBarFill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+.confPct {
+  font-size: 9px;
+  color: var(--ab-muted, #94a3b8);
+  width: 28px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* ── Action row ────────────────────────────────────────────────────────────── */
+.actions {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.actionBtn {
+  flex: 1;
+  padding: 5px 8px;
+  border-radius: 7px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid;
+  font-family: inherit;
+  transition: opacity 0.15s, transform 0.1s;
+  background: transparent;
+}
+.actionBtn:hover { opacity: 0.8; transform: translateY(-1px); }
+.acceptBtn { border-color: var(--ab-success, #10b981); color: var(--ab-success, #10b981); }
+.rejectBtn { border-color: var(--ab-danger, #ef4444); color: var(--ab-danger, #ef4444); }
+.editBtn   { border-color: var(--ab-warning, #f59e0b); color: var(--ab-warning, #f59e0b); }
+.actionActive { color: #fff; }
+.acceptBtn.actionActive { background: var(--ab-success, #10b981); }
+.rejectBtn.actionActive { background: var(--ab-danger, #ef4444); }
+.editBtn.actionActive   { background: var(--ab-warning, #f59e0b); }
+
+.statusPill {
+  font-size: 9px;
+  font-weight: 700;
+  border-radius: 999px;
+  border: 1px solid;
+  padding: 2px 7px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--ab-text, #e2e8f0);
+}
+
+/* ── Export button ─────────────────────────────────────────────────────────── */
+.exportBtn {
+  width: 100%;
+  border: 1px solid rgba(123, 104, 238, 0.35);
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ab-text, #e2e8f0);
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s, border-color 0.15s;
+}
+.exportBtn:hover {
+  background: rgba(123, 104, 238, 0.08);
+  border-color: rgba(123, 104, 238, 0.6);
+}
+
+/* ── Empty state ───────────────────────────────────────────────────────────── */
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--ab-muted, #94a3b8);
+  font-size: 12px;
+}
+.emptyIcon {
+  font-size: 28px;
+  line-height: 1;
+}

@@ -36,6 +36,7 @@
       <string id="Cat_AIEngine">AI Engine</string>
       <string id="Cat_Profile">Profile</string>
       <string id="Cat_Agent">Desktop Agent</string>
+      <string id="Cat_VisionRecovery">Vision Recovery &amp; Analytics</string>
 
       <!-- ══════════════════════════════════════════════════════════════════════
            Policy 1: EnabledFeaturesLockdown
@@ -243,6 +244,83 @@
         and the extension works with any installed agent version.
       </string>
 
+      <!-- ══════════════════════════════════════════════════════════════════════
+           Policy 10: VisionRecoveryTier3Mode (Session 23 — Feature #5 Tier 3 VLM)
+           ══════════════════════════════════════════════════════════════════════ -->
+      <string id="VisionRecoveryTier3Mode_DisplayName">
+        Vision Recovery — On-Device VLM Tier 3 Mode
+      </string>
+      <string id="VisionRecoveryTier3Mode_Description">
+        Controls when the on-device Moondream2 vision-language model (~180 MB)
+        may be downloaded and invoked for Tier 3 semantic element recovery.
+
+        Disabled — Tier 3 is turned off entirely. The extension will not
+        download Moondream2 and will never invoke on-device VLM inference.
+        Use this setting on metered connections, low-disk endpoints, or
+        deployments that must not incur large asset downloads.
+
+        AutoOnDemand (default) — Moondream2 is downloaded the first time a
+        page needs Tier 3 recovery, then cached for subsequent use. Balances
+        first-use latency against disk footprint.
+
+        PrefetchOnIdle — Moondream2 is downloaded during browser idle time
+        shortly after the extension starts, so the first Tier 3 invocation
+        is instant. Best for kiosk / high-availability accessibility
+        deployments where predictable latency matters.
+
+        When this policy is not configured, AutoOnDemand applies.
+      </string>
+      <string id="VisionRecoveryTier3Mode_Disabled">Disabled — Tier 3 off</string>
+      <string id="VisionRecoveryTier3Mode_AutoOnDemand">AutoOnDemand — Download on first use</string>
+      <string id="VisionRecoveryTier3Mode_PrefetchOnIdle">PrefetchOnIdle — Background download</string>
+
+      <!-- ══════════════════════════════════════════════════════════════════════
+           Policy 11: ObservatoryAnalyticsLevel (Session 23)
+           ══════════════════════════════════════════════════════════════════════ -->
+      <string id="ObservatoryAnalyticsLevel_DisplayName">
+        Observatory Analytics Level
+      </string>
+      <string id="ObservatoryAnalyticsLevel_Description">
+        Sets the granularity of data the extension contributes to the
+        Compliance Observatory analytics endpoints (funnel, feature usage,
+        languages, domains, compliance mappings). All levels preserve
+        differential privacy (Laplace noise, epsilon = 1.0).
+
+        Minimal — Only daily counter totals are reported. No time-series,
+        no feature-level breakdown. Lowest data footprint.
+
+        Standard (default) — Daily totals plus per-feature and per-language
+        categorical rollups. Sufficient for most compliance reporting.
+
+        Full — Per-day time-series for every feature, domain, and language.
+        Required for adoption funnel and effectiveness analytics.
+
+        When this policy is not configured, Standard applies.
+      </string>
+      <string id="ObservatoryAnalyticsLevel_Minimal">Minimal — Counters only</string>
+      <string id="ObservatoryAnalyticsLevel_Standard">Standard — Categorical rollups</string>
+      <string id="ObservatoryAnalyticsLevel_Full">Full — Per-day time series</string>
+
+      <!-- ══════════════════════════════════════════════════════════════════════
+           Policy 12: MaxVisionInferencesPerDay (Session 23)
+           ══════════════════════════════════════════════════════════════════════ -->
+      <string id="MaxVisionInferencesPerDay_DisplayName">
+        Maximum Tier 3 Vision Inferences Per Day
+      </string>
+      <string id="MaxVisionInferencesPerDay_Description">
+        Caps the number of Tier 3 on-device vision-language inferences the
+        extension may run on this machine per day. Useful for
+        battery-sensitive or thermal-sensitive deployments (ultrabooks,
+        tablets) where the ~180 MB model's inference cost must be bounded.
+
+        Accepted values: 0 - 10000.
+        0 — Effectively disables Tier 3 (same as VisionRecoveryTier3Mode = Disabled).
+        Default (not configured) — 500 inferences per day.
+
+        Inferences above the cap fall through to Tier 2 (cloud AI, if
+        allowed by AllowCloudAITier) or Tier 1 (local heuristic).
+      </string>
+
     </stringTable>
 
     <presentationTable>
@@ -298,6 +376,24 @@
           <label>Minimum agent version (semver, e.g. 0.19.0)</label>
           <defaultValue>0.19.0</defaultValue>
         </textBox>
+      </presentation>
+
+      <presentation id="VisionRecoveryTier3Mode">
+        <dropdownList refId="VisionRecoveryTier3Mode_Enum" defaultItem="1">
+          Tier 3 on-device VLM mode
+        </dropdownList>
+      </presentation>
+
+      <presentation id="ObservatoryAnalyticsLevel">
+        <dropdownList refId="ObservatoryAnalyticsLevel_Enum" defaultItem="1">
+          Observatory analytics granularity
+        </dropdownList>
+      </presentation>
+
+      <presentation id="MaxVisionInferencesPerDay">
+        <decimalTextBox refId="MaxVisionInferencesPerDay_Decimal" defaultValue="500">
+          Maximum Tier 3 inferences per day (0 - 10000)
+        </decimalTextBox>
       </presentation>
 
     </presentationTable>

@@ -21,6 +21,9 @@ export const MINILM_EMBEDDINGS_ID = 'minilm-l6-v2';
 export const T5_SUMMARIZER_ID = 't5-small';
 // --- Session 17: Indic Whisper STT ---
 export const INDIC_WHISPER_ID = 'indic-whisper-small';
+// --- Session 23: Moondream2 Vision-Language ---
+export const MOONDREAM_VISION_ID = 'moondream2-int8';
+export const MOONDREAM_TEXT_ID = 'moondream2-text-int8';
 
 export const MODEL_REGISTRY: Record<string, ModelMetadata> = {
   [STRUGGLE_CLASSIFIER_ID]: {
@@ -99,6 +102,41 @@ export const MODEL_REGISTRY: Record<string, ModelMetadata> = {
       sizeBytes: 2 * 1024 * 1024,
     },
   },
+  // --- Session 23: Moondream2 Vision-Language ---
+  // Vision encoder (Apache 2.0, Xenova ONNX port). SHA-256 null until
+  // tools/prepare-models/download-moondream.py uploads + compute-hashes.sh runs.
+  [MOONDREAM_VISION_ID]: {
+    id: MOONDREAM_VISION_ID,
+    version: 'v1',
+    url: `${VPS_MODEL_BASE}/moondream2-vision-int8.onnx`,
+    bundledPath: null,
+    sha256: null,
+    sizeBytes: 90 * 1024 * 1024,
+    loadTier: 4,
+    inputNames: ['pixel_values'],
+    outputNames: ['image_embeds'],
+    description:
+      'Moondream2 INT8 vision encoder (Apache 2.0, Xenova port). Pairs with text decoder for on-device semantic element captioning.',
+    tokenizer: {
+      url: `${VPS_MODEL_BASE}/moondream2-tokenizer.json`,
+      bundledPath: null,
+      sha256: null,
+      sizeBytes: 2 * 1024 * 1024,
+    },
+  },
+  [MOONDREAM_TEXT_ID]: {
+    id: MOONDREAM_TEXT_ID,
+    version: 'v1',
+    url: `${VPS_MODEL_BASE}/moondream2-text-int8.onnx`,
+    bundledPath: null,
+    sha256: null,
+    sizeBytes: 90 * 1024 * 1024,
+    loadTier: 4,
+    inputNames: ['input_ids', 'image_embeds'],
+    outputNames: ['logits'],
+    description:
+      'Moondream2 INT8 text decoder. Conditioned on image_embeds from the vision encoder for greedy-decode captioning.',
+  },
 };
 
 export function getModelMetadata(id: string): ModelMetadata | null {
@@ -114,6 +152,7 @@ export const TIER_LABELS: Record<ModelTier, string> = {
   1: 'Embeddings (MiniLM)',
   2: 'Summarizer (T5-small)',
   3: 'Voice STT (IndicWhisper)',
+  4: 'Vision-Language (Moondream2)',
 };
 
 export const TIER_DESCRIPTIONS: Record<ModelTier, string> = {
@@ -121,4 +160,5 @@ export const TIER_DESCRIPTIONS: Record<ModelTier, string> = {
   1: 'On-demand semantic embeddings (~22 MB, downloads from CDN).',
   2: 'On-demand abstractive summarization (~242 MB). Deferred to Session 15.',
   3: 'On-demand 22-language voice STT (~80 MB). Opt-in download; decoder loop Session 18.',
+  4: 'On-device vision-language model for semantic element recovery (~180 MB, opt-in download). Tier 3 of the vision-recovery waterfall.',
 };

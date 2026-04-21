@@ -516,7 +516,7 @@ is a deliberate design choice, not a gap.
 | Extension collector | `packages/extension/src/background/observatory-collector.ts` | In-memory counter store; `chrome.storage.local` persistence; midnight reset; increments on adaptation and struggle events |
 | Settings UI | `packages/extension/src/popup/App.tsx` | Settings tab — Anonymous Metrics section with opt-in toggle wired to `shareAnonymousMetrics` profile field |
 | Profile type | `packages/core/src/types/profile.ts` | `shareAnonymousMetrics: boolean` field on `AccessibilityProfile` |
-| VPS server | `ops/observatory/server.js` | Express app; `/api/publish`, `/api/summary`, `/api/trends`, `/api/compliance-report`, `/api/health` |
+| VPS server | `ops/observatory/server.js` | Express app; `/api/publish`, `/api/summary`, `/api/trends`, `/api/compliance-report`, `/api/health`, `/api/observatory/{funnel,feature-usage,language-breakdown,domain-penetration,adaptation-effectiveness,compliance/rpwd,compliance/ada,compliance/eaa}` (Session 23) |
 | Seed script | `ops/observatory/seed-demo-data.js` | Populates `aggregated_daily` with 30 days of synthetic data for dashboard demos |
 | Dashboard — entry | `ops/observatory/public/index.html` | Single-page dashboard shell; tab navigation |
 | Dashboard — styles | `ops/observatory/public/styles.css` | Dashboard visual layer |
@@ -578,6 +578,46 @@ docker compose exec observatory node /app/seed-demo-data.js
 4. Collection halts immediately. In-memory counters are cleared.
 5. No further data is transmitted for any subsequent day.
 6. Historical aggregate contributions are not retractable — see Section 6 for rationale.
+
+---
+
+## 12b. Session 23 — Enterprise analytics expansion
+
+Session 23 added 8 additive analytics endpoints under `/api/observatory/` to drive richer enterprise pilot → scale ROI narratives. Every endpoint preserves the differential-privacy contract (Laplace ε=1.0), applies the k-anonymity floor of 5 to any categorical breakdown, uses parameterized `better-sqlite3` prepared statements, and honors the existing `rateLimit` middleware.
+
+### New endpoints
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /api/observatory/funnel?days=30` | Adoption funnel: enrolled → active → features_used → sustained_use_7d → sustained_use_30d |
+| `GET /api/observatory/feature-usage?days=30&bucket=day\|week\|month` | Top-10 per-feature time series; bucket collapse via SQLite `strftime` |
+| `GET /api/observatory/language-breakdown?days=30` | Per-BCP-47 devices + 14 script-family rollups (Devanagari, Tamil, Bengali, CJK, Arabic, Latin, Cyrillic, Thai, Turkish, …) |
+| `GET /api/observatory/domain-penetration?days=30` | Per-domain-connector devices + usage_score, ranked |
+| `GET /api/observatory/adaptation-effectiveness?days=30` | `applied / reverted / effectiveness_pct` overall + per-adaptation. `reverted` proxied to 0 until Session 24 collects the counter |
+| `GET /api/observatory/compliance/rpwd?days=30` | Maps features to RPwD Act 2016 Section 20 accommodation categories (Visual / Auditory / Motor / Cognitive) with per-category coverage % |
+| `GET /api/observatory/compliance/ada?days=30` | Same shape, ADA Title I regulation label |
+| `GET /api/observatory/compliance/eaa?days=30` | Same shape, EAA Article 4 regulation label |
+
+### Differential privacy contract — unchanged
+
+All new endpoints read from the same `aggregated_daily` table that the legacy `/api/summary` + `/api/trends` use. The Laplace noise is added at the device on the write path (in `observatory-publisher.ts`), not at the read path, so additive endpoints inherit the same ε=1.0 guarantee. Adding 8 new read endpoints does **not** increase the privacy loss for a given user's counter — it just re-slices already-noised aggregates.
+
+### RPwD / ADA / EAA mapping rationale
+
+Regulatory frameworks don't enumerate specific web accommodations — they require "reasonable accommodation" without prescribing technique. We therefore group the 12 internal adaptation types into four canonical disability categories (Visual / Auditory / Motor / Cognitive), each of which maps to an accommodation surface:
+
+| Category | Adaptations that count toward coverage |
+|---|---|
+| Visual | `FONT_SCALE`, `CONTRAST`, `REDUCED_MOTION` |
+| Auditory | `AUTO_SUMMARIZE` (text alternative to audio content) |
+| Motor | `VOICE_NAV`, `EYE_TRACKING`, `KEYBOARD_ONLY`, `PREDICTIVE_INPUT`, `CLICK_TARGET_ENLARGE` |
+| Cognitive | `FOCUS_MODE`, `READING_MODE`, `TEXT_SIMPLIFY`, `LAYOUT_SIMPLIFY` |
+
+`coverage_pct` per category = 100 if **any** adaptation in that category triggered in the window, else 0. `overall_coverage_pct` = mean of the four category values. The disclaimer is explicit: this is a self-assessment aid, not a legal certification.
+
+### Dashboard tabs
+
+The static dashboard at `/observatory/` gains 5 new tabs (Funnel, Features, Languages, Domains, Compliance), each rendered with pure inline SVG — no new JS dependencies. The existing Overview and Trends tabs are unchanged. The Compliance tab is a tri-column view showing RPwD / ADA / EAA side-by-side plus a "Generate Compliance Report" button that downloads JSON and triggers browser print-to-PDF.
 
 ---
 

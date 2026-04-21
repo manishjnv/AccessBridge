@@ -61,6 +61,9 @@
     <category name="Agent" displayName="$(string.Cat_Agent)">
       <parentCategory ref="AccessBridge" />
     </category>
+    <category name="VisionRecovery" displayName="$(string.Cat_VisionRecovery)">
+      <parentCategory ref="AccessBridge" />
+    </category>
   </categories>
 
   <policies>
@@ -323,6 +326,113 @@
           valueName="MinimumAgentVersion"
           required="false"
           maxLength="30"
+        />
+      </elements>
+    </policy>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════
+         CATEGORY: VisionRecovery (Session 23 — Feature #5 Tier 3 VLM)
+         Policies: VisionRecoveryTier3Mode, ObservatoryAnalyticsLevel, MaxVisionInferencesPerDay
+         ═══════════════════════════════════════════════════════════════════════ -->
+
+    <!--
+      Policy: VisionRecoveryTier3Mode
+      Type: REG_SZ (enum)
+      Registry: HKLM\SOFTWARE\Policies\AccessBridge\VisionRecoveryTier3Mode
+      Values: "Disabled" | "AutoOnDemand" | "PrefetchOnIdle"
+      Purpose: Controls when the 180 MB Moondream2 VLM may be downloaded/run.
+               "Disabled" blocks Tier 3 entirely (model is never fetched).
+               "AutoOnDemand" fetches on first use and caches (default).
+               "PrefetchOnIdle" fetches during idle time so first invocation is instant.
+    -->
+    <policy
+      name="VisionRecoveryTier3Mode"
+      class="Machine"
+      displayName="$(string.VisionRecoveryTier3Mode_DisplayName)"
+      explainText="$(string.VisionRecoveryTier3Mode_Description)"
+      presentation="$(presentation.VisionRecoveryTier3Mode)"
+      key="SOFTWARE\Policies\AccessBridge">
+      <parentCategory ref="VisionRecovery" />
+      <supportedOn ref="AccessBridge_Support" />
+      <elements>
+        <enum
+          id="VisionRecoveryTier3Mode_Enum"
+          valueName="VisionRecoveryTier3Mode"
+          required="true">
+          <item displayName="$(string.VisionRecoveryTier3Mode_Disabled)">
+            <value><string>Disabled</string></value>
+          </item>
+          <item displayName="$(string.VisionRecoveryTier3Mode_AutoOnDemand)">
+            <value><string>AutoOnDemand</string></value>
+          </item>
+          <item displayName="$(string.VisionRecoveryTier3Mode_PrefetchOnIdle)">
+            <value><string>PrefetchOnIdle</string></value>
+          </item>
+        </enum>
+      </elements>
+    </policy>
+
+    <!--
+      Policy: ObservatoryAnalyticsLevel
+      Type: REG_SZ (enum)
+      Registry: HKLM\SOFTWARE\Policies\AccessBridge\ObservatoryAnalyticsLevel
+      Values: "Minimal" | "Standard" | "Full"
+      Purpose: Governs the granularity of data the extension contributes to
+               the Observatory analytics endpoints (funnel / features /
+               languages / compliance). "Minimal" = counts only; "Full" =
+               per-bucket time series. All levels preserve DP (Laplace ε=1.0).
+    -->
+    <policy
+      name="ObservatoryAnalyticsLevel"
+      class="Machine"
+      displayName="$(string.ObservatoryAnalyticsLevel_DisplayName)"
+      explainText="$(string.ObservatoryAnalyticsLevel_Description)"
+      presentation="$(presentation.ObservatoryAnalyticsLevel)"
+      key="SOFTWARE\Policies\AccessBridge">
+      <parentCategory ref="VisionRecovery" />
+      <supportedOn ref="AccessBridge_Support" />
+      <elements>
+        <enum
+          id="ObservatoryAnalyticsLevel_Enum"
+          valueName="ObservatoryAnalyticsLevel"
+          required="true">
+          <item displayName="$(string.ObservatoryAnalyticsLevel_Minimal)">
+            <value><string>Minimal</string></value>
+          </item>
+          <item displayName="$(string.ObservatoryAnalyticsLevel_Standard)">
+            <value><string>Standard</string></value>
+          </item>
+          <item displayName="$(string.ObservatoryAnalyticsLevel_Full)">
+            <value><string>Full</string></value>
+          </item>
+        </enum>
+      </elements>
+    </policy>
+
+    <!--
+      Policy: MaxVisionInferencesPerDay
+      Type: REG_DWORD (integer)
+      Registry: HKLM\SOFTWARE\Policies\AccessBridge\MaxVisionInferencesPerDay
+      Values: 0 - 10000. 0 disables Tier 3 inference globally; default 500.
+      Purpose: Caps Tier 3 VLM invocations per machine per day for
+               battery-sensitive or thermal-sensitive enterprise deployments.
+    -->
+    <policy
+      name="MaxVisionInferencesPerDay"
+      class="Machine"
+      displayName="$(string.MaxVisionInferencesPerDay_DisplayName)"
+      explainText="$(string.MaxVisionInferencesPerDay_Description)"
+      presentation="$(presentation.MaxVisionInferencesPerDay)"
+      key="SOFTWARE\Policies\AccessBridge">
+      <parentCategory ref="VisionRecovery" />
+      <supportedOn ref="AccessBridge_Support" />
+      <elements>
+        <decimal
+          id="MaxVisionInferencesPerDay_Decimal"
+          valueName="MaxVisionInferencesPerDay"
+          required="false"
+          minValue="0"
+          maxValue="10000"
         />
       </elements>
     </policy>

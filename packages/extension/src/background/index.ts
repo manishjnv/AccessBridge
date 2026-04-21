@@ -22,6 +22,9 @@ import type { NativeTargetHint, NativeAdaptation } from '@accessbridge/core/ipc'
 import { AIEngine, SummarizerService, SimplifierService } from '@accessbridge/ai-engine';
 import { ActionItemsService } from '@accessbridge/ai-engine/services/index.js';
 import { VisionRecoveryService } from '@accessbridge/ai-engine/services/index.js';
+// --- Session 23: Vision Lab user-curation store ---
+import { UserCurationStore } from '@accessbridge/core/vision/user-curation-store.js';
+import type { UnlabeledElement, RecoveredLabel } from '@accessbridge/core/vision/types.js';
 
 // --- Session 12: On-Device ONNX Models ---
 import {
@@ -136,6 +139,14 @@ function getActionItemsService(): ActionItemsService {
   return actionItemsService;
 }
 
+let curationStore: UserCurationStore | undefined;
+function getCurationStore(): UserCurationStore {
+  if (!curationStore) {
+    curationStore = new UserCurationStore();
+  }
+  return curationStore;
+}
+
 function getVisionRecoveryService(): VisionRecoveryService {
   if (!visionRecoveryService) {
     visionRecoveryService = new VisionRecoveryService(getAIEngine());
@@ -154,9 +165,9 @@ let t5Summarizer: T5Summarizer | null = null;
 // --- Session 17: Indic Whisper STT ---
 let indicWhisper: IndicWhisper | null = null;
 
-const onnxTierState: Record<ModelTier, OnnxTierState> = { 0: 'idle', 1: 'idle', 2: 'idle', 3: 'idle' };
-const onnxTierProgress: Record<ModelTier, number> = { 0: 0, 1: 0, 2: 0, 3: 0 };
-const onnxTierError: Record<ModelTier, string | null> = { 0: null, 1: null, 2: null, 3: null };
+const onnxTierState: Record<ModelTier, OnnxTierState> = { 0: 'idle', 1: 'idle', 2: 'idle', 3: 'idle', 4: 'idle' };
+const onnxTierProgress: Record<ModelTier, number> = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0 };
+const onnxTierError: Record<ModelTier, string | null> = { 0: null, 1: null, 2: null, 3: null, 4: null };
 
 function getOnnxRuntime(): ONNXRuntime {
   if (!onnxRuntime) {
@@ -321,7 +332,7 @@ async function getOnnxStatusSnapshot(): Promise<{
     };
   };
   return {
-    tiers: { 0: tierMeta(0), 1: tierMeta(1), 2: tierMeta(2), 3: tierMeta(3) },
+    tiers: { 0: tierMeta(0), 1: tierMeta(1), 2: tierMeta(2), 3: tierMeta(3), 4: tierMeta(4) },
     runtime: runtimeStats,
     forceFallback: onnxForceFallback(),
   };
@@ -487,6 +498,13 @@ type MessageType =
   | 'ACTION_ITEMS_UPDATE'
   // --- Session 10: Vision Recovery ---
   | 'VISION_RECOVER_VIA_API'
+  // --- Session 23: Vision Lab side panel + curation store ---
+  | 'VISION_LAB_SCAN'
+  | 'VISION_CURATION_LIST'
+  | 'VISION_CURATION_SAVE'
+  | 'VISION_CURATION_DELETE'
+  | 'VISION_CURATION_CLEAR'
+  | 'VISION_CURATION_EXPORT'
   // --- Session 11: Fusion pipeline ---
   | 'FUSION_INTENT_EMITTED'
   | 'FUSION_GET_STATS'
@@ -782,6 +800,109 @@ async function handleMessage(
         return result;
       } catch {
         return { role: 'button', label: 'Unlabeled control', description: '', confidence: 0 };
+      }
+    }
+
+    // --- Session 23: Vision Lab side-panel message handlers ---
+    case 'VISION_LAB_SCAN': {
+      // Delegate scan to the active tab's content script; the content script
+      // already owns the DOM walker from Session 10's Vision Recovery work.
+      const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!activeTab?.id) return { ok: false, error: 'no-active-tab' };
+      try {
+        const response = await chrome.tabs.sendMessage(activeTab.id, {
+          type: 'VISION_LAB_SCAN',
+          payload: message.payload ?? {},
+        });
+        return response ?? { ok: false, error: 'content-no-response' };
+      } catch (err) {
+        return { ok: false, error: 'content-unreachable: ' + String(err) };
+      }
+    }
+
+    case 'VISION_CURATION_LIST': {
+      try {
+        const store = getCurationStore();
+        const curations = await store.list();
+        return { curations };
+      } catch (err) {
+        return { curations: [], error: String(err) };
+      }
+    }
+
+    case 'VISION_CURATION_SAVE': {
+      const payload = message.payload as {
+        element: UnlabeledElement;
+        recovered: RecoveredLabel;
+        status: 'accepted' | 'rejected' | 'edited';
+        editedLabel?: string;
+        domain: string;
+        appVersion: string;
+      };
+      // Opus-solo adversarial pass (Session 23, codex:rescue quota-exhausted):
+      // validate status enum + required-string-field shapes before reaching
+      // store.save(). Prevents arbitrary-status rows landing in IndexedDB and
+      // keeps the curation-learning loop (tools/aggregate-curated-labels.ts)
+      // working against a tight shape contract.
+      if (!payload || typeof payload !== 'object') {
+        return { ok: false, error: 'invalid-payload' };
+      }
+      if (
+        payload.status !== 'accepted' &&
+        payload.status !== 'rejected' &&
+        payload.status !== 'edited'
+      ) {
+        return { ok: false, error: 'invalid-status' };
+      }
+      if (
+        !payload.element ||
+        typeof payload.element !== 'object' ||
+        typeof (payload.element as UnlabeledElement).classSignature !== 'string' ||
+        (payload.element as UnlabeledElement).classSignature.length === 0
+      ) {
+        return { ok: false, error: 'invalid-element' };
+      }
+      if (!payload.recovered || typeof payload.recovered !== 'object') {
+        return { ok: false, error: 'invalid-recovered' };
+      }
+      if (typeof payload.domain !== 'string' || payload.domain.length === 0) {
+        return { ok: false, error: 'invalid-domain' };
+      }
+      if (typeof payload.appVersion !== 'string' || payload.appVersion.length === 0) {
+        return { ok: false, error: 'invalid-appVersion' };
+      }
+      const store = getCurationStore();
+      return store.save(payload);
+    }
+
+    case 'VISION_CURATION_DELETE': {
+      const { id } = message.payload as { id: string };
+      if (typeof id !== 'string' || id.length === 0) return { ok: false, error: 'invalid-id' };
+      const store = getCurationStore();
+      return store.delete(id);
+    }
+
+    case 'VISION_CURATION_CLEAR': {
+      const store = getCurationStore();
+      return store.clear();
+    }
+
+    case 'VISION_CURATION_EXPORT': {
+      const store = getCurationStore();
+      const json = await store.exportAsJson();
+      // Persist to a Chrome download; returns the download id.
+      try {
+        const url = 'data:application/json;charset=utf-8,' + encodeURIComponent(json);
+        const id = await chrome.downloads.download({
+          url,
+          filename: `accessbridge-curations-${new Date().toISOString().slice(0, 10)}.json`,
+          saveAs: true,
+        });
+        return { ok: true, downloadId: id };
+      } catch (err) {
+        // Downloads API may be unavailable; return raw JSON so caller can
+        // fall back to a data URL in the side panel.
+        return { ok: true, json };
       }
     }
 

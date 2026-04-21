@@ -113,6 +113,48 @@ done
 echo "  indic-whisper files uploaded: $IW_UPLOADED"
 
 # ---------------------------------------------------------------------------
+# Session 23 — Moondream2 ONNX artifacts (Feature #5 Tier 3 Vision Recovery)
+# ---------------------------------------------------------------------------
+MD_DIR="$OUTPUT_DIR/moondream"
+MD_FILES=(
+  "moondream2-vision-int8.onnx"
+  "moondream2-text-int8.onnx"
+  "moondream2-tokenizer.json"
+  "moondream2-image-preprocessor.json"
+)
+
+echo ""
+echo "--- Uploading moondream2 artifacts (Session 23) ---"
+MD_UPLOADED=0
+for md_fname in "${MD_FILES[@]}"; do
+  md_path="$MD_DIR/$md_fname"
+  if [[ ! -f "$md_path" ]]; then
+    echo "  SKIP (not found): $md_fname"
+    continue
+  fi
+  fsize="$(stat -c%s "$md_path" 2>/dev/null || stat -f%z "$md_path")"
+  echo ""
+  echo "  Uploading $md_fname ($fsize bytes) ..."
+  SCP_FALLBACK=0
+  rsync -avz --progress "$md_path" "$REMOTE_HOST:$REMOTE_DIR/" 2>&1 || SCP_FALLBACK=1
+  if [[ $SCP_FALLBACK -eq 1 ]]; then
+    echo "  rsync failed, falling back to scp..."
+    scp "$md_path" "$REMOTE_HOST:$REMOTE_DIR/"
+  fi
+  TOTAL_BYTES=$(( TOTAL_BYTES + fsize ))
+  MD_UPLOADED=$(( MD_UPLOADED + 1 ))
+
+  PUBLIC_URL="$PUBLIC_BASE/$md_fname"
+  if curl -sI "$PUBLIC_URL" | grep -q "200 OK"; then
+    echo "  OK  $PUBLIC_URL"
+  else
+    echo "  FAIL $PUBLIC_URL — not reachable or non-200"
+    FAILURES+=("$md_fname")
+  fi
+done
+echo "  moondream2 files uploaded: $MD_UPLOADED"
+
+# ---------------------------------------------------------------------------
 # Session 14 loose end — t5-small.onnx
 # Uploads t5-small.onnx if it was produced (Tier 2 model, may not exist yet).
 # ---------------------------------------------------------------------------
@@ -149,7 +191,7 @@ ssh "$REMOTE_HOST" "chmod 644 $REMOTE_DIR/*.onnx $REMOTE_DIR/*.json && chown -R 
 echo ""
 echo "======================================="
 echo "Upload complete"
-echo "  Files uploaded : $(( ${#FILES[@]} + IW_UPLOADED + 1 ))"   # +1 for manifest
+echo "  Files uploaded : $(( ${#FILES[@]} + IW_UPLOADED + MD_UPLOADED + 1 ))"   # +1 for manifest
 echo "  Total bytes    : $TOTAL_BYTES"
 if [[ ${#FAILURES[@]} -gt 0 ]]; then
   echo "  FAILURES (${#FAILURES[@]}):"

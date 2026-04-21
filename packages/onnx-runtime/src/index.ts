@@ -52,11 +52,29 @@ export {
   MINILM_EMBEDDINGS_ID,
   T5_SUMMARIZER_ID,
   INDIC_WHISPER_ID,
+  MOONDREAM_VISION_ID,
+  MOONDREAM_TEXT_ID,
   TIER_LABELS,
   TIER_DESCRIPTIONS,
   getModelMetadata,
   getModelsForTier,
 } from './model-registry.js';
+
+export {
+  MoondreamVision,
+} from './models/moondream.js';
+export type {
+  VisionDescription,
+  MoondreamLoadOptions,
+  MoondreamDeps,
+} from './models/moondream.js';
+
+export {
+  screenshotElement,
+  normalize,
+  resize,
+  hashImageData,
+} from './models/image-preprocessor.js';
 
 export type {
   ModelTier,

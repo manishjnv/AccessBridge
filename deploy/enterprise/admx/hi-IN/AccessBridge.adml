@@ -37,6 +37,7 @@
       <string id="Cat_AIEngine">AI इंजन</string>
       <string id="Cat_Profile">प्रोफ़ाइल</string>
       <string id="Cat_Agent">डेस्कटॉप एजेंट</string>
+      <string id="Cat_VisionRecovery">विज़न रिकवरी और विश्लेषण</string>
 
       <!-- ══════════════════════════════════════════════════════════════════════
            Policy 1: EnabledFeaturesLockdown
@@ -235,6 +236,61 @@
         कॉन्फ़िगर न होने पर: कोई न्यूनतम संस्करण लागू नहीं होता।
       </string>
 
+      <!-- Session 23 — Vision Tier 3 + Observatory analytics + inference cap -->
+      <string id="VisionRecoveryTier3Mode_DisplayName">
+        विज़न रिकवरी — ऑन-डिवाइस VLM टियर 3 मोड
+      </string>
+      <string id="VisionRecoveryTier3Mode_Description">
+        ऑन-डिवाइस Moondream2 विज़न-भाषा मॉडल (~180 MB) को कब डाउनलोड और
+        सक्रिय किया जा सकता है — इसे नियंत्रित करता है।
+
+        Disabled — टियर 3 पूरी तरह बंद। विस्तार Moondream2 डाउनलोड नहीं
+        करेगा और कभी भी ऑन-डिवाइस VLM अनुमान नहीं चलाएगा।
+
+        AutoOnDemand (डिफ़ॉल्ट) — Moondream2 पहली बार टियर 3 रिकवरी की
+        आवश्यकता होने पर डाउनलोड होता है, फिर कैश होता है।
+
+        PrefetchOnIdle — ब्राउज़र निष्क्रिय समय में डाउनलोड होता है,
+        पहली बार उपयोग तत्काल होता है।
+
+        कॉन्फ़िगर न होने पर: AutoOnDemand लागू होता है।
+      </string>
+      <string id="VisionRecoveryTier3Mode_Disabled">Disabled — टियर 3 बंद</string>
+      <string id="VisionRecoveryTier3Mode_AutoOnDemand">AutoOnDemand — पहले उपयोग पर डाउनलोड</string>
+      <string id="VisionRecoveryTier3Mode_PrefetchOnIdle">PrefetchOnIdle — पृष्ठभूमि डाउनलोड</string>
+
+      <string id="ObservatoryAnalyticsLevel_DisplayName">
+        ऑब्ज़र्वेटरी विश्लेषण स्तर
+      </string>
+      <string id="ObservatoryAnalyticsLevel_Description">
+        विस्तार अनुपालन ऑब्ज़र्वेटरी विश्लेषण एंडपॉइंट्स (फ़नल, फ़ीचर
+        उपयोग, भाषाएँ, डोमेन, अनुपालन मैपिंग) में जो डेटा योगदान करता है
+        उसकी विस्तृतता सेट करता है। सभी स्तरों में अंतर गोपनीयता
+        (Laplace noise, epsilon = 1.0) संरक्षित रहती है।
+
+        Minimal — केवल दैनिक काउंटर योग।
+        Standard (डिफ़ॉल्ट) — दैनिक योग + प्रति-फ़ीचर और प्रति-भाषा रोलअप।
+        Full — प्रत्येक फ़ीचर, डोमेन, भाषा के लिए प्रति-दिन समय-श्रृंखला।
+
+        कॉन्फ़िगर न होने पर: Standard लागू होता है।
+      </string>
+      <string id="ObservatoryAnalyticsLevel_Minimal">Minimal — केवल काउंटर</string>
+      <string id="ObservatoryAnalyticsLevel_Standard">Standard — श्रेणीगत रोलअप</string>
+      <string id="ObservatoryAnalyticsLevel_Full">Full — प्रति-दिन समय-श्रृंखला</string>
+
+      <string id="MaxVisionInferencesPerDay_DisplayName">
+        प्रति दिन अधिकतम टियर 3 विज़न अनुमान
+      </string>
+      <string id="MaxVisionInferencesPerDay_Description">
+        इस मशीन पर प्रति दिन विस्तार द्वारा चलाए जा सकने वाले टियर 3
+        ऑन-डिवाइस विज़न-भाषा अनुमानों की संख्या को सीमित करता है।
+        बैटरी-संवेदनशील या थर्मल-संवेदनशील डिप्लॉयमेंट्स के लिए उपयोगी।
+
+        मान्य मान: 0 - 10000.
+        0 — टियर 3 को प्रभावी रूप से बंद करता है।
+        डिफ़ॉल्ट (कॉन्फ़िगर न होने पर) — 500 अनुमान प्रति दिन।
+      </string>
+
     </stringTable>
 
     <presentationTable>
@@ -290,6 +346,24 @@
           <label>न्यूनतम एजेंट संस्करण (सेमवर, जैसे 0.19.0)</label>
           <defaultValue>0.19.0</defaultValue>
         </textBox>
+      </presentation>
+
+      <presentation id="VisionRecoveryTier3Mode">
+        <dropdownList refId="VisionRecoveryTier3Mode_Enum" defaultItem="1">
+          टियर 3 ऑन-डिवाइस VLM मोड
+        </dropdownList>
+      </presentation>
+
+      <presentation id="ObservatoryAnalyticsLevel">
+        <dropdownList refId="ObservatoryAnalyticsLevel_Enum" defaultItem="1">
+          ऑब्ज़र्वेटरी विश्लेषण विस्तृतता
+        </dropdownList>
+      </presentation>
+
+      <presentation id="MaxVisionInferencesPerDay">
+        <decimalTextBox refId="MaxVisionInferencesPerDay_Decimal" defaultValue="500">
+          प्रति दिन अधिकतम टियर 3 अनुमान (0 - 10000)
+        </decimalTextBox>
       </presentation>
 
     </presentationTable>

@@ -48,6 +48,18 @@ AccessBridge is an ambient accessibility operating layer that runs as a Chrome e
 | 10 | Motor Assistor | extension | Voice nav, eye tracking, dwell click (planned) |
 | 11 | App Adapters | extension | Gmail, Outlook, and generic site adapters |
 
+## Session-23 Milestone — Feature #5 at 100%
+
+With the Moondream2 INT8 on-device VLM landing in Session 23, **Feature #5 (Vision-Assisted Semantic Recovery) reaches 100% of its planned scope** — all three tiers shipped:
+
+- **Tier 1 — Heuristics + icon lexicon** (200+ entries, Session 10).
+- **Tier 2 — Gemini Flash multimodal** (opt-in, user-supplied key, Session 10).
+- **Tier 3 — On-device Moondream2 INT8 VLM** (opt-in, ~180 MB, Session 23). Runs entirely on-device via `onnxruntime-web` + WASM/WebGPU. Screenshots never leave the browser.
+
+The engine also gains a per-app MiniLM-backed **semantic vocabulary** that collapses near-duplicate labels (cosine ≥ 0.85) and a **screenshot-hash dedup cache** (24 h TTL) that prevents re-running inference on pixel-identical elements. Observatory analytics expand to 8 new endpoints under `/api/observatory/` covering funnel, feature-usage time-series, language breakdown, domain penetration, adaptation effectiveness, and tri-regulation compliance mapping (RPwD / ADA / EAA).
+
+The Plan dimension "10 Unique Features" now stands at **10 / 10 features shipped**.
+
 ## Three Core Modules
 
 ### 1. Sensory Module

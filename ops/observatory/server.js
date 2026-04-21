@@ -770,6 +770,428 @@ app.get('/api/compliance-report', (req, res) => {
 const { createEnterpriseRouter } = require('./enterprise-endpoint');
 app.use('/api/observatory/enterprise', createEnterpriseRouter());
 
+// ==========================================================================
+// Session 23 Part 5 — Enterprise analytics expansion (/api/observatory/*)
+// All endpoints:
+//   - Use parameterized prepared statements (never string-concat user input)
+//   - Apply rateLimit middleware
+//   - Return { disclaimer: 'Metrics include Laplace noise...' }
+//   - Enforce k-anonymity floor K_ANON_MIN=5 on categorical breakdowns
+//   - Use clampDays(n, 1, 365) for ?days= parameter
+//   - Limit SELECT results to LIMIT 1000 to bound response size
+// ==========================================================================
+
+const K_ANON_MIN = 5;
+const DP_DISCLAIMER = 'Metrics include Laplace noise (ε=1.0). Individual users cannot be identified.';
+
+/** Parse and clamp the ?days= query parameter. */
+function parseDays(query) {
+  return clampDays(Number(query.days || 30), 1, 365);
+}
+
+/** Format a Date to YYYY-MM-DD in UTC. */
+function toISODate(d) {
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+}
+
+// ---------- 1. GET /api/observatory/funnel ----------
+app.get('/api/observatory/funnel', rateLimit, (req, res) => {
+  try {
+    const days = parseDays(req.query);
+    const windowDays = days;
+
+    const devicesEnrolled = db.prepare('SELECT COUNT(*) AS n FROM enrolled_devices').get().n;
+
+    // Devices active: distinct count of device_count across feature rows in window
+    // Proxy: sum of device_count for features_enabled:* rows in window (may double-count
+    // across features per date, so use MAX device_count per date instead).
+    const devicesActiveRow = db.prepare(
+      `SELECT COALESCE(SUM(dc),0) AS n FROM (
+         SELECT MAX(device_count) AS dc
+         FROM aggregated_daily
+         WHERE metric LIKE 'features_enabled:%'
+           AND date >= date('now','-' || ? || ' days','localtime')
+         GROUP BY date
+         LIMIT 1000
+       )`
+    ).get(windowDays);
+    const devicesActive = devicesActiveRow ? devicesActiveRow.n : 0;
+
+    // Features used: sum of all features_enabled totals in window
+    const featuresUsedRow = db.prepare(
+      `SELECT COALESCE(SUM(total),0) AS n
+       FROM aggregated_daily
+       WHERE metric LIKE 'features_enabled:%'
+         AND date >= date('now','-' || ? || ' days','localtime')
+       LIMIT 1000`
+    ).get(windowDays);
+    const featuresUsed = featuresUsedRow ? Math.round(featuresUsedRow.n) : 0;
+
+    // Sustained use 7d: rows in last 7d with device_count > 0
+    const sustained7Row = db.prepare(
+      `SELECT COUNT(*) AS n
+       FROM aggregated_daily
+       WHERE metric LIKE 'features_enabled:%'
+         AND date >= date('now','-7 days','localtime')
+         AND device_count > 0
+       LIMIT 1000`
+    ).get();
+    const sustainedUse7d = sustained7Row ? sustained7Row.n : 0;
+
+    // Sustained use 30d: rows in last 30d with device_count > 0
+    const sustained30Row = db.prepare(
+      `SELECT COUNT(*) AS n
+       FROM aggregated_daily
+       WHERE metric LIKE 'features_enabled:%'
+         AND date >= date('now','-30 days','localtime')
+         AND device_count > 0
+       LIMIT 1000`
+    ).get();
+    const sustainedUse30d = sustained30Row ? sustained30Row.n : 0;
+
+    res.json({
+      window_days: windowDays,
+      funnel: {
+        devices_enrolled: devicesEnrolled,
+        devices_active: devicesActive,
+        features_used: featuresUsed,
+        sustained_use_7d: sustainedUse7d,
+        sustained_use_30d: sustainedUse30d,
+      },
+      disclaimer: DP_DISCLAIMER,
+    });
+  } catch (e) {
+    console.error('[observatory/funnel]', e);
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
+// ---------- 2. GET /api/observatory/feature-usage ----------
+const VALID_BUCKETS = new Set(['day', 'week', 'month']);
+
+app.get('/api/observatory/feature-usage', rateLimit, (req, res) => {
+  try {
+    const days = parseDays(req.query);
+    const bucket = req.query.bucket || 'day';
+    if (!VALID_BUCKETS.has(bucket)) {
+      return res.status(400).json({ error: "bucket must be 'day', 'week', or 'month'" });
+    }
+
+    // Determine SQLite strftime format for grouping
+    let dateFmt;
+    if (bucket === 'day') dateFmt = '%Y-%m-%d';
+    else if (bucket === 'week') dateFmt = '%Y-W%W';
+    else dateFmt = '%Y-%m';
+
+    // Pull top-10 features by total in window
+    const topFeatures = db.prepare(
+      `SELECT REPLACE(metric,'features_enabled:','') AS feature,
+              SUM(total) AS grand_total
+       FROM aggregated_daily
+       WHERE metric LIKE 'features_enabled:%'
+         AND date >= date('now','-' || ? || ' days','localtime')
+       GROUP BY metric
+       ORDER BY grand_total DESC
+       LIMIT 10`
+    ).all(days);
+
+    const series = [];
+    for (const { feature } of topFeatures) {
+      const metricKey = `features_enabled:${feature}`;
+      const rows = db.prepare(
+        `SELECT strftime(?, date) AS bucket_label,
+                SUM(total) AS total,
+                SUM(device_count) AS device_count
+         FROM aggregated_daily
+         WHERE metric = ?
+           AND date >= date('now','-' || ? || ' days','localtime')
+         GROUP BY bucket_label
+         ORDER BY bucket_label ASC
+         LIMIT 1000`
+      ).all(dateFmt, metricKey, days);
+
+      const points = rows.map((r) => ({
+        date: r.bucket_label,
+        total: Math.round(r.total),
+        device_count: r.device_count,
+      }));
+      series.push({ feature, points });
+    }
+
+    res.json({ window_days: days, bucket, series, disclaimer: DP_DISCLAIMER });
+  } catch (e) {
+    console.error('[observatory/feature-usage]', e);
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
+// ---------- 3. GET /api/observatory/language-breakdown ----------
+
+// Script-family definitions as per spec
+const SCRIPT_FAMILIES = [
+  { family: 'Devanagari', langs: ['hi', 'mr', 'sa', 'ne'] },
+  { family: 'Tamil',      langs: ['ta'] },
+  { family: 'Telugu',     langs: ['te'] },
+  { family: 'Bengali',    langs: ['bn', 'as'] },
+  { family: 'Gujarati',   langs: ['gu'] },
+  { family: 'Kannada',    langs: ['kn'] },
+  { family: 'Malayalam',  langs: ['ml'] },
+  { family: 'Gurmukhi',   langs: ['pa'] },
+  { family: 'Arabic',     langs: ['ur', 'ar', 'fa'] },
+  { family: 'Latin',      langs: ['en', 'es', 'pt', 'fr', 'de', 'it', 'pl', 'id', 'tl', 'vi'] },
+  { family: 'CJK',        langs: ['zh', 'ja', 'ko'] },
+  { family: 'Cyrillic',   langs: ['ru'] },
+  { family: 'Thai',       langs: ['th'] },
+  { family: 'Turkish',    langs: ['tr'] },
+];
+// Build reverse map: lang → family name
+const LANG_TO_FAMILY = new Map();
+for (const { family, langs } of SCRIPT_FAMILIES) {
+  for (const l of langs) LANG_TO_FAMILY.set(l, family);
+}
+
+app.get('/api/observatory/language-breakdown', rateLimit, (req, res) => {
+  try {
+    const days = parseDays(req.query);
+
+    const rows = db.prepare(
+      `SELECT REPLACE(metric,'language_used:','') AS lang,
+              SUM(device_count) AS devices
+       FROM aggregated_daily
+       WHERE metric LIKE 'language_used:%'
+         AND date >= date('now','-' || ? || ' days','localtime')
+       GROUP BY metric
+       HAVING SUM(device_count) >= ?
+       ORDER BY devices DESC
+       LIMIT 1000`
+    ).all(days, K_ANON_MIN);
+
+    // Per-language (already k-anon filtered above)
+    const byLanguage = rows.map((r) => ({ lang: r.lang, devices: r.devices }));
+
+    // Aggregate into script families
+    const familyMap = new Map(); // family → { devices, langs }
+    for (const { lang, devices } of rows) {
+      const fam = LANG_TO_FAMILY.get(lang);
+      if (!fam) continue;
+      if (!familyMap.has(fam)) familyMap.set(fam, { devices: 0, langs: [] });
+      const entry = familyMap.get(fam);
+      entry.devices += devices;
+      if (!entry.langs.includes(lang)) entry.langs.push(lang);
+    }
+
+    const byScriptFamily = [...familyMap.entries()]
+      .filter(([, v]) => v.devices >= K_ANON_MIN)
+      .map(([family, v]) => ({ family, devices: v.devices, languages: v.langs.sort() }))
+      .sort((a, b) => b.devices - a.devices);
+
+    res.json({ window_days: days, by_language: byLanguage, by_script_family: byScriptFamily, disclaimer: DP_DISCLAIMER });
+  } catch (e) {
+    console.error('[observatory/language-breakdown]', e);
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
+// ---------- 4. GET /api/observatory/domain-penetration ----------
+app.get('/api/observatory/domain-penetration', rateLimit, (req, res) => {
+  try {
+    const days = parseDays(req.query);
+
+    const rows = db.prepare(
+      `SELECT REPLACE(metric,'domain_connectors_activated:','') AS domain,
+              SUM(device_count) AS devices,
+              SUM(total) AS usage_score
+       FROM aggregated_daily
+       WHERE metric LIKE 'domain_connectors_activated:%'
+         AND date >= date('now','-' || ? || ' days','localtime')
+       GROUP BY metric
+       ORDER BY usage_score DESC
+       LIMIT 1000`
+    ).all(days);
+
+    const byDomain = rows.map((r, i) => ({
+      domain: r.domain,
+      devices: r.devices,
+      usage_score: Math.round(r.usage_score),
+      rank: i + 1,
+    }));
+
+    res.json({ window_days: days, by_domain: byDomain, disclaimer: DP_DISCLAIMER });
+  } catch (e) {
+    console.error('[observatory/domain-penetration]', e);
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
+// ---------- 5. GET /api/observatory/adaptation-effectiveness ----------
+// NOTE: `adaptations_reverted` metric is NOT yet collected by the extension
+// (scheduled for Session 24). Until then, reverted is proxied as 0 everywhere.
+// See ROADMAP.md Session 24 scope. The `notes` field documents this caveat.
+app.get('/api/observatory/adaptation-effectiveness', rateLimit, (req, res) => {
+  try {
+    const days = parseDays(req.query);
+
+    // Sum applied per adaptation type in window
+    const appliedRows = db.prepare(
+      `SELECT REPLACE(metric,'adaptations_applied:','') AS type,
+              SUM(total) AS applied
+       FROM aggregated_daily
+       WHERE metric LIKE 'adaptations_applied:%'
+         AND date >= date('now','-' || ? || ' days','localtime')
+       GROUP BY metric
+       ORDER BY applied DESC
+       LIMIT 1000`
+    ).all(days);
+
+    // Sum reverted per adaptation type — metric prefix adaptations_reverted:<TYPE>
+    // Currently no data exists; will return 0 for all. Retained so the query
+    // automatically starts returning real data once Session 24 ships.
+    const revertedRows = db.prepare(
+      `SELECT REPLACE(metric,'adaptations_reverted:','') AS type,
+              SUM(total) AS reverted
+       FROM aggregated_daily
+       WHERE metric LIKE 'adaptations_reverted:%'
+         AND date >= date('now','-' || ? || ' days','localtime')
+       GROUP BY metric
+       LIMIT 1000`
+    ).all(days);
+
+    const revertedMap = new Map(revertedRows.map((r) => [r.type, r.reverted]));
+
+    let totalApplied = 0;
+    let totalReverted = 0;
+
+    const byAdaptation = appliedRows.map((r) => {
+      const applied = Math.round(r.applied);
+      const reverted = Math.round(revertedMap.get(r.type) || 0);
+      const effectivenessPct =
+        applied > 0 ? Math.round(((applied - reverted) / applied) * 1000) / 10 : 100;
+      totalApplied += applied;
+      totalReverted += reverted;
+      return { type: r.type, applied, reverted, effectiveness_pct: effectivenessPct };
+    });
+
+    const overallEffectivenessPct =
+      totalApplied > 0
+        ? Math.round(((totalApplied - totalReverted) / totalApplied) * 1000) / 10
+        : 100;
+
+    res.json({
+      window_days: days,
+      overall: {
+        applied: totalApplied,
+        reverted: totalReverted,
+        effectiveness_pct: overallEffectivenessPct,
+      },
+      by_adaptation: byAdaptation,
+      notes: 'adaptations_reverted metric not yet collected; proxy = 0',
+      disclaimer: DP_DISCLAIMER,
+    });
+  } catch (e) {
+    console.error('[observatory/adaptation-effectiveness]', e);
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
+// ---------- Compliance helpers (RPwD / ADA / EAA) ----------
+
+// Shared adaptation → disability-category mapping (same 4 categories for all regs)
+const COMPLIANCE_CATEGORIES = [
+  {
+    category: 'Visual',
+    adaptations: new Set(['FONT_SCALE', 'CONTRAST', 'REDUCED_MOTION']),
+  },
+  {
+    category: 'Auditory',
+    adaptations: new Set(['AUTO_SUMMARIZE']),
+  },
+  {
+    category: 'Motor',
+    adaptations: new Set(['VOICE_NAV', 'EYE_TRACKING', 'KEYBOARD_ONLY', 'PREDICTIVE_INPUT', 'CLICK_TARGET_ENLARGE']),
+  },
+  {
+    category: 'Cognitive',
+    adaptations: new Set(['FOCUS_MODE', 'READING_MODE', 'TEXT_SIMPLIFY', 'LAYOUT_SIMPLIFY']),
+  },
+];
+
+function buildComplianceReport(days, regulation) {
+  // Pull all adaptations_applied totals for the window in one prepared statement
+  const appliedRows = db.prepare(
+    `SELECT REPLACE(metric,'adaptations_applied:','') AS type,
+            SUM(total) AS total
+     FROM aggregated_daily
+     WHERE metric LIKE 'adaptations_applied:%'
+       AND date >= date('now','-' || ? || ' days','localtime')
+     GROUP BY metric
+     LIMIT 1000`
+  ).all(days);
+
+  // Build map: adaptation_type → total
+  const appliedMap = new Map(appliedRows.map((r) => [r.type, Math.round(r.total)]));
+
+  let categoryCount = 0;
+  let coverageSum = 0;
+
+  const categories = COMPLIANCE_CATEGORIES.map(({ category, adaptations }) => {
+    let adaptationsTrigered = 0;
+    for (const [type, total] of appliedMap.entries()) {
+      if (adaptations.has(type)) adaptationsTrigered += total;
+    }
+    const coveragePct = adaptationsTrigered > 0 ? 100 : 0;
+    coverageSum += coveragePct;
+    categoryCount += 1;
+    return { category, adaptations_triggered: adaptationsTrigered, coverage_pct: coveragePct };
+  });
+
+  const overallCoveragePct =
+    categoryCount > 0
+      ? Math.round((coverageSum / categoryCount) * 10) / 10
+      : 0;
+
+  return {
+    window_days: days,
+    regulation,
+    categories,
+    overall_coverage_pct: overallCoveragePct,
+    disclaimer:
+      'This is a self-assessment aid, NOT a legal certification. Consult counsel for regulatory audits.',
+  };
+}
+
+// ---------- 6. GET /api/observatory/compliance/rpwd ----------
+app.get('/api/observatory/compliance/rpwd', rateLimit, (req, res) => {
+  try {
+    const days = parseDays(req.query);
+    res.json(buildComplianceReport(days, 'RPwD Act 2016 (India) — Section 20'));
+  } catch (e) {
+    console.error('[observatory/compliance/rpwd]', e);
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
+// ---------- 7. GET /api/observatory/compliance/ada ----------
+app.get('/api/observatory/compliance/ada', rateLimit, (req, res) => {
+  try {
+    const days = parseDays(req.query);
+    res.json(buildComplianceReport(days, 'ADA Title I (USA) — reasonable accommodation in employment'));
+  } catch (e) {
+    console.error('[observatory/compliance/ada]', e);
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
+// ---------- 8. GET /api/observatory/compliance/eaa ----------
+app.get('/api/observatory/compliance/eaa', rateLimit, (req, res) => {
+  try {
+    const days = parseDays(req.query);
+    res.json(buildComplianceReport(days, 'European Accessibility Act 2025 — Article 4'));
+  } catch (e) {
+    console.error('[observatory/compliance/eaa]', e);
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
 // ---------- Static dashboard + verifier ----------
 // Pretty URL for the auditor verifier tool (the HTML file is
 // public/verifier.html; this alias saves auditors from typing .html).

@@ -8,6 +8,7 @@ import {
   STRUGGLE_CLASSIFIER_ID,
   MINILM_EMBEDDINGS_ID,
   T5_SUMMARIZER_ID,
+  INDIC_WHISPER_ID,
   TIER_LABELS,
   TIER_DESCRIPTIONS,
   getModelMetadata,
@@ -15,17 +16,18 @@ import {
 } from '../model-registry.js';
 
 describe('model-registry', () => {
-  it('has exactly three canonical models keyed by their ids', () => {
+  it('has exactly four canonical models keyed by their ids (Session 17 adds IndicWhisper)', () => {
     const keys = Object.keys(MODEL_REGISTRY).sort();
     expect(keys).toEqual(
-      [STRUGGLE_CLASSIFIER_ID, MINILM_EMBEDDINGS_ID, T5_SUMMARIZER_ID].sort(),
+      [STRUGGLE_CLASSIFIER_ID, MINILM_EMBEDDINGS_ID, T5_SUMMARIZER_ID, INDIC_WHISPER_ID].sort(),
     );
   });
 
-  it('each model has one entry per tier (0, 1, 2)', () => {
+  it('each model has one entry per tier (0, 1, 2, 3)', () => {
     expect(MODEL_REGISTRY[STRUGGLE_CLASSIFIER_ID].loadTier).toBe(0);
     expect(MODEL_REGISTRY[MINILM_EMBEDDINGS_ID].loadTier).toBe(1);
     expect(MODEL_REGISTRY[T5_SUMMARIZER_ID].loadTier).toBe(2);
+    expect(MODEL_REGISTRY[INDIC_WHISPER_ID].loadTier).toBe(3);
   });
 
   it('every URL is a VPS CDN path (port 8300), never the raw api port', () => {
@@ -75,20 +77,31 @@ describe('model-registry', () => {
     const tier0 = getModelsForTier(0);
     const tier1 = getModelsForTier(1);
     const tier2 = getModelsForTier(2);
+    const tier3 = getModelsForTier(3);
     expect(tier0).toHaveLength(1);
     expect(tier1).toHaveLength(1);
     expect(tier2).toHaveLength(1);
+    expect(tier3).toHaveLength(1);
     expect(tier0[0].id).toBe(STRUGGLE_CLASSIFIER_ID);
     expect(tier1[0].id).toBe(MINILM_EMBEDDINGS_ID);
     expect(tier2[0].id).toBe(T5_SUMMARIZER_ID);
+    expect(tier3[0].id).toBe(INDIC_WHISPER_ID);
   });
 
-  it('tier labels + descriptions cover all three tiers', () => {
-    for (const tier of [0, 1, 2] as const) {
+  it('tier labels + descriptions cover all four tiers', () => {
+    for (const tier of [0, 1, 2, 3] as const) {
       expect(typeof TIER_LABELS[tier]).toBe('string');
       expect(TIER_LABELS[tier].length).toBeGreaterThan(0);
       expect(typeof TIER_DESCRIPTIONS[tier]).toBe('string');
       expect(TIER_DESCRIPTIONS[tier].length).toBeGreaterThan(0);
     }
+  });
+
+  it('Tier 3 (indic-whisper-small) has null sha256 and tokenizer metadata pending upload', () => {
+    const m = MODEL_REGISTRY[INDIC_WHISPER_ID];
+    expect(m.sha256).toBeNull();
+    expect(m.bundledPath).toBeNull();
+    expect(m.tokenizer).toBeDefined();
+    expect(m.tokenizer?.url).toMatch(/indic-whisper-tokenizer\.json$/);
   });
 });

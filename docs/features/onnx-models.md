@@ -58,8 +58,33 @@ The prepare-models toolchain lives under `tools/prepare-models/`: `train-struggl
 | 0 | `struggle-classifier-v1` | Bundled in extension (`dist/models/`) | ~0.85 MB | ✅ 2s after SW start (if profile toggle on) | Blend into heuristic struggle score when classifier confidence > 0.7 |
 | 1 | `minilm-l6-v2` | VPS CDN, int8 quantized | ~22 MB | Manual (popup Download button) | 384-dim sentence embeddings → semantic cache key + future dedup |
 | 2 | `t5-small` | VPS CDN (deferred to Session 15) | ~242 MB planned | Manual | Abstractive summarization when heuristic extractive isn't enough |
+| 3 | `indic-whisper-small` | VPS CDN (Session 17 infra; real weights + hash Session 18) | ~80 MB planned | Manual (popup Download button) | Speech-to-text for all 22 Indian languages. Upstream is `openai/whisper-small` (MIT, 99-language multilingual) branded `indic-whisper-*` to preserve the option to swap to AI4Bharat IndicConformer once a Conformer ONNX export path exists. Decoder loop (language-forcing tokens + autoregressive beam search) lands Session 18. |
 
-**Total CDN footprint:** ~22 MB today (Tier 1 only). Tier 0 ships in the extension zip — no download, no network. Tier 2 placeholder keeps the registry three-tier for forward compatibility.
+**Total CDN footprint:** ~22 MB today (Tier 1 only). Tier 0 ships in the extension zip — no download, no network. Tier 2 + Tier 3 placeholders keep the registry four-tier for forward compatibility. After Session 18 decoder + Session 18 upload, the CDN footprint becomes ~22 MB (Tier 1) + ~242 MB (Tier 2) + ~80 MB (Tier 3) ≈ 345 MB total.
+
+## Session 17 — Indic Whisper STT infrastructure
+
+What shipped:
+
+- `@accessbridge/onnx-runtime`: `IndicWhisper` wrapper class, `audio-preprocessor` utilities (`preprocessAudio`, `resample`, `chunkAudio`, `normalizeFloat32`), `BCP47_TO_WHISPER` 22-language map, `FALLBACK_LANGUAGES` set for the 7 non-native codes that map to nearest-script cousins (Konkani→Marathi, Kashmiri→Urdu, etc.).
+- `@accessbridge/onnx-runtime` `MODEL_REGISTRY[INDIC_WHISPER_ID]`: loadTier 3, url + tokenizer metadata pinned, `sha256: null` until first upload.
+- Extension background: `INDIC_WHISPER_TRANSCRIBE` + `VOICE_TIER_RECORD` message handlers. Tier 3 slotted into the existing `ONNX_LOAD_TIER` / `ONNX_GET_STATUS` / `ONNX_UNLOAD_TIER` path. `IndicWhisper` singleton wired into `wireOnnxModelsIntoPipeline`.
+- Extension content: `TieredSTT` class (`packages/extension/src/content/motor/tiered-stt.ts`) picks Tier A vs B via a pure `pickTier()` function driven by preference + language + recent-confidence rolling window.
+- Extension popup: `VoiceTierPanel` on the Motor tab — tier strategy select + IndicWhisper download button + status pill. Download is gated by a runtime warning noting the sha is null until weights upload.
+- Observatory: per-tier voice counters (`voice_tier_counts: {'a','b','c'}`), Laplace-noised in the daily bundle. Server-side canonicalization of the new field is deferred to the next observatory deploy — the client intentionally does NOT fold `voice_tier_counts` into the merkle root to stay compatible with the currently-deployed server (matches the Session 12 approach for `onnx_inferences`).
+- Profile: `MotorProfile.voiceQualityTier` + `MotorProfile.indicWhisperEnabled`; `AccessibilityProfile.onnxModelsEnabled.indicWhisper` toggle.
+- Tests: audio-preprocessor (22), indic-whisper (34 incl. proto-pollution guard), tiered-stt (20). Observatory-publisher regression still green (14).
+- Python prep: `tools/prepare-models/download-indicwhisper.py` + `evaluate-indicwhisper.py`, plus extensions to `upload-to-vps.sh` + `compute-hashes.sh` + `models-manifest.json`. Scripts are artifacts — user runs them when ready to generate the ~80 MB quantized ONNX.
+
+What is deferred to Session 18:
+
+- Whisper decoder autoregressive loop with language-forcing tokens.
+- Actually running `download-indicwhisper.py` + uploading the real weights to the VPS CDN + populating the real sha256.
+- Content-side TieredSTT wire-in (instantiation in `content/index.ts` + live profile-update propagation).
+- Voice Lab side-panel demo surface.
+- Server-side canonicalization for `voice_tier_counts` so the counters enter the merkle tree.
+
+Until Session 18 lands, calling `IndicWhisper.transcribe()` on a loaded model returns `{real: false, text: '', confidence: 0, latencyMs: <preprocess wall clock>}` — the wrapper surface + observability + tiered fallback can all be tested end-to-end without real transcription.
 
 ## Fallback chain
 

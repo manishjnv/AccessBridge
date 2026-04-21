@@ -29,8 +29,10 @@ interface PersistedState {
   languages_used: string[];
   domain_connectors_activated: Record<string, number>;
   estimated_accessibility_score_improvement: number;
-  /** Session 12: keys are 'tier0', 'tier1', 'tier2', 'fallback'. */
+  /** Session 12: keys are 'tier0', 'tier1', 'tier2', 'fallback'. Session 17: adds 'tier3'. */
   onnx_inferences: Record<string, number>;
+  /** Session 17: voice STT tier usage counts: 'a' (native), 'b' (onnx), 'c' (cloud). */
+  voice_tier_counts: Record<string, number>;
 }
 
 function todayLocalISO(now: Date = new Date()): string {
@@ -50,6 +52,7 @@ function blankState(): PersistedState {
     domain_connectors_activated: {},
     estimated_accessibility_score_improvement: 0,
     onnx_inferences: {},
+    voice_tier_counts: {},
   };
 }
 
@@ -102,13 +105,20 @@ export class ObservatoryCollector {
     );
   }
 
-  /** Session 12: log a single ONNX inference against one of {'tier0','tier1','tier2','fallback'}. */
+  /** Session 12: log a single ONNX inference. Session 17 adds 'tier3' (IndicWhisper). */
   recordOnnxInference(
-    bucket: 'tier0' | 'tier1' | 'tier2' | 'fallback',
+    bucket: 'tier0' | 'tier1' | 'tier2' | 'tier3' | 'fallback',
   ): void {
     this.rollIfNewDay();
     this.state.onnx_inferences[bucket] =
       (this.state.onnx_inferences[bucket] ?? 0) + 1;
+  }
+
+  /** Session 17: log a single voice-STT utterance against tier 'a' | 'b' | 'c'. */
+  recordVoiceTier(tier: 'a' | 'b' | 'c'): void {
+    this.rollIfNewDay();
+    this.state.voice_tier_counts[tier] =
+      (this.state.voice_tier_counts[tier] ?? 0) + 1;
   }
 
   getRawCounters(): RawCounters {
@@ -122,6 +132,7 @@ export class ObservatoryCollector {
       estimated_accessibility_score_improvement:
         this.state.estimated_accessibility_score_improvement,
       onnx_inferences: { ...this.state.onnx_inferences },
+      voice_tier_counts: { ...this.state.voice_tier_counts },
     };
   }
 

@@ -5,7 +5,7 @@
  * this package without pulling in onnxruntime-web at type-check time.
  */
 
-export type ModelTier = 0 | 1 | 2;
+export type ModelTier = 0 | 1 | 2 | 3;
 
 export interface TokenizerMetadata {
   url: string;
@@ -77,4 +77,19 @@ export interface SummarizerLike {
     text: string,
     options: { maxLength: number },
   ): Promise<string | null>;
+}
+
+export interface TranscriberLike {
+  transcribe(
+    audio: Float32Array,
+    sampleRate: number,
+    options: { language: string },
+  ): Promise<{
+    text: string;
+    confidence: number;
+    language: string;
+    latencyMs: number;
+    real: boolean;
+  } | null>;
+  isSupported(language: string): boolean;
 }

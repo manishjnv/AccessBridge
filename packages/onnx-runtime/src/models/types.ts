@@ -20,3 +20,12 @@ export interface SummarizeResult {
   model: string;
   real: boolean;
 }
+
+export interface TranscribeWrapperResult {
+  text: string;
+  confidence: number;
+  language: string;
+  latencyMs: number;
+  real: boolean;
+  model: string;
+}

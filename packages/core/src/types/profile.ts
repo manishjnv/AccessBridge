@@ -70,6 +70,15 @@ export interface MotorProfile {
   gestureShowHints: boolean;
   /** Task C: require holding Shift for mouse-driven gestures (prevents accidental activation). */
   gestureMouseModeRequiresShift: boolean;
+  // --- Session 17: IndicWhisper tiered STT ---
+  /**
+   * STT tier preference. Auto = Tier A (Web Speech) first, fall back to B
+   * (IndicWhisper ONNX) on language gap / low confidence, Tier C (cloud)
+   * only when `cloud-allowed`. `native` forces A, `onnx` forces B.
+   */
+  voiceQualityTier: 'auto' | 'native' | 'onnx' | 'cloud-allowed';
+  /** Opt-in: download + use the IndicWhisper ~80 MB ONNX for Tier B STT. Default false. */
+  indicWhisperEnabled: boolean;
 }
 
 export interface AccessibilityProfile {
@@ -112,11 +121,15 @@ export interface AccessibilityProfile {
   /** Minimum confidence (0.3-0.9) at which an inferred intent triggers an adaptation. */
   fusionIntentMinConfidence: number;
   // --- Session 12: On-Device ONNX Models ---
-  /** Opt-in toggles for each model tier (0 always-on, 1 embeddings, 2 summarizer). */
+  /**
+   * Opt-in toggles for each model tier (0 always-on, 1 embeddings, 2 summarizer,
+   * 3 IndicWhisper STT). Session 17 adds `indicWhisper`.
+   */
   onnxModelsEnabled: {
     struggleClassifier: boolean;
     embeddings: boolean;
     summarizer: boolean;
+    indicWhisper: boolean;
   };
   /** Allow model downloads on metered networks. Defaults off; saves user bandwidth. */
   onnxDownloadOnMeteredNetwork: boolean;
@@ -183,6 +196,9 @@ export const DEFAULT_MOTOR_PROFILE: MotorProfile = {
   gestureShortcutsEnabled: false,
   gestureShowHints: true,
   gestureMouseModeRequiresShift: true,
+  // --- Session 17: IndicWhisper tiered STT ---
+  voiceQualityTier: 'auto',
+  indicWhisperEnabled: false,
 };
 
 export const DEFAULT_PROFILE: AccessibilityProfile = {
@@ -213,6 +229,7 @@ export const DEFAULT_PROFILE: AccessibilityProfile = {
     struggleClassifier: true,
     embeddings: false,
     summarizer: false,
+    indicWhisper: false,
   },
   onnxDownloadOnMeteredNetwork: false,
   onnxForceFallback: false,

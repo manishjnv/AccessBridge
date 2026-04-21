@@ -42,10 +42,12 @@ function makeProfile(
     fusionCompensationEnabled: true,
     fusionIntentMinConfidence: 0.65,
     // --- Session 12: On-Device ONNX Models ---
+    // Session 17: adds indicWhisper toggle for Tier 3 STT.
     onnxModelsEnabled: {
       struggleClassifier: true,
       embeddings: false,
       summarizer: false,
+      indicWhisper: false,
     },
     onnxDownloadOnMeteredNetwork: false,
     onnxForceFallback: false,

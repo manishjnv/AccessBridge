@@ -4,7 +4,25 @@
  *
  * Provides 20+ voice commands for navigation, clicking, typing, tab
  * management, page control, and accessibility features.
+ *
+ * --- Session 17: TieredSTT ---
+ * Tier A (Web Speech API) stays the fast default. For languages Chrome
+ * does not natively transcribe, the content script wraps this class in
+ * a TieredSTT picker (see ./tiered-stt.ts) that records audio via
+ * MediaRecorder and delegates transcription to the IndicWhisper ONNX
+ * model in the background service worker.
  */
+export {
+  TieredSTT,
+  TIER_A_LANGUAGES,
+  pickTier,
+} from './tiered-stt.js';
+export type {
+  VoiceTier,
+  VoiceTierPreference,
+  TranscriptionOutcome,
+  TieredSTTOptions,
+} from './tiered-stt.js';
 
 // ---------------------------------------------------------------------------
 // Types

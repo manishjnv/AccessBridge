@@ -66,6 +66,69 @@ else
   echo "WARN: Tier 1 tokenizer missing (non-fatal): $T1_TOK" >&2
 fi
 
+# ---------------------------------------------------------------------------
+# Session 17 — indic-whisper ONNX artifacts
+# Encoder and decoder are always separate (optimum never merges Whisper into
+# one file reliably); the canonical alias is a copy of the decoder.
+# ---------------------------------------------------------------------------
+IW_DIR="$OUTPUT_DIR/indic-whisper"
+IW_ENC="indic-whisper-small-encoder-int8.onnx"
+IW_DEC="indic-whisper-small-decoder-int8.onnx"
+IW_CANONICAL="indic-whisper-small-int8.onnx"
+IW_TOK="indic-whisper-tokenizer.json"
+IW_LANGMAP="indic-whisper-tokens-to-language.json"
+
+IW_ENC_HASH=""; IW_ENC_SIZE=0
+IW_DEC_HASH=""; IW_DEC_SIZE=0
+IW_CANONICAL_HASH=""; IW_CANONICAL_SIZE=0
+IW_TOK_HASH=""; IW_TOK_SIZE=0
+IW_LANGMAP_HASH=""; IW_LANGMAP_SIZE=0
+
+if [[ -f "$IW_DIR/$IW_ENC" ]]; then
+  echo "Hashing indic-whisper encoder..."
+  IW_ENC_HASH=$(sha256_of "$IW_DIR/$IW_ENC")
+  IW_ENC_SIZE=$(size_of "$IW_DIR/$IW_ENC")
+  echo "  indic-whisper-encoder: sha256=$IW_ENC_HASH  bytes=$IW_ENC_SIZE"
+else
+  echo "WARN: indic-whisper encoder missing (non-fatal): $IW_ENC" >&2
+fi
+
+if [[ -f "$IW_DIR/$IW_DEC" ]]; then
+  echo "Hashing indic-whisper decoder..."
+  IW_DEC_HASH=$(sha256_of "$IW_DIR/$IW_DEC")
+  IW_DEC_SIZE=$(size_of "$IW_DIR/$IW_DEC")
+  echo "  indic-whisper-decoder: sha256=$IW_DEC_HASH  bytes=$IW_DEC_SIZE"
+else
+  echo "WARN: indic-whisper decoder missing (non-fatal): $IW_DEC" >&2
+fi
+
+if [[ -f "$IW_DIR/$IW_CANONICAL" ]]; then
+  echo "Hashing indic-whisper canonical alias..."
+  IW_CANONICAL_HASH=$(sha256_of "$IW_DIR/$IW_CANONICAL")
+  IW_CANONICAL_SIZE=$(size_of "$IW_DIR/$IW_CANONICAL")
+  echo "  indic-whisper-small-int8 (canonical): sha256=$IW_CANONICAL_HASH  bytes=$IW_CANONICAL_SIZE"
+else
+  echo "WARN: indic-whisper canonical file missing (non-fatal): $IW_CANONICAL" >&2
+fi
+
+if [[ -f "$IW_DIR/$IW_TOK" ]]; then
+  echo "Hashing indic-whisper tokenizer..."
+  IW_TOK_HASH=$(sha256_of "$IW_DIR/$IW_TOK")
+  IW_TOK_SIZE=$(size_of "$IW_DIR/$IW_TOK")
+  echo "  indic-whisper-tokenizer: sha256=$IW_TOK_HASH  bytes=$IW_TOK_SIZE"
+else
+  echo "WARN: indic-whisper tokenizer missing (non-fatal): $IW_TOK" >&2
+fi
+
+if [[ -f "$IW_DIR/$IW_LANGMAP" ]]; then
+  echo "Hashing indic-whisper language map..."
+  IW_LANGMAP_HASH=$(sha256_of "$IW_DIR/$IW_LANGMAP")
+  IW_LANGMAP_SIZE=$(size_of "$IW_DIR/$IW_LANGMAP")
+  echo "  indic-whisper-tokens-to-language: sha256=$IW_LANGMAP_HASH  bytes=$IW_LANGMAP_SIZE"
+else
+  echo "WARN: indic-whisper language map missing (non-fatal): $IW_LANGMAP" >&2
+fi
+
 GENERATED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 # Emit manifest. Plain printf (no jq dependency).
@@ -81,6 +144,32 @@ GENERATED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     if [[ -n "$T1_TOK_HASH" ]]; then
       printf ', "tokenizer": "%s", "tokenizerSha256": "%s", "tokenizerSizeBytes": %s' \
         "$T1_TOK" "$T1_TOK_HASH" "$T1_TOK_SIZE"
+    fi
+    printf ' }'
+  fi
+  # indic-whisper block (Session 17)
+  if [[ -n "$IW_CANONICAL_HASH" || -n "$IW_ENC_HASH" ]]; then
+    printf ',\n    "indic-whisper-small-int8": {'
+    printf ' "checkpoint": "openai/whisper-small", "quantization": "int8-dynamic", "loadTier": 2'
+    if [[ -n "$IW_CANONICAL_HASH" ]]; then
+      printf ', "file": "%s", "sha256": "%s", "sizeBytes": %s' \
+        "$IW_CANONICAL" "$IW_CANONICAL_HASH" "$IW_CANONICAL_SIZE"
+    fi
+    if [[ -n "$IW_ENC_HASH" ]]; then
+      printf ', "encoderFile": "%s", "encoderSha256": "%s", "encoderSizeBytes": %s' \
+        "$IW_ENC" "$IW_ENC_HASH" "$IW_ENC_SIZE"
+    fi
+    if [[ -n "$IW_DEC_HASH" ]]; then
+      printf ', "decoderFile": "%s", "decoderSha256": "%s", "decoderSizeBytes": %s' \
+        "$IW_DEC" "$IW_DEC_HASH" "$IW_DEC_SIZE"
+    fi
+    if [[ -n "$IW_TOK_HASH" ]]; then
+      printf ', "tokenizer": "%s", "tokenizerSha256": "%s", "tokenizerSizeBytes": %s' \
+        "$IW_TOK" "$IW_TOK_HASH" "$IW_TOK_SIZE"
+    fi
+    if [[ -n "$IW_LANGMAP_HASH" ]]; then
+      printf ', "languageMap": "%s", "languageMapSha256": "%s", "languageMapSizeBytes": %s' \
+        "$IW_LANGMAP" "$IW_LANGMAP_HASH" "$IW_LANGMAP_SIZE"
     fi
     printf ' }'
   fi

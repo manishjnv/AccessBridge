@@ -251,6 +251,16 @@ export class AIEngine {
     };
   }
 
+  /** Direct handle on the always-present local provider (Session 12 ONNX wiring). */
+  getLocalProvider(): LocalAIProvider {
+    return this.providers.get('local') as LocalAIProvider;
+  }
+
+  /** Direct handle on the cache (Session 12: semantic cache key generation). */
+  getCache(): AICache {
+    return this.cache;
+  }
+
   // -----------------------------------------------------------------------
   // Internals
   // -----------------------------------------------------------------------

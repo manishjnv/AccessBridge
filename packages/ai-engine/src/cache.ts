@@ -8,6 +8,19 @@
 
 import type { AIRequest, AIResponse, CacheEntry, CacheStats } from './types.js';
 
+/** How many top-magnitude dimensions survive into the embedding cache key. */
+const EMBEDDING_KEY_DIMS = 8;
+/** Quantization resolution for each surviving dimension's magnitude. */
+const EMBEDDING_KEY_BUCKETS = 8;
+
+/**
+ * Minimal embedder contract.  Structurally compatible with
+ * LocalAIProvider.embed and @accessbridge/onnx-runtime's MiniLMEmbeddings.
+ */
+export interface CacheEmbedder {
+  embed(text: string): Promise<Float32Array | null | undefined>;
+}
+
 export class AICache {
   private readonly store = new Map<string, CacheEntry>();
   private readonly ttl: number;
@@ -38,6 +51,61 @@ export class AICache {
     ].join('|');
 
     return this.simpleHash(parts);
+  }
+
+  /**
+   * Semantic cache key: embed the request input, bucket the top-K
+   * dominant dimensions by quantized magnitude, and hash that signature.
+   *
+   * Two requests whose embeddings point in the same direction with
+   * similar emphasis produce the same key — so "summarise this meeting"
+   * and "please summarize my meeting" hit the same cache slot even
+   * though their raw strings differ.
+   *
+   * When the embedder returns null or throws, falls back to the
+   * exact-string key from generateKey().
+   */
+  async generateKeyByEmbedding(
+    request: AIRequest,
+    embedder: CacheEmbedder,
+  ): Promise<string> {
+    const raw = typeof request.input === 'string' ? request.input : '';
+    if (!raw) return this.generateKey(request);
+
+    let vector: Float32Array | null | undefined;
+    try {
+      vector = await embedder.embed(raw);
+    } catch {
+      vector = null;
+    }
+    if (!vector || vector.length === 0) return this.generateKey(request);
+
+    const pairs: Array<{ idx: number; mag: number }> = new Array(vector.length);
+    for (let i = 0; i < vector.length; i++) {
+      pairs[i] = { idx: i, mag: Math.abs(vector[i]) };
+    }
+    pairs.sort((a, b) => b.mag - a.mag);
+
+    const dims = Math.min(EMBEDDING_KEY_DIMS, pairs.length);
+    const parts: string[] = new Array(dims);
+    for (let i = 0; i < dims; i++) {
+      const { idx, mag } = pairs[i];
+      const bucket = Math.min(
+        EMBEDDING_KEY_BUCKETS - 1,
+        Math.floor(mag * EMBEDDING_KEY_BUCKETS),
+      );
+      parts[i] = `${idx}:${bucket}`;
+    }
+
+    const signature = [
+      request.type,
+      'emb',
+      parts.join(','),
+      request.language ?? '',
+      String(request.maxLength ?? ''),
+    ].join('|');
+
+    return this.simpleHash(signature);
   }
 
   // -----------------------------------------------------------------------

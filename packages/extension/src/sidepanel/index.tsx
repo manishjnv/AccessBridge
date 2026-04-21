@@ -862,6 +862,11 @@ function SidePanel() {
           </div>
         </Section>
 
+        {/* ── 4b. On-Device Models (Session 12) ──────────────────────────── */}
+        <Section title="On-Device Models">
+          <OnnxModelPanel />
+        </Section>
+
         {/* ── 5. Adaptation History ────────────────────────────────────────── */}
         <Section title="Adaptation History">
           {history.length === 0 ? (
@@ -1083,6 +1088,137 @@ function HistoryRow({ entry }: { entry: AdaptationHistoryEntry }) {
         </span>
         <span className="text-a11y-muted text-xs">{formatTime(entry.timestamp)}</span>
       </div>
+    </div>
+  );
+}
+
+// ─── Session 12: On-Device Models panel ─────────────────────────────────────
+
+interface OnnxStatusForSidepanel {
+  tiers: Record<0 | 1 | 2, {
+    state: 'idle' | 'loading' | 'loaded' | 'failed';
+    progress: number;
+    error: string | null;
+    label: string;
+    sizeBytes: number;
+  }>;
+  runtime: {
+    modelsLoaded: string[];
+    cacheBytes: number;
+    inferenceCount: Record<string, number>;
+    avgLatencyMs: Record<string, number>;
+    fallbackCount: number;
+  };
+  forceFallback: boolean;
+}
+
+function OnnxModelPanel() {
+  const [status, setStatus] = useState<OnnxStatusForSidepanel | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const poll = () => {
+      chrome.runtime
+        .sendMessage({ type: 'ONNX_GET_STATUS' })
+        .then((r: unknown) => {
+          if (!cancelled) setStatus(r as OnnxStatusForSidepanel);
+        })
+        .catch(() => {});
+    };
+    poll();
+    const id = setInterval(poll, 2000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, []);
+
+  const toggleForceFallback = (enabled: boolean) =>
+    chrome.runtime
+      .sendMessage({ type: 'ONNX_SET_FORCE_FALLBACK', payload: { enabled } })
+      .catch(() => {});
+
+  if (!status) {
+    return <div className="text-a11y-muted text-xs text-center py-2">Loading…</div>;
+  }
+
+  const fmtBytes = (n: number): string => {
+    if (n < 1024) return `${n} B`;
+    if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+    return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const stateDot = (state: string): string => {
+    if (state === 'loaded') return '#10b981';
+    if (state === 'loading') return '#f59e0b';
+    if (state === 'failed') return '#ef4444';
+    return '#94a3b8';
+  };
+
+  return (
+    <div className="space-y-3">
+      {/* Tier status rows */}
+      <div className="space-y-2">
+        {([0, 1, 2] as const).map((tier) => {
+          const snap = status.tiers[tier];
+          return (
+            <div key={tier} className="flex items-center gap-2 text-xs">
+              <span
+                className="inline-block w-2 h-2 rounded-full flex-shrink-0"
+                style={{ background: stateDot(snap.state) }}
+                aria-label={`Tier ${tier} ${snap.state}`}
+              />
+              <span className="flex-1 text-a11y-text">{snap.label}</span>
+              <span className="text-a11y-muted font-mono">
+                {snap.state === 'loading'
+                  ? `${snap.progress}%`
+                  : snap.state === 'loaded'
+                    ? 'ready'
+                    : snap.state}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Stats */}
+      <div className="bg-a11y-bg rounded-lg px-3 py-2 space-y-1 text-xs">
+        <div className="flex justify-between">
+          <span className="text-a11y-muted">Cache</span>
+          <span className="text-a11y-text font-mono">
+            {fmtBytes(status.runtime.cacheBytes)}
+          </span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-a11y-muted">Fallbacks</span>
+          <span className="text-a11y-text font-mono">
+            {status.runtime.fallbackCount}
+          </span>
+        </div>
+        {Object.entries(status.runtime.inferenceCount).map(([id, count]) => (
+          <div key={id} className="flex justify-between">
+            <span className="text-a11y-muted truncate">{id}</span>
+            <span className="text-a11y-text font-mono">
+              {count} · {status.runtime.avgLatencyMs[id] ?? 0}ms
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* Force fallback debug switch */}
+      <label className="flex items-center gap-2 text-xs cursor-pointer">
+        <input
+          type="checkbox"
+          checked={status.forceFallback}
+          onChange={(e) => toggleForceFallback(e.target.checked)}
+          className="accent-a11y-accent"
+        />
+        <span className="text-a11y-text">Force fallback (debug)</span>
+      </label>
+      <p className="text-a11y-muted" style={{ fontSize: '10px', lineHeight: 1.4 }}>
+        Forces every on-device model to return null so the heuristic path runs.
+        Useful for demoing the baseline behaviour.
+      </p>
     </div>
   );
 }

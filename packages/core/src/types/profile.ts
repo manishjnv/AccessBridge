@@ -111,6 +111,17 @@ export interface AccessibilityProfile {
   fusionCompensationEnabled: boolean;
   /** Minimum confidence (0.3-0.9) at which an inferred intent triggers an adaptation. */
   fusionIntentMinConfidence: number;
+  // --- Session 12: On-Device ONNX Models ---
+  /** Opt-in toggles for each model tier (0 always-on, 1 embeddings, 2 summarizer). */
+  onnxModelsEnabled: {
+    struggleClassifier: boolean;
+    embeddings: boolean;
+    summarizer: boolean;
+  };
+  /** Allow model downloads on metered networks. Defaults off; saves user bandwidth. */
+  onnxDownloadOnMeteredNetwork: boolean;
+  /** Debug: force all ONNX calls to fail so the heuristic path runs. Useful for demos. */
+  onnxForceFallback: boolean;
 }
 
 export const DEFAULT_SENSORY_PROFILE: SensoryProfile = {
@@ -188,4 +199,12 @@ export const DEFAULT_PROFILE: AccessibilityProfile = {
   fusionWindowMs: 3000,
   fusionCompensationEnabled: true,
   fusionIntentMinConfidence: 0.65,
+  // --- Session 12: On-Device ONNX Models ---
+  onnxModelsEnabled: {
+    struggleClassifier: true,
+    embeddings: false,
+    summarizer: false,
+  },
+  onnxDownloadOnMeteredNetwork: false,
+  onnxForceFallback: false,
 };

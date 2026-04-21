@@ -22,6 +22,17 @@ import { AIEngine, SummarizerService, SimplifierService } from '@accessbridge/ai
 import { ActionItemsService } from '@accessbridge/ai-engine/services/index.js';
 import { VisionRecoveryService } from '@accessbridge/ai-engine/services/index.js';
 
+// --- Session 12: On-Device ONNX Models ---
+import {
+  ONNXRuntime,
+  StruggleClassifier,
+  MiniLMEmbeddings,
+  T5Summarizer,
+  MODEL_REGISTRY,
+  TIER_LABELS,
+} from '@accessbridge/onnx-runtime';
+import type { ModelTier } from '@accessbridge/onnx-runtime';
+
 // Compliance Observatory — anonymous, DP-noised daily metrics (Feature #10)
 import {
   ObservatoryCollector,
@@ -107,6 +118,178 @@ function getVisionRecoveryService(): VisionRecoveryService {
     visionRecoveryService = new VisionRecoveryService(getAIEngine());
   }
   return visionRecoveryService;
+}
+
+// ---------- Session 12: ONNX model runtime + tier load state ----------
+
+type OnnxTierState = 'idle' | 'loading' | 'loaded' | 'failed';
+
+let onnxRuntime: ONNXRuntime | null = null;
+let struggleClassifier: StruggleClassifier | null = null;
+let miniLM: MiniLMEmbeddings | null = null;
+let t5Summarizer: T5Summarizer | null = null;
+
+const onnxTierState: Record<ModelTier, OnnxTierState> = { 0: 'idle', 1: 'idle', 2: 'idle' };
+const onnxTierProgress: Record<ModelTier, number> = { 0: 0, 1: 0, 2: 0 };
+const onnxTierError: Record<ModelTier, string | null> = { 0: null, 1: null, 2: null };
+
+function getOnnxRuntime(): ONNXRuntime {
+  if (!onnxRuntime) {
+    onnxRuntime = new ONNXRuntime();
+    struggleClassifier = new StruggleClassifier(onnxRuntime);
+    miniLM = new MiniLMEmbeddings(onnxRuntime);
+    t5Summarizer = new T5Summarizer(onnxRuntime);
+    wireOnnxModelsIntoPipeline();
+  }
+  return onnxRuntime;
+}
+
+function wireOnnxModelsIntoPipeline(): void {
+  // Struggle classifier → struggle detector blending path (tier 0).
+  if (struggleClassifier) {
+    struggleDetector.setClassifier({
+      predict: async (features) => {
+        if (onnxForceFallback()) {
+          maybeRecordObservatoryOnnx('fallback');
+          return null;
+        }
+        const result = await struggleClassifier!.predict(features);
+        maybeRecordObservatoryOnnx(result ? 'tier0' : 'fallback');
+        return result ? { score: result.score, confidence: result.confidence } : null;
+      },
+    });
+  }
+  // MiniLM / T5 → local AI provider embed + summarize paths (tiers 1, 2).
+  const localProvider = getAIEngine().getLocalProvider();
+  if (!localProvider) return;
+  localProvider.setEmbedder({
+    embed: async (text) => {
+      if (onnxForceFallback()) {
+        maybeRecordObservatoryOnnx('fallback');
+        return null;
+      }
+      const v = await miniLM!.embed(text);
+      maybeRecordObservatoryOnnx(v ? 'tier1' : 'fallback');
+      return v;
+    },
+    ready: () => miniLM?.ready() ?? false,
+  });
+  localProvider.setSummarizer({
+    summarize: async (text, opts) => {
+      if (onnxForceFallback()) {
+        maybeRecordObservatoryOnnx('fallback');
+        return null;
+      }
+      const r = await t5Summarizer!.summarize(text, opts);
+      maybeRecordObservatoryOnnx(r ? 'tier2' : 'fallback');
+      return r;
+    },
+    ready: () => t5Summarizer?.ready() ?? false,
+  });
+}
+
+function onnxForceFallback(): boolean {
+  return currentProfile?.onnxForceFallback === true;
+}
+
+function maybeRecordObservatoryOnnx(
+  bucket: 'tier0' | 'tier1' | 'tier2' | 'fallback',
+): void {
+  if (currentProfile?.shareAnonymousMetrics) {
+    observatoryCollector.recordOnnxInference(bucket);
+  }
+}
+
+async function loadOnnxTier(tier: ModelTier): Promise<{ ok: boolean; error?: string }> {
+  getOnnxRuntime();
+  onnxTierState[tier] = 'loading';
+  onnxTierProgress[tier] = 0;
+  onnxTierError[tier] = null;
+
+  const model =
+    tier === 0 ? struggleClassifier :
+    tier === 1 ? miniLM :
+    t5Summarizer;
+  if (!model) {
+    onnxTierState[tier] = 'failed';
+    onnxTierError[tier] = 'model-instance-missing';
+    return { ok: false, error: 'model-instance-missing' };
+  }
+
+  try {
+    const ok = await model.load((p) => {
+      onnxTierProgress[tier] = p.percent;
+    });
+    if (ok) {
+      onnxTierState[tier] = 'loaded';
+      onnxTierProgress[tier] = 100;
+      return { ok: true };
+    }
+    onnxTierState[tier] = 'failed';
+    onnxTierError[tier] = 'load-returned-false';
+    return { ok: false, error: 'load-returned-false' };
+  } catch (err) {
+    onnxTierState[tier] = 'failed';
+    onnxTierError[tier] = String(err);
+    return { ok: false, error: String(err) };
+  }
+}
+
+async function getOnnxStatusSnapshot(): Promise<{
+  tiers: Record<ModelTier, {
+    state: OnnxTierState;
+    progress: number;
+    error: string | null;
+    label: string;
+    sizeBytes: number;
+  }>;
+  runtime: {
+    modelsLoaded: string[];
+    cacheBytes: number;
+    inferenceCount: Record<string, number>;
+    avgLatencyMs: Record<string, number>;
+    fallbackCount: number;
+  };
+  forceFallback: boolean;
+}> {
+  const runtimeStats = onnxRuntime
+    ? await onnxRuntime.getStats()
+    : {
+        modelsLoaded: [],
+        cacheBytes: 0,
+        inferenceCount: {},
+        avgLatencyMs: {},
+        fallbackCount: 0,
+      };
+  const tierMeta = (tier: ModelTier) => {
+    const model = Object.values(MODEL_REGISTRY).find((m) => m.loadTier === tier);
+    return {
+      state: onnxTierState[tier],
+      progress: onnxTierProgress[tier],
+      error: onnxTierError[tier],
+      label: TIER_LABELS[tier],
+      sizeBytes: model?.sizeBytes ?? 0,
+    };
+  };
+  return {
+    tiers: { 0: tierMeta(0), 1: tierMeta(1), 2: tierMeta(2) },
+    runtime: runtimeStats,
+    forceFallback: onnxForceFallback(),
+  };
+}
+
+let tier0BootScheduled = false;
+function scheduleTier0OpportunisticLoad(): void {
+  if (tier0BootScheduled) return;
+  tier0BootScheduled = true;
+  setTimeout(() => {
+    loadProfile()
+      .then((p) => {
+        if (!p?.onnxModelsEnabled?.struggleClassifier) return;
+        return loadOnnxTier(0);
+      })
+      .catch(() => {});
+  }, 2000);
 }
 
 // ---------- State ----------
@@ -205,6 +388,7 @@ chrome.runtime.onInstalled.addListener((details) => {
       decisionEngine = new DecisionEngine(p);
     }
   });
+  scheduleTier0OpportunisticLoad();
 });
 
 chrome.runtime.onStartup.addListener(() => {
@@ -214,6 +398,7 @@ chrome.runtime.onStartup.addListener(() => {
       decisionEngine = new DecisionEngine(p);
     }
   });
+  scheduleTier0OpportunisticLoad();
 });
 
 // ---------- Message handler ----------
@@ -252,7 +437,13 @@ type MessageType =
   // --- Session 11: Fusion pipeline ---
   | 'FUSION_INTENT_EMITTED'
   | 'FUSION_GET_STATS'
-  | 'FUSION_GET_HISTORY';
+  | 'FUSION_GET_HISTORY'
+  // --- Session 12: On-Device ONNX Models ---
+  | 'ONNX_GET_STATUS'
+  | 'ONNX_LOAD_TIER'
+  | 'ONNX_UNLOAD_TIER'
+  | 'ONNX_CLEAR_CACHE'
+  | 'ONNX_SET_FORCE_FALLBACK';
 
 interface Message {
   type: MessageType;
@@ -594,6 +785,49 @@ async function handleMessage(
 
     case 'FUSION_GET_HISTORY': {
       return { history: [...fusionIntentHistory] };
+    }
+
+    // --- Session 12: On-Device ONNX Models ---
+    case 'ONNX_GET_STATUS': {
+      return getOnnxStatusSnapshot();
+    }
+
+    case 'ONNX_LOAD_TIER': {
+      const { tier } = message.payload as { tier: ModelTier };
+      if (tier !== 0 && tier !== 1 && tier !== 2) {
+        return { ok: false, error: `invalid-tier:${tier}` };
+      }
+      // Fire-and-forget so the popup can poll progress via ONNX_GET_STATUS.
+      loadOnnxTier(tier).catch(() => {});
+      return { ok: true, state: onnxTierState[tier] };
+    }
+
+    case 'ONNX_UNLOAD_TIER': {
+      const { tier } = message.payload as { tier: ModelTier };
+      if (!onnxRuntime) return { ok: true };
+      const model = Object.values(MODEL_REGISTRY).find((m) => m.loadTier === tier);
+      if (model) {
+        onnxRuntime.unloadModel(model.id);
+        onnxTierState[tier] = 'idle';
+        onnxTierProgress[tier] = 0;
+      }
+      return { ok: true };
+    }
+
+    case 'ONNX_CLEAR_CACHE': {
+      if (onnxRuntime) await onnxRuntime.clearCache();
+      onnxTierState[0] = onnxTierState[1] = onnxTierState[2] = 'idle';
+      onnxTierProgress[0] = onnxTierProgress[1] = onnxTierProgress[2] = 0;
+      return { ok: true };
+    }
+
+    case 'ONNX_SET_FORCE_FALLBACK': {
+      const { enabled } = message.payload as { enabled: boolean };
+      if (currentProfile) {
+        const updated = { ...currentProfile, onnxForceFallback: enabled, updatedAt: Date.now() };
+        await saveProfile(updated);
+      }
+      return { ok: true };
     }
 
     default: {

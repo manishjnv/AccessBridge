@@ -28,6 +28,8 @@ interface PersistedState {
   languages_used: string[];
   domain_connectors_activated: Record<string, number>;
   estimated_accessibility_score_improvement: number;
+  /** Session 12: keys are 'tier0', 'tier1', 'tier2', 'fallback'. */
+  onnx_inferences: Record<string, number>;
 }
 
 function todayLocalISO(now: Date = new Date()): string {
@@ -46,6 +48,7 @@ function blankState(): PersistedState {
     languages_used: [],
     domain_connectors_activated: {},
     estimated_accessibility_score_improvement: 0,
+    onnx_inferences: {},
   };
 }
 
@@ -98,6 +101,15 @@ export class ObservatoryCollector {
     );
   }
 
+  /** Session 12: log a single ONNX inference against one of {'tier0','tier1','tier2','fallback'}. */
+  recordOnnxInference(
+    bucket: 'tier0' | 'tier1' | 'tier2' | 'fallback',
+  ): void {
+    this.rollIfNewDay();
+    this.state.onnx_inferences[bucket] =
+      (this.state.onnx_inferences[bucket] ?? 0) + 1;
+  }
+
   getRawCounters(): RawCounters {
     this.rollIfNewDay();
     return {
@@ -108,6 +120,7 @@ export class ObservatoryCollector {
       domain_connectors_activated: { ...this.state.domain_connectors_activated },
       estimated_accessibility_score_improvement:
         this.state.estimated_accessibility_score_improvement,
+      onnx_inferences: { ...this.state.onnx_inferences },
     };
   }
 

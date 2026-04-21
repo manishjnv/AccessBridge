@@ -21,6 +21,8 @@ export interface RawCounters {
   languages_used: string[];
   domain_connectors_activated: Record<string, number>;
   estimated_accessibility_score_improvement: number;
+  /** Session 12: on-device ONNX inference counters per tier. Keys: 'tier0', 'tier1', 'tier2', 'fallback'. */
+  onnx_inferences?: Record<string, number>;
 }
 
 export interface NoisyBundle {
@@ -31,6 +33,8 @@ export interface NoisyBundle {
   languages_used: string[];
   domain_connectors_activated: Record<string, number>;
   estimated_accessibility_score_improvement: number;
+  /** Session 12: Laplace-noised ONNX inference counters per tier + fallback. */
+  onnx_inferences: Record<string, number>;
   merkle_root: string;
   schema_version: 1;
 }
@@ -151,6 +155,7 @@ function canonicalLines(bundle: {
   domain_connectors_activated: Record<string, number>;
   languages_used: string[];
   estimated_accessibility_score_improvement: number;
+  onnx_inferences?: Record<string, number>;
 }): string[] {
   const lines: string[] = [];
   for (const [k, v] of Object.entries(bundle.adaptations_applied)) {
@@ -162,6 +167,9 @@ function canonicalLines(bundle: {
   }
   for (const [k, v] of Object.entries(bundle.domain_connectors_activated)) {
     lines.push(`domain_connectors_activated:${k}=${v}`);
+  }
+  for (const [k, v] of Object.entries(bundle.onnx_inferences ?? {})) {
+    lines.push(`onnx_inferences:${k}=${v}`);
   }
   const langs = [...new Set(bundle.languages_used)].sort();
   lines.push(`languages_used:=[${langs.join(',')}]`);
@@ -211,6 +219,11 @@ export async function aggregateDailyBundle(
 
   const languages_used = [...new Set(raw.languages_used)].sort();
 
+  const onnx_inferences: Record<string, number> = {};
+  for (const [k, v] of Object.entries(raw.onnx_inferences ?? {})) {
+    onnx_inferences[k] = addLaplaceNoise(v, DP_EPSILON, DP_SENSITIVITY);
+  }
+
   const partial = {
     date: todayLocalISO(),
     adaptations_applied,
@@ -219,6 +232,7 @@ export async function aggregateDailyBundle(
     languages_used,
     domain_connectors_activated,
     estimated_accessibility_score_improvement,
+    onnx_inferences,
   };
   const lines = canonicalLines(partial);
   const merkle_root = await merkleRoot(lines);

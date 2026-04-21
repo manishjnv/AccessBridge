@@ -947,6 +947,9 @@ function SettingsTab({
       {/* --- Session 11: Multi-Modal Fusion --- */}
       <FusionSection profile={profile} onSave={onSave} />
 
+      {/* --- Session 12: On-Device ONNX Models --- */}
+      <OnnxModelsSection profile={profile} onSave={onSave} />
+
       <div className="space-y-1">
         <label className="text-xs text-a11y-muted">Adaptation Mode</label>
         <select
@@ -1222,6 +1225,216 @@ function FusionSection({
           )}
         </>
       )}
+    </div>
+  );
+}
+
+// --- Session 12: On-Device ONNX Models ---
+
+type OnnxTierId = 0 | 1 | 2;
+
+interface OnnxTierSnapshot {
+  state: 'idle' | 'loading' | 'loaded' | 'failed';
+  progress: number;
+  error: string | null;
+  label: string;
+  sizeBytes: number;
+}
+
+interface OnnxStatusResponse {
+  tiers: Record<OnnxTierId, OnnxTierSnapshot>;
+  runtime: {
+    modelsLoaded: string[];
+    cacheBytes: number;
+    inferenceCount: Record<string, number>;
+    avgLatencyMs: Record<string, number>;
+    fallbackCount: number;
+  };
+  forceFallback: boolean;
+}
+
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function OnnxModelsSection({
+  profile,
+  onSave,
+}: {
+  profile: AccessibilityProfile;
+  onSave: (p: AccessibilityProfile) => void;
+}) {
+  const [status, setStatus] = useState<OnnxStatusResponse | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const poll = () => {
+      chrome.runtime
+        .sendMessage({ type: 'ONNX_GET_STATUS' })
+        .then((r: unknown) => {
+          if (!cancelled) setStatus(r as OnnxStatusResponse);
+        })
+        .catch(() => {});
+    };
+    poll();
+    const id = setInterval(poll, 1500);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, []);
+
+  const update = (patch: Partial<AccessibilityProfile>) =>
+    onSave({ ...profile, ...patch, updatedAt: Date.now() });
+
+  const loadTier = (tier: OnnxTierId) =>
+    chrome.runtime.sendMessage({ type: 'ONNX_LOAD_TIER', payload: { tier } }).catch(() => {});
+
+  const unloadTier = (tier: OnnxTierId) =>
+    chrome.runtime.sendMessage({ type: 'ONNX_UNLOAD_TIER', payload: { tier } }).catch(() => {});
+
+  const clearCache = () =>
+    chrome.runtime.sendMessage({ type: 'ONNX_CLEAR_CACHE' }).catch(() => {});
+
+  const tierRow = (tier: OnnxTierId, enabledKey: 'struggleClassifier' | 'embeddings' | 'summarizer') => {
+    const snap = status?.tiers[tier];
+    const enabled = profile.onnxModelsEnabled[enabledKey];
+    const stateLabel =
+      snap?.state === 'loaded' ? 'loaded'
+      : snap?.state === 'loading' ? `${snap.progress}%`
+      : snap?.state === 'failed' ? 'failed'
+      : 'not loaded';
+    return (
+      <div key={tier} className="mt-3 pt-3 border-t border-a11y-primary/20">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex-1 min-w-0">
+            <div className="text-xs font-semibold text-a11y-text truncate">
+              Tier {tier} · {snap?.label ?? `Tier ${tier}`}
+            </div>
+            <div className="text-xs text-a11y-muted">
+              {formatBytes(snap?.sizeBytes ?? 0)} · {stateLabel}
+            </div>
+          </div>
+          <Toggle
+            label=""
+            value={enabled}
+            onChange={(v) =>
+              update({
+                onnxModelsEnabled: {
+                  ...profile.onnxModelsEnabled,
+                  [enabledKey]: v,
+                },
+              })
+            }
+          />
+        </div>
+        {snap?.state === 'loading' && (
+          <div
+            className="mt-2 h-1.5 rounded-full overflow-hidden"
+            style={{ background: 'rgba(123, 104, 238, 0.18)' }}
+          >
+            <div
+              className="h-full"
+              style={{
+                width: `${snap.progress}%`,
+                background: 'linear-gradient(135deg, #7b68ee, #bb86fc)',
+                transition: 'width 0.2s',
+              }}
+            />
+          </div>
+        )}
+        {snap?.state === 'failed' && snap.error && (
+          <div className="mt-1 text-xs" style={{ color: '#ef4444' }}>
+            {snap.error.length > 80 ? snap.error.slice(0, 77) + '…' : snap.error}
+          </div>
+        )}
+        {enabled && snap?.state !== 'loaded' && snap?.state !== 'loading' && (
+          <button
+            onClick={() => loadTier(tier)}
+            className="mt-2 w-full text-xs py-1.5 rounded transition-colors"
+            style={{
+              background: 'rgba(123, 104, 238, 0.15)',
+              color: '#bb86fc',
+              fontWeight: 600,
+            }}
+          >
+            Download
+          </button>
+        )}
+        {snap?.state === 'loaded' && (
+          <button
+            onClick={() => unloadTier(tier)}
+            className="mt-2 w-full text-xs py-1.5 rounded transition-colors text-a11y-muted border border-a11y-primary/30"
+          >
+            Unload
+          </button>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div
+      className="bg-a11y-surface rounded-lg p-3 border border-a11y-primary/20"
+      style={{ borderLeft: '4px solid #7b68ee' }}
+    >
+      <div
+        className="text-xs font-bold uppercase tracking-wider mb-2"
+        style={{ color: '#bb86fc', letterSpacing: '1.2px' }}
+      >
+        On-Device AI Models
+      </div>
+      <p className="text-xs text-a11y-muted mb-3" style={{ lineHeight: 1.5 }}>
+        Three on-device ONNX models. Tier 0 is always on; 1 and 2 are opt-in
+        downloads. Heuristic fallback runs automatically when a model is
+        unavailable or disabled.
+      </p>
+
+      {tierRow(0, 'struggleClassifier')}
+      {tierRow(1, 'embeddings')}
+      {tierRow(2, 'summarizer')}
+
+      <div className="mt-4 pt-3 border-t border-a11y-primary/20">
+        <Toggle
+          label="Allow downloads on metered network"
+          value={profile.onnxDownloadOnMeteredNetwork}
+          onChange={(v) => update({ onnxDownloadOnMeteredNetwork: v })}
+        />
+      </div>
+
+      {status && (
+        <div className="mt-3 space-y-1 text-xs">
+          <div className="flex justify-between">
+            <span className="text-a11y-muted">Cache size</span>
+            <span className="text-a11y-text font-mono">
+              {formatBytes(status.runtime.cacheBytes)}
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-a11y-muted">Fallbacks</span>
+            <span className="text-a11y-text font-mono">
+              {status.runtime.fallbackCount}
+            </span>
+          </div>
+          {status.runtime.modelsLoaded.length > 0 && (
+            <div className="flex justify-between">
+              <span className="text-a11y-muted">Loaded</span>
+              <span className="text-a11y-text font-mono">
+                {status.runtime.modelsLoaded.length}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
+      <button
+        onClick={clearCache}
+        className="mt-3 w-full text-xs py-1.5 rounded border border-a11y-primary/30 text-a11y-muted hover:text-a11y-text transition-colors"
+      >
+        Clear Cache
+      </button>
     </div>
   );
 }

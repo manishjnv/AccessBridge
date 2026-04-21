@@ -203,6 +203,12 @@ export default defineConfig({
         popup: resolve(__dirname, 'src/popup/index.html'),
         sidepanel: resolve(__dirname, 'src/sidepanel/index.html'),
       },
+      // Session 12 — keep the 25 MB onnxruntime-web WASM out of the zip.
+      // The runtime lazy-imports it; failure to resolve falls through to
+      // the graceful `ort = null` path documented in runtime.ts. When real
+      // ONNX weights ship, swap this for a proper CDN import map or
+      // wire `env.wasm.wasmPaths` to the VPS before toggling on.
+      external: ['onnxruntime-web'],
       output: {
         entryFileNames: (chunkInfo) => {
           if (chunkInfo.name === 'background') return 'src/background/index.js';

@@ -235,13 +235,14 @@ Full voice navigation for Windows (extend beyond browser).
 - **Key tech:** Windows UI Automation, on-device STT, command intent models
 - **Dependencies:** R1-01 Desktop companion
 
-### R4-04 ⚪ On-device ML models
+### R4-04 🟡 On-device ML models
 
 WASM + WebGPU for privacy-preserving local inference — no cloud dependency.
 
 - **Effort:** 6-10 weeks
 - **Key tech:** ONNX Runtime Web, Transformers.js, quantized models
 - **Dependencies:** None; improves `@accessbridge/ai-engine` local tier
+- **Status:** Session 12 shipped the infrastructure — `@accessbridge/onnx-runtime` package, three-tier runtime with IDB cache + SHA-256 integrity, struggle detector `featurize()` + classifier blending, `LocalAIProvider.embed()`, semantic cache key generation, popup + sidepanel UI, observatory counters, ~70 new tests. **Deferred to Session 13+:** Python XGBoost training pipeline, uploading real quantized MiniLM/T5 binaries to the VPS CDN, WordPiece tokenizer, T5 beam-search decode. See [docs/features/onnx-models.md](docs/features/onnx-models.md).
 
 ---
 

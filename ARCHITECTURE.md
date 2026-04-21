@@ -269,6 +269,34 @@ Docs: [docs/features/multi-modal-fusion.md](docs/features/multi-modal-fusion.md)
 
 ---
 
+## 8c. On-Device ONNX Models (Session 12)
+
+New workspace package `@accessbridge/onnx-runtime` hosts a singleton
+runtime that lazy-loads `onnxruntime-web`, fetches quantized ONNX weights
+from the VPS nginx CDN, SHA-256-verifies them, caches the bytes in
+IndexedDB, and exposes three thin wrapper classes — `StruggleClassifier`
+(Tier 0, ~3 MB, auto-loaded 2 s after SW start), `MiniLMEmbeddings`
+(Tier 1, ~80 MB, opt-in), `T5Summarizer` (Tier 2, ~242 MB, opt-in).
+
+- **Runtime** — [packages/onnx-runtime/src/runtime.ts](packages/onnx-runtime/src/runtime.ts). All I/O (onnxruntime-web, fetch, IndexedDB, crypto.subtle, logger) is injectable so tests mock it cleanly. Fallback-on-error is load-bearing: any ort import failure sets `ort = null` and subsequent `loadModel` calls resolve `{ok: false, error: 'ort-unavailable'}` instead of throwing.
+- **Registry** — [packages/onnx-runtime/src/model-registry.ts](packages/onnx-runtime/src/model-registry.ts). Static map of three canonical models pointing at `http://72.61.227.64:8300/models/*.onnx` (existing nginx CDN, no new manifest permission). MVP ships with `sha256: null` on every entry — populate when real weights upload.
+- **Struggle blending** — [packages/core/src/signals/struggle-detector.ts](packages/core/src/signals/struggle-detector.ts). New `featurize(): Float32Array(60)` (10 signal types × 6 rolling stats — see [docs/features/onnx-models.md](docs/features/onnx-models.md) for the layout), new `getStruggleScoreAsync()` that blends classifier + heuristic at 0.6/0.4 when the classifier's confidence exceeds 0.7 — else heuristic-only.
+- **LocalAIProvider** — [packages/ai-engine/src/providers/local.ts](packages/ai-engine/src/providers/local.ts). New optional `embedder` + `summarizer` constructor options + `setEmbedder()` / `setSummarizer()` runtime setters. New `embed(text) → Float32Array(384)` method with trigram pseudo-embedding fallback. `summarize()` tries T5 first then extractive. Every hook is timeout-guarded (5 s default) and null-safe.
+- **Semantic cache** — [packages/ai-engine/src/cache.ts](packages/ai-engine/src/cache.ts) `generateKeyByEmbedding(request, embedder)` buckets the top-8 dominant dimensions at 3-bit magnitude resolution. Two vectors pointing in the same direction with similar emphasis hit the same cache slot; the method falls back to `generateKey` if the embedder returns null or throws.
+- **Background wiring** — [packages/extension/src/background/index.ts](packages/extension/src/background/index.ts). `getOnnxRuntime()` lazy singleton; `wireOnnxModelsIntoPipeline()` installs wrapped adapters into the struggle detector + local provider (every adapter respects `profile.onnxForceFallback` and increments observatory per-tier counters); `scheduleTier0OpportunisticLoad()` fires 2 s after install/startup. Five new message types: `ONNX_GET_STATUS`, `ONNX_LOAD_TIER`, `ONNX_UNLOAD_TIER`, `ONNX_CLEAR_CACHE`, `ONNX_SET_FORCE_FALLBACK`.
+- **UI** — popup Settings section "On-Device AI Models" (per-tier toggle + Download/Unload/state row, metered-network checkbox, aggregate stats, Clear Cache). Side panel *On-Device Models* pane with per-tier status dots, cache stats, inference counts + latency, force-fallback debug switch.
+- **Observatory** — [packages/extension/src/background/observatory-publisher.ts](packages/extension/src/background/observatory-publisher.ts) + [observatory-collector.ts](packages/extension/src/background/observatory-collector.ts). New optional `onnx_inferences: Record<'tier0'|'tier1'|'tier2'|'fallback', number>` counter bucket, Laplace-noised through the same DP pipeline as existing counters.
+
+**Invariants:**
+
+- `@accessbridge/onnx-runtime` is imported **only** from `background/index.ts` — never from content scripts — so the WASM runtime never enters the content-script bundle (RCA BUG-008/012 territory).
+- The core + ai-engine packages stay free of any `onnxruntime-web` dep; they accept the model classes via structural interfaces (`StruggleClassifierLike`, `LocalEmbedder`, `LocalSummarizer`) — duck-typed.
+- Every ONNX-bearing method has a documented null-return path + heuristic fallback. No user-visible behaviour change when a model is absent.
+
+Docs: [docs/features/onnx-models.md](docs/features/onnx-models.md). Tests: ~70 (runtime 11 · classifier 15 · detector-blending 12 · local-provider-onnx 18 · cache-embedding 6 · registry 8).
+
+---
+
 ## 9. Architectural properties worth knowing
 
 1. **Cost-aware AI by default** — local tier always available; no API key required for baseline function

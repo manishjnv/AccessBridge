@@ -12,6 +12,8 @@ coverage/
 .turbo/
 *.onnx
 *.bin
-models/
+# Scope the "models/" exclusion to the repo root only — source directories named
+# models/ (e.g. packages/onnx-runtime/src/models/) must stay tracked.
+/models/
 src-tauri/target/
 *.tsbuildinfo

@@ -41,6 +41,14 @@ function makeProfile(
     fusionWindowMs: 3000,
     fusionCompensationEnabled: true,
     fusionIntentMinConfidence: 0.65,
+    // --- Session 12: On-Device ONNX Models ---
+    onnxModelsEnabled: {
+      struggleClassifier: true,
+      embeddings: false,
+      summarizer: false,
+    },
+    onnxDownloadOnMeteredNetwork: false,
+    onnxForceFallback: false,
     ...overrides,
   };
 }

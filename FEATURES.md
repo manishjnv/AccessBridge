@@ -118,6 +118,7 @@ Background-side intelligence. Not user-facing directly but drives all auto-adapt
 | CORE-02 | Decision Engine (8+ rules mapping struggle → adaptations) | `packages/core/src/decision/engine.ts` | `packages/core/src/__tests__/decision-engine.test.ts` |
 | CORE-03 | Profile Store (sensory + cognitive + motor + language) | `packages/core/src/profile/store.ts` | `packages/core/src/__tests__/profile-store.test.ts` |
 | CORE-04 | Multi-Modal Fusion Layer 5 (unified 10-channel event stream, 5 cross-modal compensation rules, 7-intent inference, decision-engine integration — all on-device) | [packages/core/src/fusion/](packages/core/src/fusion/) + [packages/extension/src/content/fusion/](packages/extension/src/content/fusion/) | quality-estimator 26 · compensator 25 · intent-inference 43 · fusion-engine 20 = 114 tests · see [docs/features/multi-modal-fusion.md](docs/features/multi-modal-fusion.md) |
+| CORE-05 | On-Device ONNX Models (Session 12): three-tier runtime (Tier 0 struggle classifier auto-loaded, Tier 1 MiniLM embeddings opt-in, Tier 2 T5-small summarizer opt-in); IDB cache + SHA-256 integrity; graceful heuristic fallback per-path. Infrastructure shipping this session; real weights deferred. | [packages/onnx-runtime/](packages/onnx-runtime/) + struggle-detector `featurize()` + local-provider `embed()` | runtime 11 · classifier 15 · detector-blending 12 · local-provider-onnx 18 · cache-embedding 6 · registry 8 = 70 tests · see [docs/features/onnx-models.md](docs/features/onnx-models.md) |
 
 Signal types collected by content script: `SCROLL_VELOCITY`, `CLICK_ACCURACY`, `DWELL_TIME`, `TYPING_RHYTHM`, `BACKSPACE_RATE`, `ZOOM_EVENTS`, `CURSOR_PATH`, `ERROR_RATE`, `READING_SPEED`, `HESITATION`.
 
@@ -154,7 +155,7 @@ Security invariants enforced at multiple layers: (a) opt-in gate on every `recor
 | Motor | 8 |
 | Domains | 6 |
 | AI engine features | 1 (+ engine layer) |
-| Core engine components | 3 |
+| Core engine components | 5 |
 | **Total user-facing features** | **29** |
 
 ---

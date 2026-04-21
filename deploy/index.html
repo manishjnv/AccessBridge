@@ -1161,33 +1161,50 @@
       background: var(--bg-alt);
     }
     .footer-inner {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 24px;
-      flex-wrap: wrap;
+      display: grid;
+      grid-template-columns: 1.8fr 1fr 1fr 1fr;
+      align-items: start;
+      gap: 36px;
     }
     .footer-brand h3 {
-      font-size: 1.1rem;
+      font-size: 1.15rem;
       font-weight: 800;
       background: linear-gradient(135deg, var(--primary), var(--accent));
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
-      margin-bottom: 6px;
+      margin-bottom: 8px;
     }
     .footer-brand p {
       color: var(--muted);
       font-size: 13px;
-      max-width: 320px;
       line-height: 1.6;
+      max-width: 380px;
     }
-    .footer-links { display: flex; gap: 40px; }
+    .footer-brand-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 14px;
+    }
+    .footer-brand-meta span {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(123,104,238,0.1);
+      border: 1px solid rgba(123,104,238,0.22);
+      color: var(--accent);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.4px;
+    }
     .footer-col h4 {
       font-size: 12px;
       text-transform: uppercase;
       letter-spacing: 1px;
       color: var(--text);
-      margin-bottom: 12px;
+      margin-bottom: 14px;
       font-weight: 700;
     }
     .footer-col a {
@@ -1196,9 +1213,9 @@
       text-decoration: none;
       font-size: 13px;
       margin-bottom: 8px;
-      transition: color 0.2s;
+      transition: color 0.2s, transform 0.15s;
     }
-    .footer-col a:hover { color: var(--accent); }
+    .footer-col a:hover { color: var(--accent); transform: translateX(2px); }
     .footer-bottom {
       margin-top: 28px;
       padding-top: 20px;
@@ -1278,8 +1295,8 @@
       .install { padding: 36px 20px; }
       .install-steps { flex-direction: column; align-items: center; }
       .step { max-width: 100%; min-width: auto; width: 100%; }
-      .footer-inner { flex-direction: column; }
-      .footer-links { gap: 28px; }
+      .footer-inner { grid-template-columns: 1fr 1fr; gap: 28px; }
+      .footer-brand { grid-column: 1 / -1; }
       .footer-bottom { flex-direction: column; text-align: center; }
       .demo-body { padding: 24px; gap: 24px; }
     }
@@ -1296,6 +1313,8 @@
       .how-step { padding: 28px 20px; }
       .demo-body { padding: 20px; }
       .demo-visual { padding: 24px; min-height: 180px; }
+      .footer-inner { grid-template-columns: 1fr; gap: 22px; }
+      .footer-brand { grid-column: auto; }
     }
 
     /* --- Back-to-Top Button --- */
@@ -2630,24 +2649,32 @@
         <div class="footer-brand">
           <h3>AccessBridge</h3>
           <p>Ambient accessibility middleware that detects user struggles and adapts web experiences in real time. No disclosure required.</p>
+          <div class="footer-brand-meta">
+            <span>28 Languages</span>
+            <span>On-device AI</span>
+            <span>Chrome MV3</span>
+            <span>MIT</span>
+          </div>
         </div>
-        <div class="footer-links">
-          <div class="footer-col">
-            <h4>Project</h4>
-            <a href="#/reach">Reach</a>
-            <a href="#/how-it-works">How It Works</a>
-            <a href="#/features">Features</a>
-            <a href="#/architecture">Architecture</a>
-            <a href="#/observatory">Observatory</a>
-            <a href="#/roadmap">Roadmap</a>
-            <a href="#/install">Install</a>
-          </div>
-          <div class="footer-col">
-            <h4>Links</h4>
-            <a href="#/github">GitHub</a>
-            <a href="https://github.com/manishjnv/AccessBridge">Repository</a>
-            <a href="https://github.com/manishjnv/AccessBridge/issues">Report Issues</a>
-          </div>
+        <div class="footer-col">
+          <h4>Explore</h4>
+          <a href="#/">Home</a>
+          <a href="#/reach">Reach</a>
+          <a href="#/how-it-works">How It Works</a>
+          <a href="#/features">Features</a>
+        </div>
+        <div class="footer-col">
+          <h4>Deeper</h4>
+          <a href="#/architecture">Architecture</a>
+          <a href="#/observatory">Observatory</a>
+          <a href="#/roadmap">Roadmap</a>
+          <a href="#/install">Install</a>
+        </div>
+        <div class="footer-col">
+          <h4>Links</h4>
+          <a href="#/github">GitHub Page</a>
+          <a href="https://github.com/manishjnv/AccessBridge">Repository</a>
+          <a href="https://github.com/manishjnv/AccessBridge/issues">Report Issues</a>
         </div>
       </div>
       <div class="footer-bottom">

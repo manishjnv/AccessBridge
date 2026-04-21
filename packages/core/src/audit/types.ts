@@ -47,6 +47,8 @@ export interface AuditNode {
   bbox: BBox;
   style: ComputedStyleSummary;
   htmlSnippet: string;
+  /** Session 10: marker from vision-recovery pipeline, e.g. "tier:1"; null if not recovered. Optional for backward compat with existing test fixtures. */
+  dataRecovered?: string | null;
 }
 
 export interface TableSummary {

@@ -2178,3 +2178,93 @@
   outline: 3px solid #e94560;
   outline-offset: 2px;
 }
+
+/* --- Session 10: Vision-Assisted Semantic Recovery --- */
+.a11y-recovered-element {
+  outline: 1px dotted rgba(123, 104, 238, 0.6) !important;
+  outline-offset: 2px !important;
+  position: relative;
+}
+
+.a11y-recovered-element::after {
+  content: '🔍';
+  position: absolute;
+  top: 0;
+  right: 0;
+  font-size: 10px;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.a11y-vision-badge {
+  position: fixed;
+  bottom: 80px;
+  left: 24px;
+  background: linear-gradient(135deg, #7b68ee, #bb86fc);
+  color: #fff;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: system-ui, -apple-system, sans-serif;
+  z-index: 999992;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(123, 104, 238, 0.35);
+  transition: transform 0.15s, box-shadow 0.2s;
+}
+
+.a11y-vision-badge:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(123, 104, 238, 0.35);
+}
+
+.a11y-vision-badge:focus-visible {
+  outline: 3px solid #e94560;
+  outline-offset: 2px;
+}
+
+.a11y-vision-panel {
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 360px;
+  background: #1a1a2e;
+  color: #e2e8f0;
+  z-index: 999991;
+  transform: translateX(-100%);
+  transition: transform 0.25s ease;
+  overflow-y: auto;
+  padding: 20px;
+  border-right: 1px solid rgba(123, 104, 238, 0.3);
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 13px;
+}
+
+.a11y-vision-panel.open {
+  transform: translateX(0);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.a11y-vision-item {
+  padding: 10px;
+  margin-bottom: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  border-left: 3px solid #7b68ee;
+}
+
+.a11y-vision-confidence-bar {
+  height: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  margin-top: 6px;
+  overflow: hidden;
+}
+
+.a11y-vision-confidence-fill {
+  height: 100%;
+  background: #10b981;
+  transition: width 0.2s;
+}

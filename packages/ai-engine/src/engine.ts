@@ -196,6 +196,19 @@ export class AIEngine {
     return resp.output;
   }
 
+  async recoverUILabel(input: {
+    screenshot: string;
+    domContext: string;
+  }): Promise<string> {
+    const resp = await this.process({
+      id: generateId(),
+      type: 'vision',
+      input: input.domContext,
+      metadata: { screenshot: input.screenshot },
+    });
+    return resp.output;
+  }
+
   // -----------------------------------------------------------------------
   // Configuration
   // -----------------------------------------------------------------------
@@ -287,6 +300,15 @@ export class AIEngine {
           (request.metadata?.from as string) ?? 'auto',
           request.language ?? 'en',
         );
+      case 'vision': {
+        const screenshot =
+          (request.metadata?.screenshot as string | undefined) ?? '';
+        try {
+          return await provider.vision(text, screenshot);
+        } catch {
+          return provider.summarize(text, request.maxLength);
+        }
+      }
       default:
         // For unsupported types (tts, stt, vision) — return empty string
         // from local, let API providers handle if they can.

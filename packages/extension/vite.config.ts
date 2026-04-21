@@ -15,66 +15,50 @@ function copyManifestPlugin() {
 
       // ---- Inline shared chunks into content script ----
       // Chrome content scripts don't reliably support "type": "module",
-      // so we inline the small shared chunks and wrap as IIFE.
+      // so we recursively inline every chunk reachable from the content script
+      // (including chunk→chunk imports) and wrap each in its own IIFE-namespace
+      // to prevent var-collisions (RCA BUG-008) and nested-import syntax errors
+      // (Session 10 regression when @accessbridge/core split across chunks).
       const contentPath = resolve(distDir, 'src/content/index.js');
       let contentCode = readFileSync(contentPath, 'utf-8');
 
-      // Find all static import statements: import{X as Y}from"../../assets/file.js";
       const importRegex = /import\{([^}]+)\}from"([^"]+)";/g;
-      const imports: Array<{ full: string; bindings: string; path: string }> = [];
-      let m: RegExpExecArray | null;
-      while ((m = importRegex.exec(contentCode)) !== null) {
-        imports.push({ full: m[0], bindings: m[1], path: m[2] });
+
+      interface ChunkInfo {
+        absPath: string;
+        nsName: string;
+        body: string;                  // with imports + exports stripped
+        exports: Record<string, string>;  // exportedName → localVarName
+        deps: Array<{ bindings: string; path: string; absPath: string }>;
       }
 
-      for (const imp of imports) {
-        const chunkPath = resolve(distDir, 'src/content', imp.path);
-        if (!existsSync(chunkPath)) continue;
+      const chunks = new Map<string, ChunkInfo>();
 
-        let chunkCode = readFileSync(chunkPath, 'utf-8');
-        // Strip export statement: export{X as Y}; or export{X};
-        chunkCode = chunkCode.replace(/export\{[^}]+\};?\s*$/, '');
+      function loadChunk(absPath: string): ChunkInfo | null {
+        if (chunks.has(absPath)) return chunks.get(absPath) as ChunkInfo;
+        if (!existsSync(absPath)) return null;
+        let code = readFileSync(absPath, 'utf-8');
+        const chunkDir = resolve(absPath, '..');
 
-        // Parse import bindings: "S as E" or "A as f" or just "S"
-        const bindingParts = imp.bindings.split(',').map(b => b.trim());
-        for (const binding of bindingParts) {
-          const parts = binding.split(/\s+as\s+/);
-          const exported = parts[0].trim();
-          const local = (parts[1] || exported).trim();
-          if (exported !== local) {
-            // Rename the exported var to match the local alias
-            // e.g. chunk has "var R=..." and import says "S as E", but export says "R as S"
-            // We need to find what var name in the chunk maps to exported name
-            // The export line was: export{R as S} → so R is the actual var, S is the export name
-            // Import says: import{S as E} → S is the export name, E is the local name
-            // So we need R → E
-            // But we already stripped the export. We need to find the mapping.
-            // Since these are simple enum chunks, the pattern is:
-            //   var R=(...)(R||{}); export{R as S};
-            // After stripping export: var R=(...)(R||{});
-            // We need to add: var E = R; (or just alias)
-            chunkCode += `\nvar ${local} = ${exported};`;
-          }
+        // Collect nested imports inside this chunk.
+        const deps: ChunkInfo['deps'] = [];
+        let dm: RegExpExecArray | null;
+        const depRe = /import\{([^}]+)\}from"([^"]+)";/g;
+        while ((dm = depRe.exec(code)) !== null) {
+          deps.push({
+            bindings: dm[1],
+            path: dm[2],
+            absPath: resolve(chunkDir, dm[2]),
+          });
         }
 
-        // Remove the import statement from content script
-        contentCode = contentCode.replace(imp.full, '');
-      }
+        // Strip all nested import statements — they'll be replaced by alias lines
+        // injected into the IIFE body.
+        code = code.replace(/import\{[^}]+\}from"[^"]+";/g, '');
 
-      // Re-read chunks, wrap each in its own IIFE to prevent var collisions,
-      // and expose only the needed exports via a unique global namespace.
-      let finalPreamble = '';
-      let chunkIdx = 0;
-      for (const imp of imports) {
-        const chunkPath = resolve(distDir, 'src/content', imp.path);
-        if (!existsSync(chunkPath)) continue;
-
-        let chunkCode = readFileSync(chunkPath, 'utf-8');
-        const nsName = `__ab_chunk${chunkIdx++}`;
-
-        // Parse the export: export{R as S}
-        const exportMatch = chunkCode.match(/export\{([^}]+)\}/);
-        const exportMap: Record<string, string> = {}; // exportName → localVar
+        // Parse the chunk's export clause.
+        const exportMap: Record<string, string> = {};
+        const exportMatch = code.match(/export\{([^}]+)\};?\s*$/);
         if (exportMatch) {
           for (const part of exportMatch[1].split(',')) {
             const pieces = part.trim().split(/\s+as\s+/);
@@ -83,34 +67,89 @@ function copyManifestPlugin() {
             exportMap[exportName] = localVar;
           }
         }
+        code = code.replace(/export\{[^}]+\};?\s*$/, '');
 
-        // Strip export
-        chunkCode = chunkCode.replace(/export\{[^}]+\};?\s*$/, '');
+        const info: ChunkInfo = {
+          absPath,
+          nsName: `__ab_chunk${chunks.size}`,
+          body: code,
+          exports: exportMap,
+          deps,
+        };
+        chunks.set(absPath, info);
 
-        // Build return object with exported values
-        const exportEntries = Object.entries(exportMap);
-        const returnObj = exportEntries.map(([expName, localVar]) => `${expName}:${localVar}`).join(',');
+        // Recurse into dependencies so they're loaded too.
+        for (const dep of deps) loadChunk(dep.absPath);
+        return info;
+      }
 
-        // Wrap chunk in IIFE that returns exports via a namespace object
-        finalPreamble += `var ${nsName}=(function(){${chunkCode};return{${returnObj}}})();\n`;
+      // Discover top-level imports from the content script itself.
+      const topImports: Array<{ full: string; bindings: string; path: string; absPath: string }> = [];
+      const contentDir = resolve(distDir, 'src/content');
+      let tm: RegExpExecArray | null;
+      while ((tm = importRegex.exec(contentCode)) !== null) {
+        const absPath = resolve(contentDir, tm[2]);
+        topImports.push({ full: tm[0], bindings: tm[1], path: tm[2], absPath });
+        loadChunk(absPath);
+      }
 
-        // Create aliases: map import bindings to namespace properties
-        const bindingParts = imp.bindings.split(',').map(b => b.trim());
-        for (const binding of bindingParts) {
-          const parts = binding.split(/\s+as\s+/);
-          const importedName = parts[0].trim();
-          const localName = (parts[1] || importedName).trim();
-          finalPreamble += `var ${localName}=${nsName}.${importedName};\n`;
+      // Topologically order chunks: every chunk must appear after its dependencies,
+      // so the `__ab_chunkN.export` aliases it depends on are already declared.
+      const order: ChunkInfo[] = [];
+      const seen = new Set<string>();
+      function visit(info: ChunkInfo): void {
+        if (seen.has(info.absPath)) return;
+        seen.add(info.absPath);
+        for (const dep of info.deps) {
+          const depInfo = chunks.get(dep.absPath);
+          if (depInfo) visit(depInfo);
+        }
+        order.push(info);
+      }
+      for (const info of chunks.values()) visit(info);
+
+      // Emit each chunk as an IIFE that returns its exports as a namespace object.
+      // Inside the IIFE, alias lines bind this chunk's dep imports to the already-
+      // declared namespaces of dependency chunks.
+      let finalPreamble = '';
+      for (const info of order) {
+        let aliasBlock = '';
+        for (const dep of info.deps) {
+          const depInfo = chunks.get(dep.absPath);
+          if (!depInfo) continue;
+          for (const binding of dep.bindings.split(',').map((b) => b.trim())) {
+            const pieces = binding.split(/\s+as\s+/);
+            const importedName = pieces[0].trim();
+            const localName = (pieces[1] || importedName).trim();
+            aliasBlock += `var ${localName}=${depInfo.nsName}.${importedName};`;
+          }
+        }
+        const returnObj = Object.entries(info.exports)
+          .map(([expName, localVar]) => `${expName}:${localVar}`)
+          .join(',');
+        finalPreamble += `var ${info.nsName}=(function(){${aliasBlock}${info.body};return{${returnObj}}})();\n`;
+      }
+
+      // Bind top-level import names to their corresponding chunk namespaces so the
+      // content-script body compiles unchanged.
+      for (const imp of topImports) {
+        const info = chunks.get(imp.absPath);
+        if (!info) continue;
+        for (const binding of imp.bindings.split(',').map((b) => b.trim())) {
+          const pieces = binding.split(/\s+as\s+/);
+          const importedName = pieces[0].trim();
+          const localName = (pieces[1] || importedName).trim();
+          finalPreamble += `var ${localName}=${info.nsName}.${importedName};\n`;
         }
       }
 
-      // Remove import lines and prepend inlined code
-      for (const imp of imports) {
+      // Remove top-level imports from the content script body.
+      for (const imp of topImports) {
         contentCode = contentCode.replace(imp.full, '');
       }
       contentCode = finalPreamble + contentCode;
 
-      // Wrap in IIFE to avoid polluting global scope
+      // Wrap the whole thing in an outer IIFE to avoid polluting the page's globals.
       contentCode = `(function(){\n${contentCode}\n})();`;
 
       writeFileSync(contentPath, contentCode);

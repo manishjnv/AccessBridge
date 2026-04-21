@@ -18,6 +18,17 @@ export interface SensoryProfile {
   captionsFontSize: number;
   /** Overlay vertical position. */
   captionsPosition: 'top' | 'bottom';
+  // --- Session 10: Vision-Assisted Semantic Recovery ---
+  /** Master toggle for vision-based semantic-recovery of unlabeled UI elements. */
+  visionRecoveryEnabled: boolean;
+  /** Re-scan on DOM mutations. Off means on-demand only. */
+  visionRecoveryAutoScan: boolean;
+  /** Opt-in Tier-2 AI-engine inference for low-confidence elements. Costs API calls. */
+  visionRecoveryTier2APIEnabled: boolean;
+  /** Visually outline auto-recovered elements with a dotted border. */
+  visionRecoveryHighlightRecovered: boolean;
+  /** Minimum confidence (0-1) below which a recovered label is discarded. */
+  visionRecoveryMinConfidence: number;
 }
 
 export interface CognitiveProfile {
@@ -108,6 +119,12 @@ export const DEFAULT_SENSORY_PROFILE: SensoryProfile = {
   captionsTranslateTo: null,
   captionsFontSize: 18,
   captionsPosition: 'bottom',
+  // --- Session 10: Vision-Assisted Semantic Recovery ---
+  visionRecoveryEnabled: true,
+  visionRecoveryAutoScan: true,
+  visionRecoveryTier2APIEnabled: false,
+  visionRecoveryHighlightRecovered: false,
+  visionRecoveryMinConfidence: 0.6,
 };
 
 export const DEFAULT_COGNITIVE_PROFILE: CognitiveProfile = {

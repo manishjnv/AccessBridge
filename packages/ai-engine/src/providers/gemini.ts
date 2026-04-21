@@ -86,6 +86,64 @@ export class GeminiAIProvider extends BaseAIProvider {
     return this.generate(prompt);
   }
 
+  async vision(prompt: string, screenshotDataUrl: string): Promise<string> {
+    const url = `${this.endpoint}/models/${MODEL}:generateContent?key=${this.apiKey}`;
+
+    const parts: Array<{
+      text?: string;
+      inline_data?: { mime_type: string; data: string };
+    }> = [
+      { text: prompt },
+    ];
+
+    if (screenshotDataUrl.length > 0) {
+      const match = screenshotDataUrl.match(/^data:(image\/\w+);base64,(.+)$/);
+      if (match !== null) {
+        parts.push({ inline_data: { mime_type: match[1], data: match[2] } });
+      }
+    }
+
+    const body = {
+      contents: [{ parts }],
+      generationConfig: { temperature: 0.2, maxOutputTokens: 512 },
+    };
+
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+    } catch (err) {
+      throw new Error(
+        `Gemini vision network error: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+
+    if (!response.ok) {
+      const errText = await response.text().catch(() => 'unknown');
+      if (response.status === 429) {
+        throw new Error('Gemini API rate limited — try again later');
+      }
+      throw new Error(`Gemini vision error ${response.status}: ${errText}`);
+    }
+
+    const data = (await response.json()) as GeminiResponse;
+
+    if (data.error) {
+      throw new Error(`Gemini vision error: ${data.error.message}`);
+    }
+
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+    const tokens =
+      data.usageMetadata?.totalTokenCount ?? estimateTokenCount(prompt + text);
+    const cost = estimateCost(tokens, this.tier, this.name);
+    this.recordUsage(tokens, cost);
+
+    return text.trim();
+  }
+
   // -----------------------------------------------------------------------
   // Internal: call Gemini REST API
   // -----------------------------------------------------------------------

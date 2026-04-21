@@ -23,3 +23,22 @@ export {
 export { ProfileStore } from './profile/index.js';
 export { StruggleDetector } from './signals/index.js';
 export { DecisionEngine } from './decision/index.js';
+
+export {
+  VisionRecoveryEngine,
+  DEFAULT_VISION_CONFIG,
+  composeHeuristicLabel,
+  inferRoleFromClass,
+  inferLabelFromSiblingContext,
+  inferIconLabel,
+  inferButtonFromPosition,
+  ICON_LEXICON,
+} from './vision/index.js';
+
+export type {
+  UnlabeledElement,
+  RecoveredLabel,
+  VisionRecoveryConfig,
+  RecoveryCache,
+  ApiVisionClient,
+} from './vision/index.js';

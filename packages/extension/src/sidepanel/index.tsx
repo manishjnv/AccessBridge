@@ -7,8 +7,10 @@ import './audit/audit.css';
 import { AuditPanel } from './audit/AuditPanel.js';
 // --- Priority 1: Captions + Actions ---
 import ActionsPanel from './actions/ActionsPanel.js';
+// --- Session 10: Vision Recovery ---
+import VisionPanel from './vision/VisionPanel.js';
 
-type SidePanelTab = 'dashboard' | 'audit' | 'actions';
+type SidePanelTab = 'dashboard' | 'audit' | 'actions' | 'vision';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -685,12 +687,16 @@ function SidePanel() {
         <TabButton label="Audit" active={tab === 'audit'} onClick={() => setTab('audit')} />
         {/* --- Priority 1: Captions + Actions --- */}
         <TabButton label="Actions" active={tab === 'actions'} onClick={() => setTab('actions')} />
+        {/* --- Session 10: Vision Recovery --- */}
+        <TabButton label="Vision" active={tab === 'vision'} onClick={() => setTab('vision')} />
       </nav>
 
       {/* ── Body ───────────────────────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3">
         {/* --- Priority 1: Captions + Actions --- */}
-        {tab === 'actions' ? (
+        {tab === 'vision' ? (
+          <VisionPanel />
+        ) : tab === 'actions' ? (
           <ActionsPanel />
         ) : tab === 'audit' ? (
           <AuditPanel />

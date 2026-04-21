@@ -494,6 +494,72 @@ function SensoryTab({
           </div>
         </>
       )}
+      {/* --- Session 10: Vision Recovery --- */}
+      <div className="pt-2 border-t border-a11y-primary/20 mt-2">
+        <div className="text-xs text-a11y-muted uppercase tracking-wider mb-2">Visual Label Recovery</div>
+        <Toggle
+          label="Enable Vision Recovery"
+          value={sensory.visionRecoveryEnabled}
+          onChange={(v) => onChange({ visionRecoveryEnabled: v })}
+        />
+        {sensory.visionRecoveryEnabled && (
+          <>
+            <Toggle
+              label="Auto-scan on DOM change"
+              value={sensory.visionRecoveryAutoScan}
+              onChange={(v) => onChange({ visionRecoveryAutoScan: v })}
+            />
+            <Toggle
+              label="Tier 2 API (uses configured AI provider; Tier 1 runs free)"
+              value={sensory.visionRecoveryTier2APIEnabled}
+              onChange={(v) => onChange({ visionRecoveryTier2APIEnabled: v })}
+            />
+            <Toggle
+              label="Highlight recovered elements"
+              value={sensory.visionRecoveryHighlightRecovered}
+              onChange={(v) => onChange({ visionRecoveryHighlightRecovered: v })}
+            />
+            <div className="space-y-1">
+              <label className="text-xs text-a11y-muted">
+                Min confidence: {sensory.visionRecoveryMinConfidence.toFixed(2)}
+              </label>
+              <input
+                type="range"
+                min={0.3}
+                max={0.9}
+                step={0.05}
+                value={sensory.visionRecoveryMinConfidence}
+                onChange={(e) => onChange({ visionRecoveryMinConfidence: parseFloat(e.target.value) })}
+                className="w-full"
+              />
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                className="flex-1 bg-gradient-to-br from-a11y-primary to-a11y-accent text-white rounded px-2 py-1.5 text-xs font-semibold"
+                onClick={() => {
+                  chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
+                    if (tab?.id) chrome.tabs.sendMessage(tab.id, { type: 'VISION_SCAN_NOW' }).catch(() => {});
+                  });
+                }}
+              >
+                Scan Now
+              </button>
+              <button
+                type="button"
+                className="flex-1 bg-a11y-surface border border-a11y-primary/30 text-a11y-text rounded px-2 py-1.5 text-xs"
+                onClick={() => {
+                  chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
+                    if (tab?.id) chrome.tabs.sendMessage(tab.id, { type: 'VISION_CLEAR_CACHE' }).catch(() => {});
+                  });
+                }}
+              >
+                Clear Cache
+              </button>
+            </div>
+          </>
+        )}
+      </div>
     </>
   );
 }

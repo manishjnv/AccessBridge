@@ -20,6 +20,7 @@ import type {
 // AI Engine — lazy-initialized to keep startup fast
 import { AIEngine, SummarizerService, SimplifierService } from '@accessbridge/ai-engine';
 import { ActionItemsService } from '@accessbridge/ai-engine/services/index.js';
+import { VisionRecoveryService } from '@accessbridge/ai-engine/services/index.js';
 
 // Compliance Observatory — anonymous, DP-noised daily metrics (Feature #10)
 import {
@@ -35,6 +36,7 @@ let aiEngine: AIEngine | null = null;
 let summarizer: SummarizerService | null = null;
 let simplifier: SimplifierService | null = null;
 let actionItemsService: ActionItemsService | undefined;
+let visionRecoveryService: VisionRecoveryService | undefined;
 
 function getAIEngine(): AIEngine {
   if (!aiEngine) {
@@ -62,6 +64,13 @@ function getActionItemsService(): ActionItemsService {
     actionItemsService = new ActionItemsService(getAIEngine());
   }
   return actionItemsService;
+}
+
+function getVisionRecoveryService(): VisionRecoveryService {
+  if (!visionRecoveryService) {
+    visionRecoveryService = new VisionRecoveryService(getAIEngine());
+  }
+  return visionRecoveryService;
 }
 
 // ---------- State ----------
@@ -201,7 +210,9 @@ type MessageType =
   | 'HIGHLIGHT_ELEMENT'
   // --- Priority 1: Captions + Actions ---
   | 'EXTRACT_ACTION_ITEMS'
-  | 'ACTION_ITEMS_UPDATE';
+  | 'ACTION_ITEMS_UPDATE'
+  // --- Session 10: Vision Recovery ---
+  | 'VISION_RECOVER_VIA_API';
 
 interface Message {
   type: MessageType;
@@ -436,6 +447,16 @@ async function handleMessage(message: Message): Promise<unknown> {
     }
 
     // --- Priority 1: Captions + Actions ---
+    case 'VISION_RECOVER_VIA_API': {
+      const { screenshot, domContext } = message.payload as { screenshot: string; domContext: string };
+      try {
+        const result = await getVisionRecoveryService().inferElementMeaning({ screenshot, domContext });
+        return result;
+      } catch {
+        return { role: 'button', label: 'Unlabeled control', description: '', confidence: 0 };
+      }
+    }
+
     case 'EXTRACT_ACTION_ITEMS': {
       const { text, context } = message.payload as { text: string; context?: 'email' | 'meeting' | 'doc' | 'generic' };
       const start = performance.now();

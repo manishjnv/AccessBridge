@@ -29,6 +29,10 @@ export abstract class BaseAIProvider {
 
   abstract translate(text: string, from: string, to: string): Promise<string>;
 
+  async vision(_prompt: string, _screenshotDataUrl: string): Promise<string> {
+    throw new Error(`${this.name} provider does not support vision`);
+  }
+
   // -----------------------------------------------------------------------
   // Tracking helpers
   // -----------------------------------------------------------------------

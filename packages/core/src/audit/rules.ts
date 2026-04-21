@@ -161,6 +161,9 @@ export const AUDIT_RULES: AuditRule[] = [
       let seq = 0;
       for (const el of input.elements) {
         if (el.tag !== 'img') continue;
+        // Session 10: skip elements where vision-recovery provided an aria-label.
+        // The auto-recovered-info rule emits a separate info-level finding instead.
+        if (el.dataRecovered) continue;
         // alt === null means attribute missing; alt === '' is decorative (valid)
         if (
           el.alt === null &&
@@ -197,6 +200,7 @@ export const AUDIT_RULES: AuditRule[] = [
       for (const el of input.elements) {
         if (el.tag !== 'a') continue;
         if (!el.href || el.href.trim() === '') continue;
+        if (el.dataRecovered) continue;
         const hasName =
           el.text.trim().length > 0 ||
           (el.ariaLabel !== null && el.ariaLabel.trim() !== '') ||
@@ -230,6 +234,7 @@ export const AUDIT_RULES: AuditRule[] = [
       let seq = 0;
       for (const el of input.elements) {
         if (el.tag !== 'button' && el.role !== 'button') continue;
+        if (el.dataRecovered) continue;
         const hasName =
           el.text.trim().length > 0 ||
           (el.ariaLabel !== null && el.ariaLabel.trim() !== '') ||
@@ -781,6 +786,37 @@ export const AUDIT_RULES: AuditRule[] = [
           el,
           `Link text "${el.text.trim()}" is not descriptive out of context.`,
           'Replace vague link text with a description of the link destination or add an aria-label.',
+          seq++,
+        ));
+      }
+      return findings;
+    },
+  },
+
+  // -----------------------------------------------------------------------
+  // 21. auto-recovered-info — 4.1.2 · A · info (Session 10)
+  // Reports elements whose accessible name was auto-inferred by AccessBridge
+  // Vision Recovery. Downgrades the severity of the original img-alt / empty-button /
+  // empty-link findings by replacing the critical/serious finding with an info
+  // finding that encourages permanent author-side labels.
+  // -----------------------------------------------------------------------
+  {
+    id: 'auto-recovered-info',
+    name: 'Element accessible name was auto-inferred by AccessBridge',
+    wcagCriterion: '4.1.2',
+    wcagPrinciple: 'robust',
+    level: 'A',
+    severity: 'info',
+    check(input: AuditInput): AuditFinding[] {
+      const findings: AuditFinding[] = [];
+      let seq = 0;
+      for (const el of input.elements) {
+        if (!el.dataRecovered) continue;
+        findings.push(baseFinding(
+          'auto-recovered-info', this.name, this.wcagCriterion, this.level, this.severity,
+          el,
+          `Auto-labeled by AccessBridge (${el.dataRecovered}). Element had no accessible name.`,
+          'Consider adding a permanent alt / aria-label so every user-agent—including those without AccessBridge—can surface this control.',
           seq++,
         ));
       }

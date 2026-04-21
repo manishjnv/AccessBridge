@@ -43,6 +43,12 @@ import {
   TimeAwarenessController,
   ensureTimeAwarenessStyles,
 } from './cognitive/time-awareness.js';
+// --- Session 10: Vision-Assisted Semantic Recovery ---
+import {
+  VisionRecoveryController,
+  registerVisionRecoveryHandlers,
+} from './vision/recovery.js';
+import { VisionRecoveryUI } from './vision/recovery-ui.js';
 
 // ---------- App Detection ----------
 
@@ -312,6 +318,21 @@ function getActionItemsUI(): ActionItemsUI {
 
 // --- Priority 5: Time-Awareness ---
 let timeAwarenessController: TimeAwarenessController | null = null;
+// --- Session 10: Vision Recovery ---
+let visionRecoveryController: VisionRecoveryController | null = null;
+let visionRecoveryUI: VisionRecoveryUI | null = null;
+
+function getVisionRecovery(): VisionRecoveryController {
+  if (!visionRecoveryController) {
+    visionRecoveryController = new VisionRecoveryController({ enabled: false });
+  }
+  return visionRecoveryController;
+}
+
+function getVisionRecoveryUI(): VisionRecoveryUI {
+  if (!visionRecoveryUI) visionRecoveryUI = new VisionRecoveryUI();
+  return visionRecoveryUI;
+}
 
 function getTimeAwarenessController(): TimeAwarenessController {
   if (!timeAwarenessController) {
@@ -660,6 +681,9 @@ function listenForCommands(adapter: BaseAdapter, sensory: SensoryAdapter): void 
           actionItemsUI?.unmount();
           // --- Priority 5: Time-Awareness ---
           timeAwarenessController?.stop();
+          // --- Session 10: Vision Recovery ---
+          visionRecoveryController?.stop();
+          visionRecoveryUI?.unmount();
           sendResponse({ reverted: true });
           break;
         }
@@ -859,6 +883,43 @@ function listenForCommands(adapter: BaseAdapter, sensory: SensoryAdapter): void 
               else timeAwarenessController?.stop();
             }
           }
+          // --- Session 10: Vision Recovery ---
+          {
+            const sVis = updatedProfile?.sensory as {
+              visionRecoveryEnabled?: boolean;
+              visionRecoveryAutoScan?: boolean;
+              visionRecoveryTier2APIEnabled?: boolean;
+              visionRecoveryHighlightRecovered?: boolean;
+              visionRecoveryMinConfidence?: number;
+            } | undefined;
+            if (sVis) {
+              const ctl = getVisionRecovery();
+              const patch: Partial<{
+                autoScan: boolean;
+                tier2Enabled: boolean;
+                minConfidence: number;
+                highlightRecovered: boolean;
+              }> = {};
+              if (sVis.visionRecoveryAutoScan !== undefined) patch.autoScan = sVis.visionRecoveryAutoScan;
+              if (sVis.visionRecoveryTier2APIEnabled !== undefined) patch.tier2Enabled = sVis.visionRecoveryTier2APIEnabled;
+              if (sVis.visionRecoveryMinConfidence !== undefined) patch.minConfidence = sVis.visionRecoveryMinConfidence;
+              if (sVis.visionRecoveryHighlightRecovered !== undefined) patch.highlightRecovered = sVis.visionRecoveryHighlightRecovered;
+              if (Object.keys(patch).length > 0) ctl.setOptions(patch);
+              if (sVis.visionRecoveryEnabled === true) {
+                ctl.setOptions({ enabled: true });
+                getVisionRecoveryUI().mount();
+                ctl.setOnResults((results) => {
+                  const ui = getVisionRecoveryUI();
+                  ui.setResults(results);
+                  ui.setStats(ctl.getCacheStats());
+                });
+                ctl.start().catch(() => {});
+              } else if (sVis.visionRecoveryEnabled === false) {
+                ctl.stop();
+                visionRecoveryUI?.unmount();
+              }
+            }
+          }
           sendResponse({ received: true });
           break;
         }
@@ -1042,6 +1103,9 @@ function init(): void {
   // Listen for adaptation commands
   listenForCommands(adapter, sensory);
 
+  // --- Session 10: Vision Recovery — register message handlers ---
+  registerVisionRecoveryHandlers(() => getVisionRecovery());
+
   // Watch for dynamic content
   observeDynamicContent(adapter);
 
@@ -1082,6 +1146,15 @@ function init(): void {
         actionItemsMinConfidence?: number;
         // --- Priority 5: Time-Awareness ---
         timeAwarenessEnabled?: boolean;
+      };
+    } & {
+      // --- Session 10: Vision Recovery ---
+      sensory?: {
+        visionRecoveryEnabled?: boolean;
+        visionRecoveryAutoScan?: boolean;
+        visionRecoveryTier2APIEnabled?: boolean;
+        visionRecoveryHighlightRecovered?: boolean;
+        visionRecoveryMinConfidence?: number;
       };
     };
     // --- Priority 1: Captions + Actions ---
@@ -1163,6 +1236,34 @@ function init(): void {
       const ctl = getTransliteration();
       ctl.setScript(p.transliterationScript ?? 'devanagari');
       ctl.start();
+    }
+
+    // --- Session 10: Vision Recovery (opt-in, defaults on) ---
+    {
+      const sVis = p.sensory as {
+        visionRecoveryEnabled?: boolean;
+        visionRecoveryAutoScan?: boolean;
+        visionRecoveryTier2APIEnabled?: boolean;
+        visionRecoveryHighlightRecovered?: boolean;
+        visionRecoveryMinConfidence?: number;
+      } | undefined;
+      if (sVis?.visionRecoveryEnabled) {
+        const ctl = getVisionRecovery();
+        ctl.setOptions({
+          enabled: true,
+          autoScan: sVis.visionRecoveryAutoScan ?? true,
+          tier2Enabled: sVis.visionRecoveryTier2APIEnabled ?? false,
+          highlightRecovered: sVis.visionRecoveryHighlightRecovered ?? false,
+          minConfidence: sVis.visionRecoveryMinConfidence ?? 0.6,
+        });
+        getVisionRecoveryUI().mount();
+        ctl.setOnResults((results) => {
+          const ui = getVisionRecoveryUI();
+          ui.setResults(results);
+          ui.setStats(ctl.getCacheStats());
+        });
+        ctl.start().catch(() => {});
+      }
     }
 
     const envProfile = profile as {

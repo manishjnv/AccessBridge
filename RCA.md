@@ -177,6 +177,21 @@ Track every bug fix: what broke, why, how it was fixed, and how to prevent recur
 
 ---
 
+## BUG-012: Content-script IIFE wrap leaks nested chunk imports — SyntaxError
+
+| Field | Detail |
+| ------- | -------- |
+| **Date** | 2026-04-21 |
+| **Severity** | Critical |
+| **Symptom** | After Session 10's Vision Recovery work, `pnpm build` succeeded but `node -c packages/extension/dist/src/content/index.js` failed: `SyntaxError: Unexpected token '{'` at the line `var __ab_chunk0=(function(){…import{A as p}from"./adaptation-Qwg4dGjT.js"…})()`. Chrome would have refused to load the content script at all, killing every feature — the exact symptom class as BUG-008. |
+| **Root Cause** | The `copyManifestPlugin` in [packages/extension/vite.config.ts](packages/extension/vite.config.ts) only rewrote **top-level** import statements from `dist/src/content/index.js` into IIFE-namespaced aliases. Nested imports **inside** inlined chunks (e.g. a `styles-*.js` chunk whose body itself did `import{A as p}from"./adaptation-*.js"`) were never stripped or rewritten. Pre-Session-10 the module graph was shallow enough that rollup only produced top-level imports, so the bug was latent. Session 10's new `@accessbridge/core` imports (VisionRecoveryEngine, DEFAULT_VISION_CONFIG, etc.) expanded the graph → rollup split core across multiple chunks → inter-chunk imports appeared inside inlined bodies → IIFE wrap produced illegal `import` inside a function body. |
+| **Fix** | Rewrote the plugin to: (1) recursively `loadChunk()` every transitively-imported chunk, recording its body + exports + deps; (2) topologically DFS-post-order the chunks so deps always come before dependents; (3) emit each as `var __ab_chunkN=(function(){aliasLines;body;return{exports}})();` where `aliasLines` bind this chunk's nested-import bindings to the already-declared `__ab_chunkM.exportName` of each dependency; (4) continue to bind top-level content-script imports as before. Post-fix `node -c` passes both `dist/src/content/index.js` and `dist/src/background/index.js`. |
+| **Files Changed** | `packages/extension/vite.config.ts` — plugin rewritten from a 2-pass linear inliner into a recursive topo-sort + chunk-scoped namespace emitter. |
+| **Commit** | (pending — Session 10 combined commit) |
+| **Prevention** | The latent class of bug is: **any post-build transform that processes only `depth==1` imports will break as soon as the module graph deepens**. (a) `node -c` on the built content + background bundles MUST stay in the deploy pipeline (already is, per Session 8's BUG-008 prevention). (b) If future plugin work re-introduces a depth-limited pass, a regression test must build a fixture with a 2-deep chunk chain (module A imports B imports C, content imports A) and assert `node -c` passes. (c) Whenever a new `@accessbridge/*` workspace dep is added to the content script, rebuild immediately and `node -c` before merging — the graph shape is the trigger, not the new code's contents. |
+
+---
+
 ## Checklist: Version Bump — AUTOMATED (post-commit `a4bd6a1`)
 
 Version bumping is now driven by `./deploy.sh` → `scripts/bump-version.sh --auto` — do **not** hand-edit versions. The checklist is only included here for manual overrides.

@@ -156,6 +156,7 @@ export function collectAuditInput(): AuditInput {
       autoplay, muted, controls, lang,
       hasLabelElement, hasFieldsetLabel, parentTag,
       bbox, style, htmlSnippet,
+      dataRecovered: el.getAttribute('data-a11y-recovered'),
     };
 
     elements.push(node);

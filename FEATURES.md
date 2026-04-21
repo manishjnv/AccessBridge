@@ -18,6 +18,7 @@ Visual / perceptual adaptations. All live in [packages/extension/src/content/sen
 | S-04 | Line-height + letter-spacing | P | Shipped | Typography sliders |
 | S-05 | Reduced motion | P | Shipped | Disables animations + transitions site-wide |
 | S-06 | Live Captions + Translation (Web Speech API overlay on &lt;video&gt;, 12 languages, optional live translation, draggable overlay, font-size + position controls) | P | Shipped | [content/sensory/captions.ts](packages/extension/src/content/sensory/captions.ts) |
+| S-07 | Vision-Assisted Semantic Recovery (3-tier pipeline: Tier 1 heuristic + 200-entry icon lexicon; Tier 2 opt-in Gemini vision; Tier 3 stub for on-device VLM). Adds `aria-label` + `data-a11y-recovered` to unlabeled buttons/links/icons; audit engine downgrades findings to info-severity. | P, SP | Shipped | [core/vision/](packages/core/src/vision/) + [content/vision/](packages/extension/src/content/vision/) · see [docs/features/vision-recovery.md](docs/features/vision-recovery.md) |
 
 Tests: indirect via `packages/core/src/__tests__/decision-engine.test.ts`.
 
@@ -145,13 +146,13 @@ Security invariants enforced at multiple layers: (a) opt-in gate on every `recor
 
 | Module | Count |
 |--------|-------|
-| Sensory | 6 |
+| Sensory | 7 |
 | Cognitive | 8 (6 rule-based + 2 AI) |
 | Motor | 8 |
 | Domains | 6 |
 | AI engine features | 1 (+ engine layer) |
 | Core engine components | 3 |
-| **Total user-facing features** | **28** |
+| **Total user-facing features** | **29** |
 
 ---
 

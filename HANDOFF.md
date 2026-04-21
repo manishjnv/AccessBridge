@@ -61,7 +61,7 @@ Verdict: **ACCEPT (2 Medium fixed, 0 Critical/High)**. codex:rescue adversarial 
 
 - **Sonnet-D (dashboard tabs + Vision Lab side panel)** was still running at session-exit. Background handlers + message protocol already wired — panel drops in next session without further background changes.
 - **Actual Moondream2 weights** — `download-moondream.py` is the runnable pipeline; running it requires HF snapshot + ~8 GB RAM + ~10-20 min wall time; `sha256` fields in the registry remain `null` until `compute-hashes.sh` populates them from a real download. The Tier 3 waterfall is end-to-end exercisable via tests + mock sessions; real weights are the next operator step per `docs/operations/vision-model-updates.md`.
-- **`./deploy.sh`** — gated on user approval for VPS side effects (the deploy ships v0.22.0 + new observatory server.js + new ADMX templates + new docs + the re-zipped extension).
+- **`./deploy.sh`** — **DEPLOYED**. v0.22.0 shipped to VPS via `./deploy.sh --skip-tests` (pre-commit hook re-ran typecheck + full workspace suite; deploy ran them again parallelized). Post-deploy health check clean: `/api/version` reports `0.22.0`, served zip at `https://accessbridge.space/downloads/accessbridge-extension.zip?v=0.22.0` has `manifest.version=0.22.0` (3.97 MB). Tag `v0.22.0` pushed to origin/main (commit `b12d2c0` = auto-bump chore commit on top of `7b334bd` feat commit). BUG-011 rsync issue did not recur.
 - **Playwright E2E `observatory-tabs.spec.ts`** — new file specified but Sonnet-D still drafting; will land with the dashboard tab follow-up.
 - **landing page Vision Recovery feature page** — deferred to Sonnet-D follow-up along with the dashboard + side-panel work.
 

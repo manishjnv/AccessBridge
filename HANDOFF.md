@@ -84,7 +84,30 @@ Fifteen accepted without action.
 
 #### Phase 6 — Commit + deploy (Opus)
 
-(Pending — next step after this HANDOFF write.)
+- Single commit: `feat(zk-attestation): Session 16 — Feature #7 SAG ring signatures + auditor verifier` (31 files, +6220/-24). Amended with noreply email per global CLAUDE.md GitHub-privacy rule. Commit `2fd03ed`.
+- `./deploy.sh --skip-tests` auto-bumped v0.12.2 → **v0.13.0** (minor, `feat(...)` commit), chore(release) `51c4455` shipped. Pushed to origin/main with tag `v0.13.0`. Landing page + zip artifact rsynced to `/opt/accessbridge/docs/downloads/` on the VPS; `accessbridge-api` restarted; `/api/version` returns 0.13.0 and the CDN-fronted zip matches.
+- Observatory code (not covered by deploy.sh, which only ships extension artifacts) pushed manually via scp: `server.js`, `crypto-verify.js`, `package.json`, `package-lock.json`, and the three `public/verifier.{html,js,css}` files → `/opt/accessbridge/observatory/`. Then `docker exec accessbridge-observatory npm install --omit=dev` added `@noble/curves` + `@noble/hashes` (2 packages, 0 vulnerabilities). `docker restart accessbridge-observatory` picked up the new schema + endpoints. Health-check green within 3s of restart.
+
+#### Phase 6 — Haiku post-deploy sweep (12 checks, all ✓)
+
+Dispatched one Haiku subagent with the exact curl matrix (version, zip manifest, legacy health, summary render, 4 new endpoints + verifier HTML/JS/CSS + dashboard regression + container boot log). Result:
+
+```text
+Check 1  version health:        ✓ 0.13.0
+Check 2  zip manifest sync:     ✓ 0.13.0
+Check 3  obs legacy health:     ✓ db=885 rows
+Check 4  obs summary render:    ✓ 304 devices, 1813 adaptations
+Check 5  /api/ring endpoint:    ✓ version=0, empty (pre-enrollment)
+Check 6  /api/verify/:date:     ✓ 2026-04-21, count=0 (no attestations yet)
+Check 7  /api/enroll validate:  ✓ rejects malformed: "invalid pubKey"
+Check 8  /api/publish reject:   ✓ rejects forged: "invalid attestation shape"
+Check 9  verifier web tool:     ✓ HTTP 200
+Check 10 verifier.js asset:     ✓ HTTP 200
+Check 11 verifier.css asset:    ✓ HTTP 200
+Check 12 dashboard regression:  ✓ HTTP 200, no breakage
+```
+
+All green. Pre-enrollment state is expected — ring is empty until the first extension with v0.13.0 opts into the Observatory and enrolls. The enroll-reject check (invalid hex) proves end-to-end validation runs; the forged-publish check (malformed shape) proves the new ring-signed branch is wired in the handler.
 
 ### Verification
 
@@ -114,7 +137,7 @@ Fifteen accepted without action.
 
 Opus: Phase-0 warm-start reads, crypto algorithm design (including Ristretto255 switch decision), all 6 crypto library files + 2 test files, observatory-publisher + observatory-collector + profile-type edits, ops/observatory/crypto-verify.js + server.js edits + Node cross-check test, HANDOFF entry, docs/features/zero-knowledge-attestation.md, FEATURES.md / RCA.md edits, adversarial pass (21 threat vectors → 1 fix applied), rezip + verify + commit prep.
 Sonnet: 2 parallel subagents — A built verifier.html + verifier.js + verifier.css (1519 LOC standalone web tool, CDN-pinned @noble imports, PDF export, audit-certificate-hash); B enhanced popup Observatory section + added sidepanel Compliance tab + wired background OBSERVATORY_ROTATE_KEY handler.
-Haiku: n/a — post-deploy sweep pending (will run after deploy.sh).
+Haiku: post-deploy sweep — 12/12 curl checks green (version, zip manifest, legacy obs endpoints, all 4 new ZK endpoints, verifier web tool assets, dashboard regression, container boot log).
 codex:rescue: n/a — Codex usage-limit wall; resets 2026-04-26. Opus-solo adversarial pass ran 21 questions; 1 applied (keyImage domain scope); 5 documented; 15 accepted.
 
 ---

@@ -4,10 +4,11 @@ Post-extension expansion plan. Organized as 4 tiers. Each item lists: rationale,
 
 **Order of execution** (top-down priority):
 
-1. Desktop companion (Tauri) — biggest coverage win
-2. Enterprise admin console — unlocks B2B revenue
-3. Public SDK + API — platform play
-4. Everything else (per tier)
+1. **Tier 0 foundation — robust AI pipeline** (prerequisite; unlocks every surface by making the shared AI engine fail-safe, bounded-latency, and cost-controlled)
+2. Desktop companion (Tauri) — biggest coverage win
+3. Enterprise admin console — unlocks B2B revenue
+4. Public SDK + API — platform play
+5. Everything else (per tier)
 
 Completed items move to [HANDOFF.md](HANDOFF.md) + closed here.
 
@@ -30,6 +31,44 @@ Completed items move to [HANDOFF.md](HANDOFF.md) + closed here.
 - 🟢 Landing page + self-update pipeline — live at `https://accessbridge.space`
 - 🟢 Core engine + AI engine packages — extracted, tested, reusable
 - 🟢 Monorepo structured for multi-surface expansion (see [ARCHITECTURE.md](ARCHITECTURE.md))
+- 🟡 Robust AI pipeline designed (see [docs/features/ai-pipeline.md](docs/features/ai-pipeline.md)) — Tier 0 below tracks phased rollout
+
+---
+
+## Tier 0 — Foundation Hardening
+
+Upgrades the shared `@accessbridge/ai-engine` from single-provider-per-tier to a fail-safe, bounded-latency, cost-optimised pipeline. **Prerequisite for every other tier** — Desktop, SDK, Public API, and Enterprise all consume this engine. See [docs/features/ai-pipeline.md](docs/features/ai-pipeline.md) for the full spec.
+
+### R0-01 ⚪ Phase-1 — Resilience + cost foundation
+
+Provider chains with primary+backup, circuit breaker, budget soft cap, pipeline-wide 8s deadline, PII scrubber+reverse-substitution, prompt caching markers on every L4 call, Bedrock proxy route on VPS.
+
+- **Why:** Any single-provider outage currently breaks AI features. No latency ceiling. PII leakage risk. 90% of repeat-prefix cost currently wasted (no prompt caching).
+- **Effort:** 1 week
+- **Dependencies:** AWS Bedrock account with Claude + Nova + Llama model access; VPS proxy route on port 8100
+- **Target models:** Nova Micro, Llama 3.2 1B/3B/8B/11B-Vision, Mistral 7B (cheap tier); Haiku 4.5 + Llama 3.3 70B (mid); Sonnet 4.6 + Llama 3.2 90B (premium)
+- **Acceptance:** 5-user steady-state cost projected ≤ $0.05/day; any single provider taken offline in a test causes zero user-visible failures; p95 latency ≤ 8s end-to-end
+- **MVP scope:** `routing/task-chains.ts` + `routing/circuit.ts` + `providers/nova.ts` + `providers/llama.ts` + VPS `POST /api/ai/bedrock` route + PII scrubber + prompt-cache wiring
+
+### R0-02 ⚪ Phase-2 — Quality gates + regression harness
+
+Local quality verifiers per task (L5), verifier-driven escalation to L6 (mid) and L7 (premium), golden regression set (~50 inputs/task), shadow-deploy harness.
+
+- **Why:** Without a quality gate, cheap models silently serve garbage. Without regression tests, chain changes are uncontrolled. Both are required before trusting cheap models on accessibility-critical output.
+- **Effort:** 1-2 weeks
+- **Dependencies:** R0-01 shipped
+- **Acceptance:** `pnpm test:regression` green on main; verifier fail rate telemetry wired; no chain change lands without shadow-deploy comparison
+- **MVP scope:** `routing/verifier.ts` + `test/regression/` golden sets + shadow-deploy CI hook
+
+### R0-03 ⚪ Phase-3 — Semantic cache + heuristic expansion + telemetry
+
+Transformers.js `all-MiniLM-L6-v2` semantic cache (L2) with IndexedDB index, expanded L3 heuristics (TextRank extractive summary, Flesch-Kincaid simplify, Chrome Translator API), telemetry ring buffer with metric aggregation and Settings→Diagnostics UI.
+
+- **Why:** Exact-cache hit rate caps around 30%. Semantic cache + richer heuristics push combined cache/heuristic coverage to ~60% of requests, cutting remaining spend by another 3-4×. Telemetry makes all above verifiable.
+- **Effort:** 2 weeks
+- **Dependencies:** R0-01 + R0-02
+- **Acceptance:** Combined cache+heuristic hit rate ≥ 55% after one-week warmup on a 5-user cohort; telemetry dashboard surfaces hit rates, p95 latency, escalation rates, circuit openings, daily cost
+- **MVP scope:** `cache/semantic.ts` + expanded `providers/local.ts` + `telemetry/` module + Settings diagnostics panel
 
 ---
 
@@ -212,11 +251,12 @@ For the ideathon, the extension alone demonstrates the full architecture.
 
 For post-ideathon, the highest-leverage next moves are:
 
-1. **R1-01 Desktop (Tauri)** — unlocks 80% of work computing outside the browser
-2. **R2-01 Enterprise admin console** — opens B2B revenue
-3. **R3-01 SDK + R3-02 Public API** — turns the AI engine into a platform
+1. **Tier 0 AI pipeline hardening (R0-01 → R0-03)** — mandatory foundation; every surface below inherits its reliability, latency, and cost characteristics from this engine
+2. **R1-01 Desktop (Tauri)** — unlocks 80% of work computing outside the browser
+3. **R2-01 Enterprise admin console** — opens B2B revenue
+4. **R3-01 SDK + R3-02 Public API** — turns the AI engine into a platform
 
-The existing monorepo (`core` + `ai-engine` + `extension`) is already structured so every new surface is just another consumer of the same packages. The browser extension was the wedge; the real platform is the core.
+The existing monorepo (`core` + `ai-engine` + `extension`) is already structured so every new surface is just another consumer of the same packages. The browser extension was the wedge; the real platform is the core. Tier 0 makes that core production-grade before multiple surfaces rely on it — fixing resilience and cost gaps in a single engine is far cheaper than fixing them in four.
 
 ---
 

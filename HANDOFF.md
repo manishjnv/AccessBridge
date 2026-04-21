@@ -1,6 +1,44 @@
 # AccessBridge - Shift Handoff
 
-## Last Session: Session 11 — Multi-Modal Fusion (Layer 5) (2026-04-21)
+## Last Session: Session 12 — Robust AI Pipeline Design + Tier 0 Roadmap (2026-04-21)
+
+### Headline
+
+Design-only session (no code). Cost-modelled AccessBridge AI engine at 5-user and 1000-DAU scales comparing AWS Bedrock vs OpenRouter (user has $100 AWS credit). Authored `docs/features/ai-pipeline.md` — 15-section fail-safe pipeline spec: 8-layer flow (L0 normalize → L8 persist), primary+backup provider chains per task, per-(task,model) circuit breaker, 8s pipeline-wide deadline with per-layer budget propagation (§6.1), mandatory prompt caching at L4, PII scrubber with placeholder map + reverse substitution at L8, quality verifier gates, failure-mode catalogue, runbook, rollout checklist. Added Tier 0 to ROADMAP.md (R0-01 → R0-03, ~4-5 weeks total) as prerequisite before all Tier 1-3 surfaces. Cost projection at 5-user steady state with full pipeline: **~$0.04/day** (~$1.20/month).
+
+### Completed
+
+- **`docs/features/ai-pipeline.md`** (new, ~500 lines) — 15 sections covering the 8-layer pipeline, provider-chain table (9 tasks × 6 slots each), circuit-breaker state machine, soft/hard budget caps, quality verifier rules per task, §6.1 deadline propagation with per-layer budget table, failure-mode catalogue (13 scenarios), on-call runbook (5 scenarios), rollout checklist for new models/tasks, §14 implementation-status-vs-target gap table, §15 change log.
+- **Second-pass review (user-requested)**: reviewed own guide for best features and gaps; user picked 3 correctness fixes to fold back in — (1) pipeline-wide 8s deadline + abort propagation, (2) prompt caching marked mandatory at L4 with `cache_control` / `cachePoint`, (3) PII scrubber placeholder map + reverse substitution at L8 to prevent placeholder leak. Folded via §2 principle #6 + new §6.1 + §4 L0/L4/L8 edits + §10 failure rows + §14 status rows + §15 changelog entry.
+- **`ROADMAP.md`** — new Tier 0 section with three phased items: R0-01 (resilience + cost foundation: chains, circuit breaker, deadline, PII, prompt caching, Bedrock VPS proxy — 1 week); R0-02 (quality verifiers + regression harness — 1-2 weeks); R0-03 (semantic cache + heuristic expansion + telemetry — 2 weeks). Updated top-of-file execution priority to place Tier 0 first, Current State to reflect 🟡 pipeline designed, Strategic Take to cite Tier 0 as mandatory prerequisite.
+- **Target model slate captured** (§5 of ai-pipeline.md): Llama 3.2 1B for classify, Nova Micro for simplify:short / summarize:short, Llama 3.1 8B + chunking for long, Gemini Flash for Indic translation, Llama 3.2 11B Vision for alt-text, Haiku 4.5 for L6 escalation, Sonnet 4.6 for L7. Every slot has a backup.
+
+### Verification
+
+- `git status --short`: only `ROADMAP.md` + new `docs/features/ai-pipeline.md` — fusion/extension work from Session 11 already merged in commit `41ace36`.
+- Design-only session; no `pnpm build` / `pnpm test` required.
+- Secrets scan on new doc: clean. `TODO|FIXME|XXX` scan on new doc: clean.
+- Lint warnings on ai-pipeline.md are style-only (MD036/MD032/MD040/MD060) and match the file's existing convention.
+
+### Post-session state
+
+- ROADMAP.md now has a prioritised Tier 0 foundation block preceding Tier 1-3 surface expansions. Every future surface (Desktop, SDK, Public API, Enterprise) inherits whatever pipeline resilience + cost characteristics this Tier 0 work delivers — fixing the engine once beats fixing it per-surface.
+- Pipeline guide is implementation-ready: each §4 layer describes concrete data flow, each §5 chain row maps to a provider file, §6 circuit breaker + §6.1 deadline + §7 budget are spec'd with pseudocode-level detail.
+
+### Next actions
+
+1. Start R0-01 (Phase-1 PR) when implementation session begins: `routing/task-chains.ts` + `routing/circuit.ts` + `providers/nova.ts` + `providers/llama.ts` + `providers/bedrock-proxy.ts` (extension-side) + VPS `POST /api/ai/bedrock` route (server-side signing) + PII scrubber in L0 + prompt-cache markers in every L4 provider + `AbortController` propagation for 8s deadline.
+2. Before R0-01 lands: request AWS Bedrock model access for Claude Haiku 4.5, Claude Sonnet 4.6, Nova Micro, Nova Lite, Llama 3.2 1B/3B/11B-Vision, Llama 3.1 8B, Llama 3.3 70B, Mistral 7B in `us-east-1` (instant approval for all except possibly Llama 90B Vision).
+3. Nothing else forced. Extension v0.8.0 is healthy on VPS; Tier 0 is new engineering work, not a hotfix.
+
+Opus: all design work this session — cost modelling (5-user and 1000-DAU scenarios, naive vs optimised), pipeline guide authoring (15 sections, ~500 lines), self-review critique (best features + 10 prioritised gaps), folded 3 correctness fixes back into the guide (deadline, prompt caching, PII re-sub), ROADMAP Tier 0 integration (3 items + priority reshuffle + strategic take), HANDOFF entry.
+Sonnet: n/a — design/docs session; no mechanical contract-bound implementation to delegate. When R0-01 starts, parallel Sonnet subagents will draft `routing/*.ts` + each `providers/*.ts` file under a contract spec from the guide.
+Haiku: n/a — single-file authoring with no cross-repo grep sweeps or multi-file fact distillation needed.
+codex:rescue: n/a — no code or security-adjacent changes this session (pure documentation + roadmap). R0-01 will be security-adjacent (new cross-origin fetch to VPS proxy, new PII-handling path) and MUST gate on codex:rescue sign-off before push per CLAUDE.md.
+
+---
+
+## Session 11 — Multi-Modal Fusion (Layer 5) (2026-04-21)
 
 ### Headline
 

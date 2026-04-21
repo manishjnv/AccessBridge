@@ -1383,5 +1383,5 @@ ssh a11yos-vps        # SSH to VPS
 
 Opus: Phase 0 warm-start reads, scope triage + Option A gating with the user, registry + types + runtime + vite + manifest + background edits (load-bearing), compute-hashes.sh + validate-models.sh rewrites after first-pass bugs, Phase 3 diff review, HANDOFF + FEATURES + onnx-models.md updates
 Sonnet: 4 parallel prepare-models script authors (train / download / compute / upload+validate) in one burst; then 2 parallel for side-panel benchmark UI + runtime-option tests; all returned clean diffs, no rework
-Haiku: n/a — no bulk-read / post-deploy curl-grid sweep fired this session; validate-models.sh plays the post-deploy verification role deterministically
+Haiku: post-deploy verification sweep (7-check curl grid — API version, landing, served zip, observatory, + 3 model CDN endpoints). All green; returned a pass/fail table in ≤150 words.
 codex:rescue: opus-solo adversarial pass (fallback per feedback_rescue_fallback memory; codex call interrupted). Reviewed 5 points: CSP+WAR scope, HTTP-CDN vs SHA-256 trust, bundled-path integrity, ONNX_RUN_BENCHMARK handler (no user-data flow), vite unlinkSync regex anchoring. Verdict: ACCEPTED — no must-fix items

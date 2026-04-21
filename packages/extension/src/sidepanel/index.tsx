@@ -1094,6 +1094,12 @@ function HistoryRow({ entry }: { entry: AdaptationHistoryEntry }) {
 
 // ─── Session 12: On-Device Models panel ─────────────────────────────────────
 
+interface BenchmarkResult {
+  avgLatencyMs: number;
+  classifierScores: number[];
+  heuristicScores: number[];
+}
+
 interface OnnxStatusForSidepanel {
   tiers: Record<0 | 1 | 2, {
     state: 'idle' | 'loading' | 'loaded' | 'failed';
@@ -1114,6 +1120,9 @@ interface OnnxStatusForSidepanel {
 
 function OnnxModelPanel() {
   const [status, setStatus] = useState<OnnxStatusForSidepanel | null>(null);
+  const [benchRunning, setBenchRunning] = useState(false);
+  const [benchResult, setBenchResult] = useState<BenchmarkResult | null>(null);
+  const [benchError, setBenchError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -1137,6 +1146,23 @@ function OnnxModelPanel() {
     chrome.runtime
       .sendMessage({ type: 'ONNX_SET_FORCE_FALLBACK', payload: { enabled } })
       .catch(() => {});
+
+  const runBenchmark = () => {
+    setBenchRunning(true);
+    setBenchError(null);
+    chrome.runtime
+      .sendMessage({ type: 'ONNX_RUN_BENCHMARK', tier: 0 })
+      .then((r: unknown) => {
+        const res = r as { error?: string } & Partial<BenchmarkResult>;
+        if (res.error) {
+          setBenchError(res.error);
+        } else {
+          setBenchResult(res as BenchmarkResult);
+        }
+      })
+      .catch((e: unknown) => setBenchError(String(e)))
+      .finally(() => setBenchRunning(false));
+  };
 
   if (!status) {
     return <div className="text-a11y-muted text-xs text-center py-2">Loading…</div>;
@@ -1219,6 +1245,82 @@ function OnnxModelPanel() {
         Forces every on-device model to return null so the heuristic path runs.
         Useful for demoing the baseline behaviour.
       </p>
+
+      {/* Benchmark */}
+      <button
+        onClick={runBenchmark}
+        disabled={benchRunning || !status || status.tiers[0].state !== 'loaded'}
+        style={{
+          width: '100%',
+          padding: '8px 16px',
+          borderRadius: '10px',
+          fontSize: '12px',
+          fontWeight: 600,
+          background: 'linear-gradient(135deg, var(--primary, #7b68ee), var(--accent, #bb86fc))',
+          color: '#fff',
+          border: 'none',
+          cursor: benchRunning || !status || status.tiers[0].state !== 'loaded' ? 'not-allowed' : 'pointer',
+          opacity: benchRunning || !status || status.tiers[0].state !== 'loaded' ? 0.5 : 1,
+          boxShadow: '0 4px 12px rgba(123,104,238,0.35)',
+          transition: 'opacity 0.2s',
+        }}
+        aria-busy={benchRunning}
+      >
+        {benchRunning ? '⟳ Running…' : 'Run Benchmark (10 inferences)'}
+      </button>
+
+      {benchError && (
+        <p className="text-xs" style={{ color: '#ef4444' }}>
+          Error: {benchError}
+        </p>
+      )}
+
+      {benchResult && !benchError && (() => {
+        const { avgLatencyMs, classifierScores, heuristicScores } = benchResult;
+        const meanClassifier = classifierScores.reduce((a, b) => a + b, 0) / classifierScores.length;
+        const meanHeuristic = heuristicScores.reduce((a, b) => a + b, 0) / heuristicScores.length;
+        return (
+          <div className="space-y-2">
+            <div
+              className="bg-a11y-bg rounded-lg px-3 py-2 text-xs font-mono"
+              style={{ color: 'var(--muted, #94a3b8)' }}
+            >
+              avg latency: <span style={{ color: 'var(--accent, #bb86fc)' }}>{avgLatencyMs} ms</span>
+              {'  |  '}mean classifier: <span style={{ color: '#10b981' }}>{meanClassifier.toFixed(1)}</span>
+              {'  |  '}mean heuristic: <span style={{ color: '#f59e0b' }}>{meanHeuristic.toFixed(1)}</span>
+            </div>
+            <div className="bg-a11y-bg rounded-lg overflow-hidden">
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', fontFamily: 'var(--font-mono, monospace)' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid rgba(123,104,238,0.2)' }}>
+                    {['#', 'classifier', 'heuristic', 'diff'].map((h) => (
+                      <th key={h} style={{ padding: '4px 8px', textAlign: 'right', color: 'var(--muted, #94a3b8)', fontWeight: 600 }}>
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {classifierScores.map((cs, i) => {
+                    const hs = heuristicScores[i];
+                    const diff = cs - hs;
+                    return (
+                      <tr key={i} style={{ borderBottom: '1px solid rgba(123,104,238,0.08)' }}>
+                        <td style={{ padding: '3px 8px', textAlign: 'right', color: 'var(--muted, #94a3b8)' }}>{i + 1}</td>
+                        <td style={{ padding: '3px 8px', textAlign: 'right', color: '#10b981' }}>{cs.toFixed(1)}</td>
+                        <td style={{ padding: '3px 8px', textAlign: 'right', color: '#f59e0b' }}>{hs.toFixed(1)}</td>
+                        <td style={{ padding: '3px 8px', textAlign: 'right', color: diff >= 0 ? '#10b981' : '#ef4444' }}>
+                          {diff >= 0 ? '+' : ''}{diff.toFixed(1)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

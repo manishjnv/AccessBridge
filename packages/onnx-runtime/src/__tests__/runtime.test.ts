@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ONNXRuntime } from '../runtime.js';
-import { STRUGGLE_CLASSIFIER_ID, MODEL_REGISTRY } from '../model-registry.js';
+import { STRUGGLE_CLASSIFIER_ID, MINILM_EMBEDDINGS_ID, MODEL_REGISTRY } from '../model-registry.js';
 
 // ---------------------------------------------------------------------------
 // Shared mock bytes — small but realistic enough to pass into the session.
@@ -46,9 +46,22 @@ function makeFetch(bytes: Uint8Array = MODEL_BYTES) {
   });
 }
 
-/** Returns 32 zero bytes — distinct from 'aa...' so mismatch tests work. */
+/** Returns 32 zero bytes — distinct from registry hash so mismatch tests work. */
 function makeDigest() {
   return vi.fn(async (_algo: 'SHA-256', _data: ArrayBuffer) => new ArrayBuffer(32));
+}
+
+/**
+ * Returns a digest stub whose output hex equals the registry's sha256 for the
+ * given model id (defaults to STRUGGLE_CLASSIFIER_ID). Lets the integrity gate
+ * pass in happy-path tests.
+ */
+function makeMatchingDigest(modelId: string = STRUGGLE_CLASSIFIER_ID) {
+  const expectedHex = MODEL_REGISTRY[modelId].sha256!;
+  const buf = Uint8Array.from(
+    expectedHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)),
+  ).buffer;
+  return vi.fn(async (_algo: 'SHA-256', _data: ArrayBuffer) => buf);
 }
 
 function makeLogger() {
@@ -173,12 +186,12 @@ describe('ONNXRuntime', () => {
     mockLogger = makeLogger();
   });
 
-  function makeRuntime(extra?: { indexedDB?: IDBFactory | null }) {
+  function makeRuntime(extra?: { indexedDB?: IDBFactory | null; digest?: ReturnType<typeof makeDigest> }) {
     return new ONNXRuntime({
       ortLoader: async () => ort as never,
       fetch: mockFetch as unknown as typeof fetch,
       indexedDB: extra?.indexedDB !== undefined ? extra.indexedDB : null,
-      digest: mockDigest,
+      digest: extra?.digest ?? makeMatchingDigest(),
       logger: mockLogger,
     });
   }
@@ -279,7 +292,7 @@ describe('ONNXRuntime', () => {
       ortLoader: async () => ort as never,
       fetch: streamFetch as unknown as typeof fetch,
       indexedDB: null,
-      digest: mockDigest,
+      digest: makeMatchingDigest(),
       logger: mockLogger,
     });
 
@@ -311,7 +324,7 @@ describe('ONNXRuntime', () => {
 
     it('returns {ok: false, error: /^integrity-mismatch/} when digest does not match registry sha256', async () => {
       // digest returns 32 zero bytes → hex = '00'.repeat(32) — does not match FAKE_SHA
-      const runtime = makeRuntime();
+      const runtime = makeRuntime({ digest: mockDigest });
       const result = await runtime.loadModel(STRUGGLE_CLASSIFIER_ID);
 
       expect(result.ok).toBe(false);
@@ -423,7 +436,7 @@ describe('ONNXRuntime', () => {
         ortLoader: async () => ort as never,
         fetch: mockFetch as unknown as typeof fetch,
         indexedDB: idb,
-        digest: mockDigest,
+        digest: makeMatchingDigest(),
         logger: mockLogger,
       });
       const r1 = await rt1.loadModel(STRUGGLE_CLASSIFIER_ID);
@@ -437,6 +450,132 @@ describe('ONNXRuntime', () => {
       if (r2.ok) expect(r2.cached).toBe(true);
       // fetch still only called once
       expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Session 14 runtime options
+  // -----------------------------------------------------------------------
+  describe('Session 14 runtime options', () => {
+    // -------------------------------------------------------------------
+    // Test 1: wasmPathBase sets ort.env.wasm.wasmPaths on doInitialize
+    // -------------------------------------------------------------------
+    it('wasmPathBase: sets ort.env.wasm.wasmPaths on doInitialize when provided', async () => {
+      // Give the ort mock a mutable wasm env shape
+      const ortWithWasm = {
+        ...makeOrt(),
+        env: { wasm: { wasmPaths: undefined as string | undefined } },
+      };
+
+      const runtime = new ONNXRuntime({
+        ortLoader: async () => ortWithWasm as never,
+        fetch: mockFetch as unknown as typeof fetch,
+        indexedDB: null,
+        digest: mockDigest,
+        logger: mockLogger,
+        wasmPathBase: 'chrome-extension://test/ort/',
+      });
+
+      // initialize() triggers doInitialize which should set wasmPaths
+      await runtime.initialize();
+
+      expect(ortWithWasm.env.wasm.wasmPaths).toBe('chrome-extension://test/ort/');
+    });
+
+    // -------------------------------------------------------------------
+    // Test 2: wasmPathBase leaves env.wasm.wasmPaths untouched when not provided
+    // -------------------------------------------------------------------
+    it('wasmPathBase: leaves env.wasm.wasmPaths untouched when not provided', async () => {
+      const ortWithWasm = {
+        ...makeOrt(),
+        env: { wasm: { wasmPaths: undefined as string | undefined } },
+      };
+
+      const runtime = new ONNXRuntime({
+        ortLoader: async () => ortWithWasm as never,
+        fetch: mockFetch as unknown as typeof fetch,
+        indexedDB: null,
+        digest: mockDigest,
+        logger: mockLogger,
+        // wasmPathBase intentionally omitted
+      });
+
+      await runtime.initialize();
+
+      expect(ortWithWasm.env.wasm.wasmPaths).toBeUndefined();
+    });
+
+    // -------------------------------------------------------------------
+    // Test 3: bundledUrlResolver used when meta.bundledPath is non-null (Tier 0)
+    // -------------------------------------------------------------------
+    it('bundledUrlResolver: fetches from resolver output when meta.bundledPath is set', async () => {
+      const resolver = vi.fn((path: string) => `chrome-extension://test/${path}`);
+
+      const runtime = new ONNXRuntime({
+        ortLoader: async () => ort as never,
+        fetch: mockFetch as unknown as typeof fetch,
+        indexedDB: null,
+        digest: makeMatchingDigest(STRUGGLE_CLASSIFIER_ID),
+        logger: mockLogger,
+        bundledUrlResolver: resolver,
+      });
+
+      const result = await runtime.loadModel(STRUGGLE_CLASSIFIER_ID);
+      expect(result.ok).toBe(true);
+
+      // Resolver should have been called with the bundledPath from the registry
+      expect(resolver).toHaveBeenCalledWith('models/struggle-classifier-v1.onnx');
+
+      // fetch must have been called with the resolver's output URL, NOT meta.url
+      const expectedUrl = 'chrome-extension://test/models/struggle-classifier-v1.onnx';
+      expect(mockFetch).toHaveBeenCalledWith(expectedUrl);
+      expect(mockFetch).not.toHaveBeenCalledWith(MODEL_REGISTRY[STRUGGLE_CLASSIFIER_ID].url);
+    });
+
+    // -------------------------------------------------------------------
+    // Test 4: bundledUrlResolver falls back to meta.url when bundledPath is null (Tier 1)
+    // -------------------------------------------------------------------
+    it('bundledUrlResolver: falls back to meta.url when bundledPath is null', async () => {
+      const resolver = vi.fn((path: string) => `chrome-extension://test/${path}`);
+
+      const runtime = new ONNXRuntime({
+        ortLoader: async () => ort as never,
+        fetch: mockFetch as unknown as typeof fetch,
+        indexedDB: null,
+        // Stub digest to return bytes matching MiniLM's registry sha256
+        digest: makeMatchingDigest(MINILM_EMBEDDINGS_ID),
+        logger: mockLogger,
+        bundledUrlResolver: resolver,
+      });
+
+      const result = await runtime.loadModel(MINILM_EMBEDDINGS_ID);
+      expect(result.ok).toBe(true);
+
+      // resolver should NOT have been called — bundledPath is null
+      expect(resolver).not.toHaveBeenCalled();
+
+      // fetch must use meta.url (the VPS CDN URL)
+      expect(mockFetch).toHaveBeenCalledWith(MODEL_REGISTRY[MINILM_EMBEDDINGS_ID].url);
+    });
+
+    // -------------------------------------------------------------------
+    // Test 5: falls back to meta.url even when bundledPath is set, if resolver not provided
+    // -------------------------------------------------------------------
+    it('bundledUrlResolver: falls back to meta.url when resolver not provided even if bundledPath is set', async () => {
+      const runtime = new ONNXRuntime({
+        ortLoader: async () => ort as never,
+        fetch: mockFetch as unknown as typeof fetch,
+        indexedDB: null,
+        digest: makeMatchingDigest(STRUGGLE_CLASSIFIER_ID),
+        logger: mockLogger,
+        // bundledUrlResolver intentionally omitted
+      });
+
+      const result = await runtime.loadModel(STRUGGLE_CLASSIFIER_ID);
+      expect(result.ok).toBe(true);
+
+      // Without a resolver, must fall through to meta.url
+      expect(mockFetch).toHaveBeenCalledWith(MODEL_REGISTRY[STRUGGLE_CLASSIFIER_ID].url);
     });
   });
 });

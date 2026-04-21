@@ -135,7 +135,19 @@ const onnxTierError: Record<ModelTier, string | null> = { 0: null, 1: null, 2: n
 
 function getOnnxRuntime(): ONNXRuntime {
   if (!onnxRuntime) {
-    onnxRuntime = new ONNXRuntime();
+    // Point ort at bundled WASM + let the runtime resolve bundledPath models
+    // (Tier 0 struggle-classifier) through chrome.runtime.getURL. Both are
+    // no-ops in non-extension contexts (tests) because chrome.runtime may be
+    // undefined there.
+    const hasChromeRuntime =
+      typeof chrome !== 'undefined' &&
+      typeof chrome.runtime?.getURL === 'function';
+    onnxRuntime = new ONNXRuntime({
+      wasmPathBase: hasChromeRuntime ? chrome.runtime.getURL('ort/') : undefined,
+      bundledUrlResolver: hasChromeRuntime
+        ? (p: string) => chrome.runtime.getURL(p)
+        : undefined,
+    });
     struggleClassifier = new StruggleClassifier(onnxRuntime);
     miniLM = new MiniLMEmbeddings(onnxRuntime);
     t5Summarizer = new T5Summarizer(onnxRuntime);
@@ -443,7 +455,8 @@ type MessageType =
   | 'ONNX_LOAD_TIER'
   | 'ONNX_UNLOAD_TIER'
   | 'ONNX_CLEAR_CACHE'
-  | 'ONNX_SET_FORCE_FALLBACK';
+  | 'ONNX_SET_FORCE_FALLBACK'
+  | 'ONNX_RUN_BENCHMARK';
 
 interface Message {
   type: MessageType;
@@ -828,6 +841,29 @@ async function handleMessage(
         await saveProfile(updated);
       }
       return { ok: true };
+    }
+
+    case 'ONNX_RUN_BENCHMARK': {
+      if (!struggleClassifier || onnxTierState[0] !== 'loaded') {
+        return { error: 'tier0-not-loaded' };
+      }
+      const N = 10;
+      const classifierScores: number[] = [];
+      const heuristicScores: number[] = [];
+      let totalMs = 0;
+      for (let i = 0; i < N; i++) {
+        const features = new Float32Array(60).map(() => Math.random());
+        const t0 = performance.now();
+        const result = await struggleClassifier.predict(features);
+        totalMs += performance.now() - t0;
+        classifierScores.push(result ? result.score : 0);
+        heuristicScores.push(struggleDetector.getStruggleScore().score);
+      }
+      return {
+        avgLatencyMs: Math.round((totalMs / N) * 100) / 100,
+        classifierScores,
+        heuristicScores,
+      };
     }
 
     default: {

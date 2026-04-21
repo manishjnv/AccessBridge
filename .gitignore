@@ -11,9 +11,13 @@ Thumbs.db
 coverage/
 .turbo/
 *.onnx
+# Exception: the Tier 0 struggle classifier ships bundled with the extension.
+!packages/extension/public/models/*.onnx
 *.bin
 # Scope the "models/" exclusion to the repo root only — source directories named
 # models/ (e.g. packages/onnx-runtime/src/models/) must stay tracked.
 /models/
+# Local model-prep artifacts (regeneratable from tools/prepare-models/*.py).
+tools/prepare-models/output/
 src-tauri/target/
 *.tsbuildinfo

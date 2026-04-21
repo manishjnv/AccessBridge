@@ -1,10 +1,17 @@
 # Feature: On-Device ONNX Models
 
-**Status:** Infrastructure shipping (Session 12, 2026-04-21). Real quantized weights for MiniLM + T5 and a custom-trained XGBoost struggle classifier are deferred to a follow-up session.
+**Status:** Tier 0 functional + bundled with the extension (Session 14, 2026-04-21). Tier 1 weights live on the CDN with SHA pinning; functional inference requires the WordPiece tokenizer + embedding pooling code still being deferred. Tier 2 (T5 beam-search decoder) remains deferred to Session 15.
 
-Session 12 delivers the **end-to-end wiring** for real on-device ONNX inference: runtime manager, model registry, IndexedDB cache, SHA-256 integrity check, per-tier toggles, popup + side-panel UI, observatory counters, and heuristic fallback on every path. The three model classes (`StruggleClassifier`, `MiniLMEmbeddings`, `T5Summarizer`) expose their final public interfaces; their internal tokenize / decode plumbing is stubbed with an explicit `return null` that triggers fallback, and a `TODO(session-13)` marker points at the exact line that needs real weights + tokenizer.
+Session 14 closed the loop on the Session 12/13 infrastructure:
 
-This means: **today**, every ONNX call returns null → the existing heuristic path runs, and observatory logs a "fallback" inference. **Tomorrow**, when the VPS CDN has real `.onnx` bytes, the runtime will transparently download them, cache them, and the model classes' predict/embed/summarize paths will produce real outputs with no further code churn.
+- **Real XGBoost struggle classifier** trained on 5 000 synthetic 60-dim feature vectors (weighted-sum labels mirroring the heuristic) and exported through `onnxmltools.convert_xgboost` to a ~0.9 MB ONNX file. Ships **bundled** in the extension zip under `dist/models/` — no network fetch at startup, works offline.
+- **All-MiniLM-L6-v2 int8** downloaded from `Xenova/all-MiniLM-L6-v2` (HF) and uploaded to the VPS CDN at `http://72.61.227.64:8300/models/all-MiniLM-L6-v2-int8.onnx` (~22 MB quantized, well below the planned 80 MB). Registry SHA-256 pinned; integrity-verified on every fetch.
+- **`onnxruntime-web/wasm` bundled** into the extension (~72 KB JS + 12 MB WASM under `dist/ort/`). Runtime configures `env.wasm.wasmPaths = chrome.runtime.getURL('ort/')` so inference stays fully offline once the extension is installed.
+- **Manifest CSP** adds `'wasm-unsafe-eval'`; `web_accessible_resources` exposes `models/*.onnx`, `ort/*.wasm`, `ort/*.mjs` to the page origin only where needed.
+
+The prepare-models toolchain lives under `tools/prepare-models/`: `train-struggle-classifier.py`, `download-hf-models.py`, `compute-hashes.sh`, `upload-to-vps.sh`, plus `tools/validate-models.sh` for post-upload verification. Re-running the five scripts in sequence regenerates every binary + the `models-manifest.json` (committed — the manifest is the single source of truth for hash values copied into `model-registry.ts`).
+
+**Tier 2 summarization still returns null → heuristic extractive fallback.** The T5 registry entry keeps `sha256: null` so the integrity gate stays armed once real weights arrive.
 
 ## Architecture
 
@@ -46,13 +53,13 @@ This means: **today**, every ONNX call returns null → the existing heuristic p
 
 ## Three-tier loading strategy
 
-| Tier | Model | Size | Auto-load | Purpose |
-|------|-------|------|-----------|---------|
-| 0 | `struggle-classifier-v1` | ~3 MB | ✅ 2s after SW start (if profile toggle on) | Blend into heuristic struggle score when classifier confidence > 0.7 |
-| 1 | `minilm-l6-v2` | ~80 MB | Manual (popup Download button) | 384-dim sentence embeddings → semantic cache key + future dedup |
-| 2 | `t5-small` | ~242 MB | Manual | Abstractive summarization when heuristic extractive isn't enough |
+| Tier | Model | Source | Size | Auto-load | Purpose |
+|------|-------|--------|------|-----------|---------|
+| 0 | `struggle-classifier-v1` | Bundled in extension (`dist/models/`) | ~0.85 MB | ✅ 2s after SW start (if profile toggle on) | Blend into heuristic struggle score when classifier confidence > 0.7 |
+| 1 | `minilm-l6-v2` | VPS CDN, int8 quantized | ~22 MB | Manual (popup Download button) | 384-dim sentence embeddings → semantic cache key + future dedup |
+| 2 | `t5-small` | VPS CDN (deferred to Session 15) | ~242 MB planned | Manual | Abstractive summarization when heuristic extractive isn't enough |
 
-**Total footprint:** ~325 MB downloaded once, cached in IndexedDB under `accessbridge-onnx-cache`. Only Tier 0 is resident at startup; Tier 1 and 2 are opt-in.
+**Total CDN footprint:** ~22 MB today (Tier 1 only). Tier 0 ships in the extension zip — no download, no network. Tier 2 placeholder keeps the registry three-tier for forward compatibility.
 
 ## Fallback chain
 
@@ -104,32 +111,63 @@ All values are already normalized `[0, 1]` (current/mean/min/max/stddev) or `[-1
 
 ## Privacy
 
-- Models download over HTTPS from the same VPS nginx instance as `/api/version`. No third-party CDN. (The in-browser runtime fetches `http://72.61.227.64:8300/models/*.onnx` directly via the `<all_urls>` host permission already granted — no new manifest permission.)
-- Model binaries are cached in IndexedDB on the user's machine. Nothing is ever uploaded back.
-- Inference happens 100% on device. The struggle feature vector, the text being embedded, and the text being summarized **never leave the browser**. The only telemetry is a Laplace-noised per-tier inference count — opt-in, identical mechanism to existing observatory counters.
+- Tier 0 weights ship **inside the extension** — zero network access at startup or inference. Packaged under `dist/models/struggle-classifier-v1.onnx`, referenced via `chrome.runtime.getURL`.
+- Tier 1 downloads from the VPS nginx CDN over HTTP (same host + port as `/api/version`, covered by existing `<all_urls>` host permission — no new manifest permission). HTTP trust is backstopped by SHA-256 integrity: any MITM-altered bytes fail the hash compare before `InferenceSession.create()` runs.
+- Model binaries are cached in IndexedDB (`accessbridge-onnx-cache`). Nothing is ever uploaded back.
+- Inference happens 100 % on device. The 60-dim struggle feature vector, the text being embedded, and the text being summarized **never leave the browser**. The only telemetry is a Laplace-noised per-tier inference count — opt-in, identical mechanism to existing observatory counters.
 
 ## Integrity
 
-Once real model binaries ship, `MODEL_REGISTRY[id].sha256` will hold the hex SHA-256 of the ONNX bytes. The runtime verifies this after fetch and before storing in the IDB cache; mismatches reject the load with `integrity-mismatch:expected=... actual=...` and no session is created. In the MVP, `sha256` is `null` and the runtime logs `[onnx] model ... has no sha256 — integrity unverified` to warn operators.
+`MODEL_REGISTRY[id].sha256` holds the lower-case hex SHA-256 of the ONNX bytes for every model with a real binary. The runtime computes `crypto.subtle.digest('SHA-256', buffer)` after fetch and before writing to the IDB cache; a mismatch rejects the load with `integrity-mismatch:expected=... actual=...` and no session is created. Current pinned hashes (2026-04-21):
+
+| Model | SHA-256 | Size |
+|-------|---------|------|
+| `struggle-classifier-v1` | `174695b3a7c3b2e1b42aa4ce72b827ea58e982954aa7a5fa434d2f780d810589` | 868 691 bytes |
+| `minilm-l6-v2` | `afdb6f1a0e45b715d0bb9b11772f032c399babd23bfc31fed1c170afc848bdb1` | 22 972 370 bytes |
+| `minilm-tokenizer.json` (companion) | `da0e79933b9ed51798a3ae27893d3c5fa4a201126cef75586296df9b4d2c62a0` | 711 661 bytes |
+| `t5-small` | `null` (deferred) | planned ~242 MB |
+
+These come from `tools/prepare-models/output/models-manifest.json` and are copy-verified into the TypeScript registry at commit time.
+
+## Model provenance
+
+- **Struggle classifier (Tier 0)** — own-trained via `tools/prepare-models/train-struggle-classifier.py`. XGBoost `multi:softprob`, n_estimators=100, max_depth=6, lr=0.1, 4-class softmax (`none / low / medium / high`). Synthetic data only, 5 000 samples with a weighted-sum label formula that mirrors the heuristic (bias toward CLICK_ACCURACY / DWELL_TIME / BACKSPACE_RATE / ERROR_RATE). License MIT. Will be retrained on real pilot data post-launch.
+- **MiniLM (Tier 1)** — `Xenova/all-MiniLM-L6-v2`, `onnx/model_quantized.onnx` variant. Upstream license Apache-2.0 (sentence-transformers). Companion tokenizer from the same HF repo.
+- **T5-small (Tier 2, deferred)** — `Xenova/t5-small` planned. Upstream license Apache-2.0.
 
 ## Deferred work
 
 | Item | Why | Session |
 |------|-----|---------|
-| Custom XGBoost training script (`tools/train-struggle-classifier.py`) | Needs Python + xgboost + skl2onnx toolchain set up | 13 |
-| Upload real `.onnx` binaries to `/opt/accessbridge/models/` | Depends on training + quantizing scripts | 13 |
-| WordPiece tokenizer for MiniLM (`packages/onnx-runtime/src/models/tokenizer.ts`) | Bundle vocab.txt + trie; ~3 KLOC including BPE fallback | 13 |
-| SentencePiece + beam-search decode for T5 | Non-trivial autoregressive decode loop with KV-cache | 13+ |
-| WebGPU backend | Faster but CSP-constrained in MV3; WASM default works | 14+ |
+| WordPiece tokenizer for MiniLM inference | Needs vocab.txt + trie; mean-pooling over last_hidden_state | 15 |
+| T5 SentencePiece tokenizer + beam-search decode | Non-trivial autoregressive loop with KV-cache | 15 |
+| Upload real T5-small int8 `.onnx` + tokenizer | Gated on decode implementation | 15 |
+| WebGPU backend | Faster but CSP-constrained in MV3; WASM SIMD default works | 16+ |
 | Re-train classifier on pilot data | Needs real user rollout | post-pilot |
+
+## Prepare-models toolchain
+
+```text
+tools/prepare-models/
+├── train-struggle-classifier.py   # synth data + XGBoost + ONNX export (seed=42 for determinism)
+├── download-hf-models.py          # hf_hub_download of Xenova/all-MiniLM-L6-v2 pre-quantized
+├── compute-hashes.sh              # sha256sum + size → output/models-manifest.json
+├── upload-to-vps.sh               # rsync with scp fallback (BUG-011), chmod 644, public curl smoke
+└── output/                        # gitignored — regenerate via the scripts above
+
+tools/
+└── validate-models.sh             # curl each URL, compare HTTP / Content-Length / SHA-256 / CORS
+```
+
+Run order after every model change: `train → download → hash → upload → validate`. Hashes from the freshly computed manifest get copy-verified into [packages/onnx-runtime/src/model-registry.ts](packages/onnx-runtime/src/model-registry.ts).
 
 ## Testing
 
-- **onnx-runtime package:** 26 tests (`runtime.test.ts` + `struggle-classifier.test.ts` + `model-registry.test.ts`) cover load path with mocked onnxruntime-web + IndexedDB + fetch + crypto.
-- **core:** 12 new tests (`struggle-detector-classifier.test.ts`) cover `featurize()` layout + stats correctness + classifier blend math + fallback on null/throw.
-- **ai-engine:** 18 new tests (`local-provider-onnx.test.ts`) cover `embed()` pseudo-fallback + T5 summarize path + force-fallback + timeout; plus 6 cache semantic-key tests.
+- **onnx-runtime package:** 41 tests (`runtime.test.ts` 16 + `struggle-classifier.test.ts` 15 + `model-registry.test.ts` 10) cover load path with mocked onnxruntime-web + IndexedDB + fetch + crypto, integrity gating, `wasmPathBase`, `bundledUrlResolver`, and the Tier 0 bundled-path code path.
+- **core:** 12 tests (`struggle-detector-classifier.test.ts`) cover `featurize()` layout + stats correctness + classifier blend math + fallback on null/throw.
+- **ai-engine:** 18 tests (`local-provider-onnx.test.ts`) cover `embed()` pseudo-fallback + T5 summarize path + force-fallback + timeout; plus 6 cache semantic-key tests.
 
-Total Session 12 additions: **~62 tests**, running alongside the existing 629.
+Total on-device-ONNX tests (Session 12 + 14): **~77**, running alongside the remaining 750+ tests.
 
 ## Operations
 

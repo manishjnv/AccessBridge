@@ -37,11 +37,26 @@ describe('model-registry', () => {
     }
   });
 
-  it('MVP ships no sha256 hashes yet — real weights gate on hash presence', () => {
-    // When real weights ship, populate MODEL_REGISTRY[id].sha256 + update this test.
-    for (const model of Object.values(MODEL_REGISTRY)) {
-      expect(model.sha256).toBeNull();
-    }
+  it('Tier 0 (struggle-classifier) has a real sha256 hex and a bundledPath', () => {
+    const m = MODEL_REGISTRY[STRUGGLE_CLASSIFIER_ID];
+    expect(m.sha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(m.bundledPath).toBe('models/struggle-classifier-v1.onnx');
+  });
+
+  it('Tier 1 (minilm-l6-v2) has a real sha256 hex, no bundledPath, and a tokenizer with sha256', () => {
+    const m = MODEL_REGISTRY[MINILM_EMBEDDINGS_ID];
+    expect(m.sha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(m.bundledPath).toBeNull();
+    expect(m.tokenizer).toBeDefined();
+    expect(m.tokenizer).toHaveProperty('url');
+    expect(m.tokenizer).toHaveProperty('sizeBytes');
+    expect((m.tokenizer as { sha256: string }).sha256).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it('Tier 2 (t5-small) still has sha256: null and no bundledPath (deferred to Session 15)', () => {
+    const m = MODEL_REGISTRY[T5_SUMMARIZER_ID];
+    expect(m.sha256).toBeNull();
+    expect(m.bundledPath).toBeNull();
   });
 
   it('getModelMetadata returns the right entry for a known id', () => {

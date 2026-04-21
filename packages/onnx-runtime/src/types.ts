@@ -7,6 +7,13 @@
 
 export type ModelTier = 0 | 1 | 2;
 
+export interface TokenizerMetadata {
+  url: string;
+  bundledPath: string | null;
+  sha256: string | null;
+  sizeBytes: number;
+}
+
 export interface ModelMetadata {
   id: string;
   version: string;
@@ -20,6 +27,8 @@ export interface ModelMetadata {
   inputNames: readonly string[];
   outputNames: readonly string[];
   description: string;
+  /** Companion tokenizer for NL models (MiniLM, T5). Not present for numeric-feature models like the struggle classifier. */
+  tokenizer?: TokenizerMetadata;
 }
 
 export interface ModelLoadProgress {

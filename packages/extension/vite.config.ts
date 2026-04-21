@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
-import { writeFileSync, copyFileSync, mkdirSync, existsSync, readFileSync, readdirSync } from 'fs';
+import { writeFileSync, copyFileSync, mkdirSync, existsSync, readFileSync, readdirSync, unlinkSync } from 'fs';
 
 /**
  * Post-build plugin: copies manifest, icons, and inlines shared chunks
@@ -186,6 +186,62 @@ function copyManifestPlugin() {
           }
         }
       }
+
+      // ---- Copy bundled ONNX models (Tier 0) ----
+      // Session 14: the struggle-classifier ships with the extension so
+      // Tier 0 inference needs zero network access. The file lives in
+      // public/models/ and is mirrored to dist/models/ here.
+      const srcModels = resolve(__dirname, 'public/models');
+      if (existsSync(srcModels)) {
+        const modelsDir = resolve(distDir, 'models');
+        mkdirSync(modelsDir, { recursive: true });
+        for (const entry of readdirSync(srcModels)) {
+          copyFileSync(resolve(srcModels, entry), resolve(modelsDir, entry));
+        }
+      }
+
+      // ---- Copy onnxruntime-web WASM + glue ----
+      // Session 14: ort-wasm-simd-threaded.{wasm,mjs} are pulled straight from
+      // the pnpm-resolved onnxruntime-web dist and placed at dist/ort/. The
+      // runtime sets env.wasm.wasmPaths = chrome.runtime.getURL('ort/') so
+      // InferenceSession.create() fetches the WASM from our own origin — no
+      // jsdelivr CDN, no CSP violation.
+      const ortSrc = resolve(
+        __dirname,
+        '..',
+        'onnx-runtime',
+        'node_modules',
+        'onnxruntime-web',
+        'dist',
+      );
+      if (existsSync(ortSrc)) {
+        const ortDir = resolve(distDir, 'ort');
+        mkdirSync(ortDir, { recursive: true });
+        for (const entry of [
+          'ort-wasm-simd-threaded.wasm',
+          'ort-wasm-simd-threaded.mjs',
+        ]) {
+          const srcPath = resolve(ortSrc, entry);
+          if (existsSync(srcPath)) {
+            copyFileSync(srcPath, resolve(ortDir, entry));
+          }
+        }
+      }
+
+      // ---- Strip rollup-auto-emitted ort-wasm copies ----
+      // onnxruntime-web contains `new URL('./ort-wasm-simd-threaded.wasm',
+      // import.meta.url)` patterns which vite rewrites into asset emissions
+      // under dist/assets/. We don't want the 12 MB duplicate — our own
+      // copy under dist/ort/ is the canonical one that env.wasm.wasmPaths
+      // points at. Drop the extra.
+      const assetsDir = resolve(distDir, 'assets');
+      if (existsSync(assetsDir)) {
+        for (const entry of readdirSync(assetsDir)) {
+          if (/^ort-wasm-simd-threaded.*\.wasm$/.test(entry)) {
+            unlinkSync(resolve(assetsDir, entry));
+          }
+        }
+      }
     },
   };
 }
@@ -203,12 +259,11 @@ export default defineConfig({
         popup: resolve(__dirname, 'src/popup/index.html'),
         sidepanel: resolve(__dirname, 'src/sidepanel/index.html'),
       },
-      // Session 12 — keep the 25 MB onnxruntime-web WASM out of the zip.
-      // The runtime lazy-imports it; failure to resolve falls through to
-      // the graceful `ort = null` path documented in runtime.ts. When real
-      // ONNX weights ship, swap this for a proper CDN import map or
-      // wire `env.wasm.wasmPaths` to the VPS before toggling on.
-      external: ['onnxruntime-web'],
+      // Session 14 — onnxruntime-web is now bundled into the service-worker
+      // build. vite/rollup pulls in ort.min.mjs (~360 KB of JS glue). The
+      // ~12 MB WASM binary lives in dist/ort/ (copied by copyManifestPlugin)
+      // and is fetched at InferenceSession.create time via
+      // env.wasm.wasmPaths — NOT embedded in the JS bundle.
       output: {
         entryFileNames: (chunkInfo) => {
           if (chunkInfo.name === 'background') return 'src/background/index.js';

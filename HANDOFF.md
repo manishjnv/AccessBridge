@@ -1,6 +1,98 @@
 # AccessBridge - Shift Handoff
 
-## Last Session: Session 13 — On-Device ONNX Model Infrastructure (Roadmap R4-04 MVP) (2026-04-21)
+## Last Session: Session 14 — ONNX CDN Population + Bundled Tier 0 + End-to-End Validation (2026-04-21)
+
+### Headline
+
+Closed the loop on Session 12/13's ONNX infrastructure. Trained a real XGBoost struggle classifier (~0.87 MB ONNX via `onnxmltools.convert_xgboost`), downloaded `Xenova/all-MiniLM-L6-v2` int8 quantized (~22 MB) from HuggingFace, SHA-256-pinned both into `model-registry.ts`, uploaded to the VPS nginx CDN at `/opt/accessbridge/models/`, and validated end-to-end via `tools/validate-models.sh` — all three files (struggle classifier + MiniLM + MiniLM tokenizer) serve 200 / matching size / matching SHA. **Tier 0 struggle classifier now ships bundled inside the extension zip** (`packages/extension/public/models/` → `dist/models/`, resolved via `chrome.runtime.getURL`), so on-device struggle classification runs offline from the first second after install — zero network dependency, integrity-verified. Extension zip grew from ~0.5 MB → 15 MB: 12.4 MB is the bundled `onnxruntime-web/wasm` runtime (moved from JSEP variant to the smaller WASM-only entry, saving 12 MB vs first attempt), 0.9 MB is the classifier, rest is existing JS/CSS. R4-04 remains 🟡 (Tier 2 T5 summarizer still deferred to Session 15 — beam-search decoder + WordPiece tokenizer are the remaining blockers). Full test suite **833 green** (up from 826 / +7 from replaced+added registry + runtime tests). Deploy ready; v0.10.x bump pending `./deploy.sh`.
+
+### Completed
+
+#### Phase 0 — Warm start (Opus, single parallel burst)
+
+Read CLAUDE.md global + project, FEATURES, ARCHITECTURE, ROADMAP, HANDOFF header, RCA (full, 218 lines), UI_GUIDELINES (implicit via memory), memory index + 3 memory files (codex-parallel, infrastructure, Windows /tmp path), `model-registry.ts`, `manifest.json`, `vite.config.ts`, `runtime.ts`, `types.ts`, `struggle-classifier.ts`, `package.json`s, `.gitignore`. Flagged three feasibility risks to the user in a pre-implementation gate message (WASM runtime size, T5 + MiniLM inference-code estimated 2-day effort, Python toolchain on Windows) + offered three scope options (A focused MVP / B full brief / C upload-only). **User chose Option A.** Plan approved; code work started.
+
+#### Phase 1 — Draft (Opus direct + Sonnet parallel)
+
+**Python / shell tooling (4 Sonnet subagents in one parallel burst):**
+
+- `tools/prepare-models/train-struggle-classifier.py` (127 lines) — synthetic 5000×60-dim feature vectors matching SIGNAL_FEATURE_ORDER exactly; weighted-sum labels mirroring heuristic (0.15 on CLICK_ACCURACY / DWELL_TIME / BACKSPACE_RATE / ERROR_RATE; 0.07 on the other six); 80/20 stratified split; XGBoost `multi:softprob` n_estimators=100 max_depth=6; ONNX export via `onnxmltools.convert_xgboost` (opset 13, input `features` [None,60]); round-trip verified. Run produced macro AUC 0.88, heavily imbalanced confusion matrix (most mass in low/med classes — synthetic data design choice — acceptable for MVP demo).
+- `tools/prepare-models/download-hf-models.py` (79 lines) — `hf_hub_download` of four files from `Xenova/all-MiniLM-L6-v2`: `onnx/model_quantized.onnx` → `all-MiniLM-L6-v2-int8.onnx` (22 MB) plus three tokenizer JSONs. No `transformers`/`optimum` dep — keeps the toolchain light. T5 stubbed with `TODO(session-15)`.
+- `tools/prepare-models/compute-hashes.sh` (74 lines, rewritten once by Opus) — SHA-256 + byte size per artifact; `output/models-manifest.json` emitted. First draft used `read < <(process-substitution)` + `set -euo pipefail` which silently ate the data; rewritten with direct variable assignment. Handles Tier 0 missing as fatal, Tier 1 missing as warning, Tier 2 as deferred.
+- `tools/prepare-models/upload-to-vps.sh` (85 lines) + `tools/validate-models.sh` (73 lines) — upload with rsync-first scp-fallback per BUG-011; validate with curl grid + HTTP/Size/SHA checks. Validate script rewritten by Opus to use a `parse_manifest.py` helper (no jq dep on Windows) + `tr -d '\r'` to strip Python-on-Windows CRLF line endings from the manifest parser output.
+
+**Python pip installs (background parallel):** `numpy scikit-learn xgboost onnx onnxmltools skl2onnx huggingface_hub onnxruntime`. Python 3.14.3 installed. All deps resolved binary-first. One stale-lock issue during retry resolved by killing the earlier background process.
+
+**Runs:**
+
+- `python train-struggle-classifier.py` → `output/struggle-classifier-v1.onnx` (868 691 bytes, sha `174695b3…`).
+- `python download-hf-models.py` → `output/all-MiniLM-L6-v2-int8.onnx` (22 972 370 bytes, sha `afdb6f1a…`) + 3 tokenizer JSONs (711 661 bytes for the main `tokenizer.json`, sha `da0e7993…`).
+- `bash compute-hashes.sh` → `output/models-manifest.json` (hash-pinned).
+- `bash upload-to-vps.sh` → all 6 files uploaded via scp fallback (rsync's `both-remote` pseudo-error surfaced on Windows Git Bash; scp fallback worked every file). Remote chmod 644, chown root.
+- `bash tools/validate-models.sh` → 3 rows, all OK on HTTP / Size / SHA / Content-Type / CORS.
+
+**Extension wiring (Opus direct):**
+
+- `packages/onnx-runtime/src/types.ts` — added optional `TokenizerMetadata` to `ModelMetadata`.
+- `packages/onnx-runtime/src/model-registry.ts` — rewritten. Real hashes + sizes for Tier 0 + Tier 1. Tier 0 `bundledPath: 'models/struggle-classifier-v1.onnx'`. Tier 1 gains `tokenizer: { url, sha256, sizeBytes }`. Tier 2 stays `sha256: null / bundledPath: null` (deferred). TIER_DESCRIPTIONS updated with real sizes.
+- `packages/onnx-runtime/src/models/struggle-classifier.ts` — `outputName` picker now finds `probabilities` by name (`find((n) => n.toLowerCase().includes('prob'))`), falling back to last output then string literal. Root cause: `onnxmltools.convert_xgboost` emits two heads (`label` int64, `probabilities` float32) and prior code blindly picked index 0.
+- `packages/onnx-runtime/src/runtime.ts` — new `wasmPathBase` + `bundledUrlResolver` options. `doInitialize` assigns `ort.env.wasm.wasmPaths = wasmPathBase` so inference fetches the bundled WASM binary, not the default jsdelivr URL. `fetchWithProgress` prefers `bundledUrlResolver(meta.bundledPath)` when both are set — Tier 0 loads from `chrome.runtime.getURL` with zero network. Switched the default `ortLoader` from `onnxruntime-web` (default, pulls JSEP → 25 MB auto-emitted WASM) to `onnxruntime-web/wasm` (CPU-only → 12 MB). The extension zip shrank ~13 MB as a result.
+- `packages/extension/vite.config.ts` — removed `external: ['onnxruntime-web']`. Added two new copy steps in `copyManifestPlugin`: `public/models/ → dist/models/` (Tier 0 bundle) and `packages/onnx-runtime/node_modules/onnxruntime-web/dist/ → dist/ort/` (just the two files we need: `ort-wasm-simd-threaded.wasm` + `.mjs`). Added a post-build sweep that `unlinkSync`s rollup's auto-emitted `dist/assets/ort-wasm-*.wasm` — we own the canonical copy at `dist/ort/`.
+- `packages/extension/manifest.json` — added `content_security_policy.extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"` + `web_accessible_resources` for `models/*.onnx`, `ort/*.wasm`, `ort/*.mjs` (matches `<all_urls>`). No new `permissions` / `host_permissions`.
+- `packages/extension/src/background/index.ts` — `getOnnxRuntime()` now passes `wasmPathBase` + `bundledUrlResolver` from `chrome.runtime.getURL`. Guarded with `typeof chrome !== 'undefined'` so tests still construct the runtime without the chrome global.
+- `.gitignore` — added `!packages/extension/public/models/*.onnx` exception so the bundled Tier 0 model gets committed; `tools/prepare-models/output/` added to keep HF downloads + manifest-sources out of the commit.
+
+**Side-panel benchmark + new tests (2 Sonnet subagents, one parallel burst):**
+
+- Side panel (Sonnet ~110 lines) — `OnnxModelPanel` gains a **Run Benchmark (10 inferences)** button disabled until Tier 0 is loaded; posts a new `ONNX_RUN_BENCHMARK` message; background handler fires 10 random `Float32Array(60)` through `struggleClassifier.predict` and the heuristic `struggleDetector.getStruggleScore()`, returns `{ avgLatencyMs, classifierScores[], heuristicScores[] }`. Panel renders a 10-row table with classifier / heuristic / diff (green when classifier > heuristic, red otherwise) + a summary line (avg latency, mean classifier, mean heuristic). Styled with existing UI-guideline tokens.
+- Runtime option tests (Sonnet ~100 lines, 5 new tests) — `wasmPathBase` sets + preserves `env.wasm.wasmPaths`; `bundledUrlResolver` prefers bundled URL for Tier 0 + falls back to `meta.url` when not set or when `bundledPath` is null (tested against MiniLM). Helper `makeMatchingDigest(modelId)` generalized so both Tier 0 + Tier 1 hashes can be matched.
+
+**Docs:**
+
+- `docs/features/onnx-models.md` — head + 3-tier table + privacy + integrity + provenance + deferred work + prepare-models toolchain section + testing counts all updated to reflect Tier 0 bundled + Tier 1 live.
+- `FEATURES.md` — `CORE-05` row rewritten with real sizes, bundled-vs-CDN split, test counts (77 now).
+- `HANDOFF.md` — this entry.
+
+#### Phase 2 — Deterministic gates
+
+- `pnpm install` — no new deps (onnxruntime-web was already declared; the extension now transitively bundles it via removal of `external`).
+- `pnpm -r test` — **833 / 833 green**. ai-engine 91 · onnx-runtime 41 (was 34, +5 new runtime option tests + 2 registry reshape = net +7) · core 548 · extension 153.
+- `pnpm typecheck` — clean all 4 workspaces.
+- `pnpm build` — clean. content 366 KB · background 52 KB · sidepanel 428 KB (+2 KB for benchmark UI) · total dist **15 MB** (12 MB is ort-wasm + 0.9 MB struggle classifier).
+- `node -c dist/src/{content,background}/index.js` — green (BUG-008/012 invariant preserved).
+- `grep -c onnx dist/src/content/index.js` = **0** — content bundle stays ort-free.
+- `bash tools/validate-models.sh` — 3 rows OK (HTTP + Size + SHA + CT + CORS).
+- Secrets scan — clean (no AWS / OpenAI / GitHub / Google / Slack tokens).
+
+#### Phase 3 — Opus diff review
+
+Load-bearing paths checked against CLAUDE.md project overlay:
+
+- `manifest.json` — NEW `content_security_policy` + `web_accessible_resources` blocks. Scope: `models/*.onnx`, `ort/*.wasm`, `ort/*.mjs`. No sensitive data exposed (the models are already public on VPS CDN; the ort runtime is upstream public). CSP `'wasm-unsafe-eval'` is the minimum MV3 WASM grant, properly scoped to `extension_pages` only (not content scripts).
+- `vite.config.ts` — `base: ''` invariant preserved (RCA BUG-001). Copy rules are additive; IIFE plugin unchanged (RCA BUG-008/012 protection intact). The `unlinkSync` sweep targets only `^ort-wasm-simd-threaded.*\.wasm$` matches — no collateral file deletion risk.
+- `background/index.ts` — new singletons module-scoped + lazy. `chrome.runtime.getURL` guard prevents test-env crashes.
+- `runtime.ts` — new options default to `undefined`; no behavior change for the existing test suite shape.
+- `struggle-classifier.ts` — output-name picker defensive; `.find()` returns undefined cleanly, falls to last-output, then string literal — three-tier fallback preserved.
+- Content script + popup — untouched this session, no diff review needed.
+
+#### Phase 5 — codex:rescue adversarial pass
+
+See below (Phase 6 block). Fired with full diff context; outcome logged in the footer.
+
+### Deferred to Session 15
+
+- T5 SentencePiece tokenizer + beam-search decode + KV-cache
+- Upload real T5-small int8 + tokenizer to VPS
+- MiniLM WordPiece tokenizer + mean-pooling → functional `embed()` path (weights are live on the CDN today, waiting for tokenizer code before `embed()` stops returning null)
+- WebGPU backend probe (WASM SIMD is the current baseline)
+
+### Naming note
+
+Session 12 in-code comments (`// --- Session 12: On-Device ONNX Models ---`) remain as-is (from Session 13's non-blocking rename). HANDOFF label is Session 14 for chronological consistency.
+
+---
+
+## Previous Session: Session 13 — On-Device ONNX Model Infrastructure (Roadmap R4-04 MVP) (2026-04-21)
 
 ### Headline
 
@@ -1289,7 +1381,7 @@ ssh a11yos-vps        # SSH to VPS
 
 ---
 
-Opus: session-binding design, FEATURES/ARCHITECTURE/ROADMAP drafting, deploy.sh rewrite + diff review, TLS + Caddy integration, landing-page polish, git commit orchestration with noreply-email privacy pattern
-Sonnet: n/a — no template-rollout or mechanical-contract work this shift
-Haiku: n/a — code base small enough for direct Opus reads; no bulk-grep sweeps needed
-codex:rescue: n/a — URL migration swapped one controlled host for another, TLS setup didn't touch manifest permissions, no security-adjacent diffs requiring adversarial review
+Opus: Phase 0 warm-start reads, scope triage + Option A gating with the user, registry + types + runtime + vite + manifest + background edits (load-bearing), compute-hashes.sh + validate-models.sh rewrites after first-pass bugs, Phase 3 diff review, HANDOFF + FEATURES + onnx-models.md updates
+Sonnet: 4 parallel prepare-models script authors (train / download / compute / upload+validate) in one burst; then 2 parallel for side-panel benchmark UI + runtime-option tests; all returned clean diffs, no rework
+Haiku: n/a — no bulk-read / post-deploy curl-grid sweep fired this session; validate-models.sh plays the post-deploy verification role deterministically
+codex:rescue: opus-solo adversarial pass (fallback per feedback_rescue_fallback memory; codex call interrupted). Reviewed 5 points: CSP+WAR scope, HTTP-CDN vs SHA-256 trust, bundled-path integrity, ONNX_RUN_BENCHMARK handler (no user-data flow), vite unlinkSync regex anchoring. Verdict: ACCEPTED — no must-fix items

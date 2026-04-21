@@ -42,7 +42,13 @@ type ORTInferenceSession = {
 interface ORTModuleShape {
   InferenceSession: ORTInferenceSession;
   Tensor: ORTTensorCtor;
-  env?: { wasm?: { numThreads?: number; simd?: boolean } };
+  env?: {
+    wasm?: {
+      numThreads?: number;
+      simd?: boolean;
+      wasmPaths?: string | Record<string, string>;
+    };
+  };
 }
 
 export interface ONNXRuntimeOptions {
@@ -56,10 +62,25 @@ export interface ONNXRuntimeOptions {
   digest?: (algo: 'SHA-256', data: ArrayBuffer) => Promise<ArrayBuffer>;
   /** Log hook (defaults to console). */
   logger?: Pick<Console, 'log' | 'warn' | 'error'>;
+  /**
+   * Base URL for the ort-wasm files inside the extension (e.g. the result of
+   * `chrome.runtime.getURL('ort/')`). Set once the runtime is constructed in
+   * the service worker; tests leave it undefined.
+   */
+  wasmPathBase?: string;
+  /**
+   * Resolver for `meta.bundledPath` — typically `(p) => chrome.runtime.getURL(p)`
+   * in extension context. If provided, Tier 0 + any other model with a non-null
+   * `bundledPath` loads from the packaged URL instead of the CDN.
+   */
+  bundledUrlResolver?: (path: string) => string;
 }
 
 export class ONNXRuntime {
-  private readonly opts: Required<ONNXRuntimeOptions>;
+  private readonly opts: Omit<Required<ONNXRuntimeOptions>, 'wasmPathBase' | 'bundledUrlResolver'> & {
+    wasmPathBase: string | undefined;
+    bundledUrlResolver: ((path: string) => string) | undefined;
+  };
   private ort: ORTModuleShape | null = null;
   private sessions = new Map<string, InferenceSessionLike>();
   private inferenceCounts = new Map<string, number>();
@@ -95,13 +116,19 @@ export class ONNXRuntime {
       ortLoader:
         options.ortLoader ??
         (async () => {
-          const mod = await import('onnxruntime-web');
+          // Import the /wasm entry specifically — it omits JSEP / WebGPU
+          // variants (~50 % smaller bundle + half-size WASM). Our runtime
+          // configures env.wasm.wasmPaths to the extension-local copy so
+          // the CPU SIMD WASM file is the one that actually loads.
+          const mod = await import('onnxruntime-web/wasm');
           return mod as unknown as ORTModuleShape;
         }),
       fetch: options.fetch ?? defaultFetch,
       indexedDB: options.indexedDB === undefined ? defaultIDB : options.indexedDB,
       digest: options.digest ?? defaultDigest,
       logger: options.logger ?? console,
+      wasmPathBase: options.wasmPathBase,
+      bundledUrlResolver: options.bundledUrlResolver,
     };
   }
 
@@ -117,6 +144,12 @@ export class ONNXRuntime {
   private async doInitialize(): Promise<void> {
     try {
       this.ort = await this.opts.ortLoader();
+      // Point ort at bundled ort-wasm-*.wasm so inference stays offline.
+      // Without this, onnxruntime-web tries to fetch from a jsdelivr CDN at
+      // session-create time — which the extension's default CSP blocks.
+      if (this.opts.wasmPathBase && this.ort?.env?.wasm) {
+        this.ort.env.wasm.wasmPaths = this.opts.wasmPathBase;
+      }
     } catch (err) {
       this.opts.logger.warn(
         '[onnx] onnxruntime-web failed to load — runtime will return fallback for all models',
@@ -266,9 +299,15 @@ export class ONNXRuntime {
     meta: ModelMetadata,
     onProgress?: (p: ModelLoadProgress) => void,
   ): Promise<{ ok: true; buffer: ArrayBuffer } | { ok: false; error: string }> {
+    // Prefer the bundled packaged path when it exists — zero-latency, offline,
+    // no CDN dependency. Falls through to the CDN URL on tiers without a bundle.
+    const fetchUrl =
+      meta.bundledPath && this.opts.bundledUrlResolver
+        ? this.opts.bundledUrlResolver(meta.bundledPath)
+        : meta.url;
     let res: Response;
     try {
-      res = await this.opts.fetch(meta.url);
+      res = await this.opts.fetch(fetchUrl);
     } catch (err) {
       return { ok: false, error: `fetch-error:${(err as Error).message}` };
     }

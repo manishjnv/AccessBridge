@@ -45,7 +45,14 @@ export class StruggleClassifier {
     if (features.length !== 60) return null;
 
     const inputName = session.inputNames[0] ?? 'features';
-    const outputName = session.outputNames[0] ?? 'probabilities';
+    // onnxmltools.convert_xgboost emits two outputs: `label` (int64 argmax)
+    // and `probabilities` (float32 softmax). Pick probabilities by name; fall
+    // back to the last output name, then the literal string, so this still
+    // works against models that expose only one head.
+    const outputName =
+      session.outputNames.find((n) => n.toLowerCase().includes('prob')) ??
+      session.outputNames[session.outputNames.length - 1] ??
+      'probabilities';
     const tensor = this.runtime.createTensor('float32', features, [1, 60]);
     if (!tensor) return null;
 

@@ -1654,6 +1654,104 @@
       .obs-bar-row { grid-template-columns: 90px 1fr 44px; }
       .obs-subnav-window { margin-left: 0; }
     }
+
+    /* --- Hash router: one page visible at a time, nav/footer persistent --- */
+    #router { min-height: calc(100vh - 56px); }
+    .route { display: none; animation: route-in 0.28s ease both; }
+    .route.is-active { display: block; }
+    .route[data-route]:not([data-route="/"]) > section:first-child { padding-top: 96px; }
+    @keyframes route-in {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .navbar-links a.is-current { opacity: 1; }
+    .navbar-links a.is-current::after {
+      content: '';
+      display: block;
+      height: 2px;
+      margin-top: 2px;
+      border-radius: 2px;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+    }
+
+    /* GitHub page */
+    .github-section { padding: 0 0 72px; }
+    .github-card {
+      background: var(--surface);
+      border-radius: 20px;
+      border: 1px solid rgba(123,104,238,0.18);
+      padding: clamp(28px, 4vw, 48px);
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .github-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse 60% 80% at 50% 0%, rgba(123,104,238,0.14) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .github-card > * { position: relative; }
+    .github-mark {
+      width: 72px;
+      height: 72px;
+      margin: 0 auto 18px;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      border-radius: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 8px 24px var(--glow);
+    }
+    .github-mark svg { width: 40px; height: 40px; color: #fff; }
+    .github-card h2 {
+      font-size: clamp(1.6rem, 4vw, 2.2rem);
+      font-weight: 800;
+      margin-bottom: 10px;
+    }
+    .github-card > p {
+      color: var(--muted);
+      font-size: 15px;
+      max-width: 640px;
+      margin: 0 auto 28px;
+      line-height: 1.65;
+    }
+    .github-meta {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 14px;
+      max-width: 720px;
+      margin: 0 auto 28px;
+    }
+    .github-meta-item {
+      background: rgba(123,104,238,0.08);
+      border: 1px solid rgba(123,104,238,0.22);
+      border-radius: 12px;
+      padding: 14px 12px;
+    }
+    .github-meta-key {
+      font-size: 10px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--muted);
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .github-meta-val {
+      font-size: 13px;
+      color: var(--text);
+      font-weight: 600;
+      font-family: 'SF Mono', 'Consolas', monospace;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .github-actions {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
   </style>
 </head>
 <body>
@@ -1662,7 +1760,7 @@
   <nav class="navbar" id="navbar">
     <div class="navbar-inner">
       <div style="display: flex; align-items: center;">
-        <a href="#top" class="navbar-brand" aria-label="AccessBridge — back to top">
+        <a href="#/" class="navbar-brand" aria-label="AccessBridge — home">
           <span class="brand-mark" aria-hidden="true">
             <svg viewBox="0 0 64 64" fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round">
               <path d="M20 46 L32 18 L44 46" stroke-width="7"/>
@@ -1672,21 +1770,21 @@
           <span class="brand-text">AccessBridge</span>
         </a>
         <div class="navbar-stats" aria-label="Coverage quick stats">
-          <a href="#global-reach" class="nav-stat nav-stat-highlight" title="28 languages supported — 10 Indian + English + 17 global"><span class="nav-stat-value">28</span>Languages</a>
-          <a href="#global-reach" class="nav-stat nav-stat-highlight" title="~6.96 billion speakers across 28 languages"><span class="nav-stat-value">7.0 B</span>Speakers</a>
-          <a href="#global-reach" class="nav-stat nav-stat-highlight" title="~87% of the world population covered"><span class="nav-stat-value">87%</span>of World</a>
+          <a href="#/reach" class="nav-stat nav-stat-highlight" title="28 languages supported — 10 Indian + English + 17 global"><span class="nav-stat-value">28</span>Languages</a>
+          <a href="#/reach" class="nav-stat nav-stat-highlight" title="~6.96 billion speakers across 28 languages"><span class="nav-stat-value">7.0 B</span>Speakers</a>
+          <a href="#/reach" class="nav-stat nav-stat-highlight" title="~87% of the world population covered"><span class="nav-stat-value">87%</span>of World</a>
         </div>
       </div>
       <div class="navbar-links" id="nav-links">
-        <a href="#global-reach">Reach</a>
-        <a href="#how-it-works">How It Works</a>
-        <a href="#features">Features</a>
-        <a href="#architecture">Architecture</a>
-        <a href="#observatory">Observatory</a>
-        <a href="#roadmap">Roadmap</a>
-        <a href="https://github.com/manishjnv/AccessBridge" target="_blank">GitHub</a>
+        <a href="#/reach" data-route="/reach">Reach</a>
+        <a href="#/how-it-works" data-route="/how-it-works">How It Works</a>
+        <a href="#/features" data-route="/features">Features</a>
+        <a href="#/architecture" data-route="/architecture">Architecture</a>
+        <a href="#/observatory" data-route="/observatory">Observatory</a>
+        <a href="#/roadmap" data-route="/roadmap">Roadmap</a>
+        <a href="#/github" data-route="/github">GitHub</a>
         <span class="app-version navbar-version" aria-label="Current version">v…</span>
-        <a href="#install" class="navbar-cta">
+        <a href="#/install" data-route="/install" class="navbar-cta">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
           Install
         </a>
@@ -1696,6 +1794,11 @@
       </button>
     </div>
   </nav>
+
+  <main id="router">
+
+  <!-- =============== ROUTE: / (Landing) =============== -->
+  <div class="route is-active" data-route="/">
 
   <!-- Hero -->
   <section class="hero" id="top">
@@ -1713,11 +1816,11 @@
       </div>
 
       <div class="hero-actions">
-        <a href="#install" class="btn btn-primary">
+        <a href="#/install" class="btn btn-primary">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
           Install Extension
         </a>
-        <a href="https://github.com/manishjnv/AccessBridge" target="_blank" class="btn btn-secondary">
+        <a href="#/github" class="btn btn-secondary">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
           View on GitHub
         </a>
@@ -1748,6 +1851,11 @@
       </div>
     </div>
   </section>
+
+  </div><!-- /route "/" -->
+
+  <!-- =============== ROUTE: /reach =============== -->
+  <div class="route" data-route="/reach">
 
   <!-- Global Reach -->
   <section class="reach-section" id="global-reach">
@@ -1807,6 +1915,11 @@
       </div>
     </div>
   </section>
+
+  </div><!-- /route /reach -->
+
+  <!-- =============== ROUTE: /how-it-works (includes live-detection demo) =============== -->
+  <div class="route" data-route="/how-it-works">
 
   <!-- How It Works -->
   <section class="how-section" id="how-it-works">
@@ -1897,6 +2010,11 @@
       </div>
     </div>
   </section>
+
+  </div><!-- /route /how-it-works -->
+
+  <!-- =============== ROUTE: /features =============== -->
+  <div class="route" data-route="/features">
 
   <!-- Features -->
   <section class="features-section" id="features">
@@ -2024,6 +2142,11 @@
       </div>
     </div>
   </section>
+
+  </div><!-- /route /features -->
+
+  <!-- =============== ROUTE: /architecture =============== -->
+  <div class="route" data-route="/architecture">
 
   <!-- Architecture -->
   <section class="arch-section" id="architecture">
@@ -2238,6 +2361,11 @@
     </div>
   </section>
 
+  </div><!-- /route /architecture -->
+
+  <!-- =============== ROUTE: /install =============== -->
+  <div class="route" data-route="/install">
+
   <!-- Install CTA -->
   <section class="install-section" id="install">
     <div class="container">
@@ -2269,6 +2397,11 @@
       </div>
     </div>
   </section>
+
+  </div><!-- /route /install -->
+
+  <!-- =============== ROUTE: /observatory (+ sub-routes /overview /trends /compliance) =============== -->
+  <div class="route" data-route="/observatory">
 
   <!-- Observatory — in-page help + deep link to full dashboard -->
   <section class="observatory-section" id="observatory">
@@ -2349,14 +2482,19 @@
       </div>
 
       <div class="obs-actions">
-        <a href="/observatory/" target="_blank" rel="noopener" class="btn btn-primary">
+        <a href="/observatory/" class="btn btn-primary">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/></svg>
           Open full dashboard
         </a>
-        <span class="obs-hint">Opens in a new tab for print-to-PDF and the full interactive view.</span>
+        <span class="obs-hint">Full interactive view with print-to-PDF.</span>
       </div>
     </div>
   </section>
+
+  </div><!-- /route /observatory -->
+
+  <!-- =============== ROUTE: /roadmap =============== -->
+  <div class="route" data-route="/roadmap">
 
   <!-- Strategic Roadmap -->
   <section class="roadmap-section" id="roadmap">
@@ -2431,6 +2569,63 @@
     </div>
   </section>
 
+  </div><!-- /route /roadmap -->
+
+  <!-- =============== ROUTE: /github =============== -->
+  <div class="route" data-route="/github">
+    <section class="github-section">
+      <div class="container" style="padding-top: 32px;">
+        <div class="github-card fade-in">
+          <div class="github-mark">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+          </div>
+          <h2>AccessBridge on GitHub</h2>
+          <p>
+            Source, issues, and release history for AccessBridge — the ambient accessibility operating layer.
+            Chrome extension, core engine, AI engine, and the Observatory dashboard all live in a single
+            TypeScript monorepo.
+          </p>
+
+          <div class="github-meta">
+            <div class="github-meta-item">
+              <div class="github-meta-key">Repository</div>
+              <div class="github-meta-val">manishjnv/AccessBridge</div>
+            </div>
+            <div class="github-meta-item">
+              <div class="github-meta-key">License</div>
+              <div class="github-meta-val">MIT</div>
+            </div>
+            <div class="github-meta-item">
+              <div class="github-meta-key">Stack</div>
+              <div class="github-meta-val">TS · React · Vite · pnpm</div>
+            </div>
+            <div class="github-meta-item">
+              <div class="github-meta-key">Team</div>
+              <div class="github-meta-val">Manish Kumar</div>
+            </div>
+          </div>
+
+          <div class="github-actions">
+            <a href="https://github.com/manishjnv/AccessBridge" class="btn btn-primary">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+              Open Repository
+            </a>
+            <a href="https://github.com/manishjnv/AccessBridge/issues" class="btn btn-secondary">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+              Report an Issue
+            </a>
+            <a href="#/install" class="btn btn-secondary">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+              Install Extension
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div><!-- /route /github -->
+
+  </main><!-- #router -->
+
   <!-- Back to Top -->
   <button id="back-to-top" class="back-to-top" aria-label="Back to top" title="Back to top">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -2449,16 +2644,19 @@
         <div class="footer-links">
           <div class="footer-col">
             <h4>Project</h4>
-            <a href="#features">Features</a>
-            <a href="#how-it-works">How It Works</a>
-            <a href="#architecture">Architecture</a>
-            <a href="#observatory">Observatory</a>
-            <a href="#install">Install</a>
+            <a href="#/reach">Reach</a>
+            <a href="#/how-it-works">How It Works</a>
+            <a href="#/features">Features</a>
+            <a href="#/architecture">Architecture</a>
+            <a href="#/observatory">Observatory</a>
+            <a href="#/roadmap">Roadmap</a>
+            <a href="#/install">Install</a>
           </div>
           <div class="footer-col">
             <h4>Links</h4>
-            <a href="https://github.com/manishjnv/AccessBridge" target="_blank">GitHub Repository</a>
-            <a href="https://github.com/manishjnv/AccessBridge/issues" target="_blank">Report Issues</a>
+            <a href="#/github">GitHub</a>
+            <a href="https://github.com/manishjnv/AccessBridge">Repository</a>
+            <a href="https://github.com/manishjnv/AccessBridge/issues">Report Issues</a>
           </div>
         </div>
       </div>
@@ -2466,7 +2664,7 @@
         <p>
           <span class="footer-status"><span class="health-dot" id="health-dot"></span> AccessBridge <span class="app-version" id="app-version">v…</span></span>
         </p>
-        <p>Team: Manish Kumar &nbsp;|&nbsp; <a href="https://github.com/manishjnv/AccessBridge" target="_blank">github.com/manishjnv/AccessBridge</a></p>
+        <p>Team: Manish Kumar &nbsp;|&nbsp; <a href="#/github">github.com/manishjnv/AccessBridge</a></p>
       </div>
     </div>
   </footer>
@@ -2669,28 +2867,73 @@
         loadView(name);
       };
 
+      // Pill clicks drive the hash router; router will call back into activate().
       pills.forEach(p => {
-        p.addEventListener('click', () => activate(p.dataset.obsView));
+        p.addEventListener('click', () => {
+          location.hash = '#/observatory/' + p.dataset.obsView;
+        });
       });
 
-      // Lazy-load the Overview preview the first time the section is on-screen,
-      // so visitors who never scroll to Observatory don't trigger API calls.
-      const section = document.getElementById('observatory');
-      if (section && 'IntersectionObserver' in window) {
-        const io = new IntersectionObserver((entries) => {
-          for (const e of entries) {
-            if (e.isIntersecting) {
-              loadView('overview');
-              io.disconnect();
-              break;
-            }
-          }
-        }, { rootMargin: '200px' });
-        io.observe(section);
-      } else {
-        loadView('overview');
-      }
+      // Expose for the hash router.
+      window.__observatoryActivate = activate;
     })();
+
+    // ─── Hash router ──────────────────────────────────────────────────────
+    const ROUTE_TITLES = {
+      '/': 'AccessBridge — Ambient Accessibility Operating Layer',
+      '/reach': 'Global Reach · AccessBridge',
+      '/how-it-works': 'How It Works · AccessBridge',
+      '/features': 'Features · AccessBridge',
+      '/architecture': 'Architecture · AccessBridge',
+      '/install': 'Install · AccessBridge',
+      '/observatory': 'Observatory · AccessBridge',
+      '/roadmap': 'Roadmap · AccessBridge',
+      '/github': 'GitHub · AccessBridge',
+    };
+
+    function parseRoute() {
+      const hash = (location.hash || '#/').replace(/^#/, '');
+      if (hash.startsWith('/observatory')) {
+        const sub = hash.replace(/^\/observatory\/?/, '');
+        return { page: '/observatory', sub: sub || 'overview' };
+      }
+      if (ROUTE_TITLES[hash]) return { page: hash, sub: null };
+      return { page: '/', sub: null };
+    }
+
+    function activateRoute() {
+      const { page, sub } = parseRoute();
+
+      document.querySelectorAll('.route').forEach(r => {
+        r.classList.toggle('is-active', r.dataset.route === page);
+      });
+
+      document.querySelectorAll('.navbar-links a[data-route]').forEach(a => {
+        a.classList.toggle('is-current', a.dataset.route === page);
+      });
+
+      document.title = ROUTE_TITLES[page] || ROUTE_TITLES['/'];
+
+      // Reveal fade-ins inside the active route immediately — route swap doesn't
+      // trigger the IntersectionObserver since elements don't "enter" the viewport.
+      document.querySelectorAll('.route.is-active .fade-in').forEach(el => {
+        el.classList.add('visible');
+      });
+
+      window.scrollTo({ top: 0, behavior: 'auto' });
+
+      if (page === '/observatory') {
+        window.__observatoryActivate && window.__observatoryActivate(sub || 'overview');
+      }
+
+      navLinks.classList.remove('open');
+    }
+
+    if (!location.hash) {
+      history.replaceState(null, '', '#/');
+    }
+    window.addEventListener('hashchange', activateRoute);
+    activateRoute();
   </script>
 </body>
 </html>

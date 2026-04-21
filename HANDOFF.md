@@ -1,6 +1,79 @@
 # AccessBridge - Shift Handoff
 
-## Last Session: Session 14 — ONNX CDN Population + Bundled Tier 0 + End-to-End Validation (2026-04-21)
+## Last Session: Session 15 — Landing Page Multi-Page Revamp (hash router) (2026-04-21)
+
+### Headline
+
+Converted [deploy/index.html](deploy/index.html) from a single scrollable page into a hash-routed multi-page SPA with a persistent nav + footer. Nine routes now live behind `#/`, `#/reach`, `#/how-it-works`, `#/features`, `#/architecture`, `#/install`, `#/observatory` (+ sub-routes `/overview`, `/trends`, `/compliance`), `#/roadmap`, and a new `#/github` internal page. Every `target="_blank"` has been stripped from the file (was 6 instances across hero / nav / observatory / footer) — the user's explicit rule was *no page opens in a new tab at all*. The 3 headline pills (28 Languages / 7.0 B Speakers / 87% of World) and the main-nav "Reach" link now both route to `#/reach`. Observatory sub-nav pills push `#/observatory/<view>` so sub-views are bookmarkable and back-button navigable. No infra change: still a single static HTML file served by existing nginx — zero `try_files` rewrites needed (preserves BUG-011 workarounds). Typecheck clean across all 4 workspaces; no package / extension code touched.
+
+### Completed
+
+#### Phase 0 — Warm start (Opus)
+
+Read CLAUDE.md global + project, FEATURES, ARCHITECTURE, ROADMAP, UI_GUIDELINES, RCA summary, HANDOFF header, MEMORY index in one parallel burst. User drip-fed the spec across five messages (nav-strip landing, 3 pills → Reach, 5 pages for 5 menu items + GitHub + Install, Observatory sub-nav Overview/Trends/Compliance, final "go revamp"). Landed plan approval before rewriting the 2696-line file: hash-based SPA router (vs multi-HTML, vs history-API pushState) — picked hash routing because (a) zero nginx rewrites, (b) shared nav/footer remain in DOM so they're *genuinely* common, (c) `no new tab` rule trivially honored since all links are internal hash changes.
+
+#### Phase 1 — Draft (Opus direct; small scope, single file)
+
+- **Structure** — added `<main id="router">` with 9 `<div class="route" data-route="...">` containers wrapping the existing `<section>` groupings. Landing = hero + stats. `/how-it-works` now also owns the "See It In Action" demo (paired naturally). `/observatory` contains the original privacy card + sub-nav + 3 view panels.
+- **Nav** — brand → `#/`, 7 data-route-tagged links (Reach / How It Works / Features / Architecture / Observatory / Roadmap / GitHub) + Install CTA. Active-route underline via `.navbar-links a.is-current`. All 3 nav-stat pills (28 / 7.0 B / 87%) route to `#/reach`.
+- **New internal `/github` page** — gradient mark, repo description, 4-field meta grid (Repository / License / Stack / Team), 3 action buttons (Open Repository, Report Issue, Install Extension) — all same-tab.
+- **Router JS** — `parseRoute()` splits observatory sub-routes; `activateRoute()` toggles `.is-active`, sets `document.title`, reveals `.fade-in` elements in the active route (IntersectionObserver doesn't fire on route swap because elements don't "enter" the viewport — manual `.visible` toggle fixes this), `scrollTo(0)`, closes mobile nav. `history.replaceState(null, '', '#/')` on first load when no hash.
+- **Observatory integration** — existing IIFE kept intact for render helpers + chart SVG logic. Pill click handler rewritten to push `#/observatory/<view>` to the hash; router calls `window.__observatoryActivate(view)` on each observatory navigation. IntersectionObserver-based auto-load removed (route activation is the trigger now).
+- **CSS additions** — `.route { display: none }` + `.route.is-active { display: block }` + 0.28 s `route-in` animation; `padding-top: 96px` on first section of non-landing routes to clear the fixed navbar; full `.github-card` / `.github-mark` / `.github-meta` / `.github-actions` ruleset using canonical UI tokens.
+- **Dynamic data preserved** — `/api/version` fetch still populates `.app-version` + `#download-btn` href + `#health-dot` color (RCA BUG-004 invariant).
+
+#### Phase 2 — Deterministic gates
+
+- Secrets scan on diff → clean (AWS / OpenAI / Anthropic / GitHub / Google / Slack patterns all absent).
+- TODO/FIXME/XXX scan on diff → clean.
+- `target="_blank"` grep on final file → **0** (was 6).
+- Opening / closing `<div class="route">` count → **9 / 9** (balanced).
+- `<main id="router">` opens / closes → **1 / 1** (balanced).
+- `pnpm typecheck` → clean across all 4 workspaces (unaffected by landing HTML, but confirms the repo is still green).
+- pnpm build / vitest — not required: landing page is a static HTML asset, not part of the pnpm build or extension test suites.
+
+#### Phase 3 — Opus diff review (load-bearing path)
+
+`deploy/index.html` is flagged load-bearing per project CLAUDE.md (RCA BUG-002 nginx port routing, BUG-004 dynamic version/download URL). Diff review:
+
+- BUG-002 port 8300: not touched. All internal links are hash routes; external `/observatory/` link preserved as a root-relative path (nginx routes it through the existing 8300 proxy).
+- BUG-004 dynamic version: `document.querySelectorAll('.app-version')` still has 3 targets (nav pill, footer, download button tag). `fetch('/api/version')` block untouched.
+- No hardcoded versions introduced anywhere in the diff.
+- Nav HTML changes are visual-only (hashes + active-route data attribute); no new permissions, no new cross-origin fetch, no content-script / background / popup changes — not a security-adjacent change. `codex:rescue` adversarial pass not required per project CLAUDE.md (no manifest permissions changed, no content-script injection logic, no new cross-origin fetch).
+
+#### Phase 5 — codex:rescue
+
+Not required (see Phase 3 — change is visual/routing only on a static HTML asset, zero security-adjacent surface). Skipped per project CLAUDE.md scope rule.
+
+#### Phase 6 — commit, push, deploy
+
+- Single commit: `feat(landing): multi-page hash router + Global Reach / GitHub / Observatory sub-routes`. One logical unit.
+- `./deploy.sh` rsyncs `deploy/` → `/var/www/accessbridge/`. No VPS build step. Health check reloads the page and confirms `/api/version` stays reachable + version string still renders.
+
+### Verification
+
+- Diff: **+285 / -42** on [deploy/index.html](deploy/index.html).
+- 9 routes declared, 9 routes closed, 7 data-route nav tags (6 main-menu + 1 Install CTA).
+- 0 × `target="_blank"` in the final file.
+- 3 × pill → `#/reach`; brand → `#/`; GitHub nav → `#/github`; Install CTA → `#/install`.
+- Observatory: 1 landing + 3 sub-routes (`/overview`, `/trends`, `/compliance`), data-driven pill active state.
+
+### Post-session state
+
+- Landing page is a hash-routed SPA with a persistent chrome (nav + footer) — matches the user's explicit specs across 5 drip messages.
+- No extension, core, ai-engine, or onnx-runtime code touched; no new RCA entry required (no bug was fixed).
+- User-visible behavior change is discoverable the moment someone opens the site: the hero strips its former below-the-fold scroll flow into a clean menu-driven landing.
+
+### Agent utilization
+
+Opus: orchestration, 5-message spec gathering with inline confirmations, full rewrite of [deploy/index.html](deploy/index.html) via 15 surgical `Edit` calls (CSS additions, nav swap, route wrapping per-section boundary, observatory integration, new /github page, router JS), Phase 2 + 3 verification, HANDOFF entry.
+Sonnet: n/a — small-scope, single-file rewrite; Opus cold read-cache already had the file. Sonnet cold-start would have cost more than Opus typing.
+Haiku: n/a — no multi-file sweeps, no bulk log triage this session.
+codex:rescue: n/a — no security-adjacent changes (no manifest permissions, no content-script injection, no new cross-origin fetch).
+
+---
+
+## Previous Session: Session 14 — ONNX CDN Population + Bundled Tier 0 + End-to-End Validation (2026-04-21)
 
 ### Headline
 

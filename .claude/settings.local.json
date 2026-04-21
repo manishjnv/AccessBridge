@@ -2,6 +2,9 @@
   "permissions": {
     "allow": [
       "Bash",
+      "Bash(*)",
+      "PowerShell",
+      "PowerShell(*)",
       "Edit",
       "Write",
       "Read",
@@ -9,10 +12,13 @@
       "Grep",
       "Agent",
       "Skill",
+      "Skill(*)",
       "TodoWrite",
       "WebFetch",
       "WebSearch",
-      "NotebookEdit"
+      "NotebookEdit",
+      "ToolSearch",
+      "ScheduleWakeup"
     ],
     "defaultMode": "bypassPermissions"
   }

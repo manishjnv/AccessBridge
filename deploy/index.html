@@ -1823,78 +1823,6 @@
       border: 1px solid rgba(123,104,238,0.22);
     }
 
-    /* Quick start terminal */
-    .gh-terminal {
-      background: #08081a; border: 1px solid rgba(123,104,238,0.22);
-      border-radius: 14px; overflow: hidden; max-width: 720px; margin: 0 auto;
-    }
-    .gh-terminal-head {
-      background: rgba(123,104,238,0.08); padding: 10px 16px;
-      border-bottom: 1px solid rgba(123,104,238,0.18);
-      display: flex; align-items: center; gap: 10px;
-      font-size: 12px; color: var(--muted);
-    }
-    .gh-terminal-dots { display: flex; gap: 6px; }
-    .gh-terminal-dot { width: 10px; height: 10px; border-radius: 50%; background: rgba(255,255,255,0.16); }
-    .gh-terminal-body {
-      padding: 18px 20px; font-family: 'SF Mono','Consolas',monospace;
-      font-size: 13px; line-height: 1.85; color: var(--text);
-      overflow-x: auto; white-space: pre;
-    }
-    .gh-prompt { color: var(--accent); user-select: none; }
-    .gh-cmd { color: #d4d4f0; }
-    .gh-comment { color: rgba(180,180,220,0.55); }
-
-    /* Releases timeline */
-    .gh-releases { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
-    .gh-release {
-      background: var(--surface); border: 1px solid rgba(123,104,238,0.18);
-      border-radius: 12px; padding: 14px 18px;
-      display: grid; grid-template-columns: auto 1fr auto; gap: 16px;
-      align-items: center;
-    }
-    .gh-release-tag {
-      font-family: 'SF Mono','Consolas',monospace;
-      font-size: 12.5px; font-weight: 700; color: var(--accent);
-      background: rgba(123,104,238,0.12); padding: 4px 10px; border-radius: 6px;
-      border: 1px solid rgba(123,104,238,0.22); white-space: nowrap;
-    }
-    .gh-release-note { color: var(--text); font-size: 13.5px; line-height: 1.5; }
-    .gh-release-date {
-      color: var(--muted); font-size: 11.5px;
-      font-family: 'SF Mono','Consolas',monospace; white-space: nowrap;
-    }
-
-    /* Contribute grid */
-    .gh-contrib {
-      display: grid; gap: 14px;
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-      max-width: 920px; margin: 0 auto;
-    }
-    .gh-contrib-card {
-      background: var(--surface); border: 1px solid rgba(123,104,238,0.18);
-      border-radius: 14px; padding: 22px; text-align: left;
-    }
-    .gh-contrib-card h4 { font-size: 15px; margin-bottom: 8px; color: var(--text); }
-    .gh-contrib-card p {
-      color: var(--muted); font-size: 13.5px; line-height: 1.55; margin-bottom: 14px;
-    }
-    .gh-contrib-card code {
-      font-family: 'SF Mono','Consolas',monospace; font-size: 12px;
-      background: rgba(123,104,238,0.12); padding: 1px 5px; border-radius: 4px;
-      color: var(--text);
-    }
-    .gh-contrib-card a {
-      color: var(--accent); font-size: 13px; font-weight: 600;
-      text-decoration: none;
-    }
-    .gh-contrib-card a:hover { text-decoration: underline; }
-
-    @media (max-width: 600px) {
-      .gh-release { grid-template-columns: 1fr; gap: 6px; }
-      .gh-release-tag, .gh-release-date { justify-self: start; }
-    }
-
     /* ---- Desktop Agent section ---- */
     .desktop-agent-section { padding: 72px 0; }
     .section-heading {
@@ -3016,7 +2944,7 @@
     </section>
 
     <!-- Monorepo Layout -->
-    <section class="gh-section">
+    <section class="gh-section" style="padding-bottom: 72px;">
       <div class="container">
         <div class="gh-section-label">Monorepo Layout</div>
         <h2 class="gh-section-title">Four packages, one TypeScript workspace</h2>
@@ -3066,88 +2994,6 @@
       </div>
     </section>
 
-    <!-- Quick Start -->
-    <section class="gh-section">
-      <div class="container">
-        <div class="gh-section-label">Quick Start</div>
-        <h2 class="gh-section-title">Clone, install, build</h2>
-        <p class="gh-section-sub">Node 20+ and pnpm 9+ required. The build emits an unpacked Chrome MV3 extension into <code>packages/extension/dist/</code>.</p>
-        <div class="gh-terminal fade-in">
-          <div class="gh-terminal-head">
-            <div class="gh-terminal-dots">
-              <span class="gh-terminal-dot"></span>
-              <span class="gh-terminal-dot"></span>
-              <span class="gh-terminal-dot"></span>
-            </div>
-            <span>bash &middot; clone &amp; build</span>
-          </div>
-          <div class="gh-terminal-body"><span class="gh-comment"># 1. Clone the monorepo</span>
-<span class="gh-prompt">$ </span><span class="gh-cmd">git clone https://github.com/manishjnv/AccessBridge.git</span>
-<span class="gh-prompt">$ </span><span class="gh-cmd">cd AccessBridge</span>
-
-<span class="gh-comment"># 2. Install workspace dependencies</span>
-<span class="gh-prompt">$ </span><span class="gh-cmd">pnpm install</span>
-
-<span class="gh-comment"># 3. Build the extension</span>
-<span class="gh-prompt">$ </span><span class="gh-cmd">pnpm build</span>
-
-<span class="gh-comment"># 4. Load packages/extension/dist/ in chrome://extensions</span>
-<span class="gh-comment">#    (Developer Mode &rarr; Load unpacked)</span></div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Recent Releases -->
-    <section class="gh-section">
-      <div class="container">
-        <div class="gh-section-label">Recent Releases</div>
-        <h2 class="gh-section-title">Shipping every session</h2>
-        <p class="gh-section-sub">Auto-versioned from conventional commits; full history in <a href="https://github.com/manishjnv/AccessBridge/blob/main/CHANGELOG.md">CHANGELOG.md</a>.</p>
-        <div class="gh-releases">
-          <div class="gh-release fade-in">
-            <span class="gh-release-tag">v0.14.0</span>
-            <span class="gh-release-note">Inline install section on home; collapse footer Links to a single GitHub Repository entry.</span>
-            <span class="gh-release-date">2026-04-21</span>
-          </div>
-          <div class="gh-release fade-in">
-            <span class="gh-release-tag">v0.13.0</span>
-            <span class="gh-release-note">Feature #7 &mdash; SAG ring signatures + auditor verifier (zk-attestation).</span>
-            <span class="gh-release-date">2026-04-21</span>
-          </div>
-          <div class="gh-release fade-in">
-            <span class="gh-release-tag">v0.12.2</span>
-            <span class="gh-release-note">Landing 4-column footer grid; split Project into Explore + Deeper.</span>
-            <span class="gh-release-date">2026-04-21</span>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Contribute -->
-    <section class="gh-section" style="padding-bottom: 72px;">
-      <div class="container">
-        <div class="gh-section-label">Get Involved</div>
-        <h2 class="gh-section-title">Contribute</h2>
-        <p class="gh-section-sub">AccessBridge is MIT-licensed and built in the open. Issues, PRs, and accessibility feedback all welcome.</p>
-        <div class="gh-contrib">
-          <div class="gh-contrib-card fade-in">
-            <h4>File an Issue</h4>
-            <p>Bug report, accessibility gap, or feature request &mdash; open an issue with reproduction steps and the URL where you saw the behavior.</p>
-            <a href="https://github.com/manishjnv/AccessBridge/issues/new">Open issue tracker &rarr;</a>
-          </div>
-          <div class="gh-contrib-card fade-in">
-            <h4>Pull Requests</h4>
-            <p>Fork, branch, and open a PR. Code follows TypeScript strict mode + Vitest; <code>pnpm typecheck &amp;&amp; pnpm test</code> must pass.</p>
-            <a href="https://github.com/manishjnv/AccessBridge/pulls">View open PRs &rarr;</a>
-          </div>
-          <div class="gh-contrib-card fade-in">
-            <h4>Run Locally</h4>
-            <p>Clone the monorepo and use <code>pnpm dev</code> for live-reload extension dev. ARCHITECTURE.md walks the message flow end-to-end.</p>
-            <a href="https://github.com/manishjnv/AccessBridge/blob/main/ARCHITECTURE.md">Read the architecture &rarr;</a>
-          </div>
-        </div>
-      </div>
-    </section>
   </div><!-- /route /github -->
 
   </main><!-- #router -->

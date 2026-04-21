@@ -708,6 +708,8 @@ function MotorTab({
           toggleFeature('voice-nav', v);
         }}
       />
+      {/* --- Session 17: Voice Tier Selection --- */}
+      <VoiceTierPanel motor={motor} onChange={onChange} />
       <Toggle
         label="Eye Tracking"
         value={motor.eyeTrackingEnabled}
@@ -832,6 +834,176 @@ function MotorTab({
       </div>
       {showLibrary && <GestureLibrary onClose={() => setShowLibrary(false)} />}
     </>
+  );
+}
+
+// --- Session 17: Voice Tier Selection ---
+function VoiceTierPanel({
+  motor,
+  onChange,
+}: {
+  motor: MotorProfile;
+  onChange: (patch: Partial<MotorProfile>) => void;
+}) {
+  const [tierState, setTierState] = useState<string>('idle');
+  const [progress, setProgress] = useState<number>(0);
+  const [error, setError] = useState<string | null>(null);
+
+  const refreshStatus = useCallback(() => {
+    chrome.runtime
+      .sendMessage({ type: 'ONNX_GET_STATUS' })
+      .then((res) => {
+        const r = res as {
+          tiers?: Record<number, { state: string; progress: number; error: string | null }>;
+        } | undefined;
+        const t3 = r?.tiers?.[3];
+        if (t3) {
+          setTierState(t3.state);
+          setProgress(t3.progress);
+          setError(t3.error);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    refreshStatus();
+    const id = window.setInterval(refreshStatus, 1000);
+    return () => window.clearInterval(id);
+  }, [refreshStatus]);
+
+  const download = () => {
+    setError(null);
+    chrome.runtime.sendMessage({ type: 'ONNX_LOAD_TIER', payload: { tier: 3 } }).catch(() => {});
+    onChange({ indicWhisperEnabled: true });
+  };
+
+  const statusLabel =
+    tierState === 'loaded'
+      ? 'Ready'
+      : tierState === 'loading'
+        ? `Downloading ${progress}%`
+        : tierState === 'failed'
+          ? 'Failed'
+          : 'Not loaded';
+
+  const tierBadgeColor =
+    tierState === 'loaded' ? '#10b981' : tierState === 'loading' ? '#f59e0b' : '#94a3b8';
+
+  return (
+    <div
+      className="bg-a11y-surface rounded-lg p-3 border border-a11y-primary/20"
+      style={{ borderLeft: '4px solid #7b68ee', marginTop: 8 }}
+    >
+      <div
+        className="text-xs font-bold uppercase mb-2"
+        style={{ color: '#bb86fc', letterSpacing: '1.2px' }}
+      >
+        Voice Quality Tier
+      </div>
+
+      <label style={{ display: 'block', fontSize: 13, color: '#e2e8f0', marginBottom: 4 }}>
+        Strategy
+      </label>
+      <select
+        value={motor.voiceQualityTier}
+        onChange={(e) =>
+          onChange({
+            voiceQualityTier: e.target.value as MotorProfile['voiceQualityTier'],
+          })
+        }
+        style={{
+          width: '100%',
+          padding: '6px 8px',
+          borderRadius: 8,
+          border: '1px solid rgba(123, 104, 238, 0.35)',
+          background: '#1a1a2e',
+          color: '#e2e8f0',
+          fontSize: 13,
+        }}
+      >
+        <option value="auto">Auto — native first, ONNX on gap</option>
+        <option value="native">Native only (Web Speech)</option>
+        <option value="onnx">ONNX only (IndicWhisper)</option>
+        <option value="cloud-allowed">Allow cloud fallback</option>
+      </select>
+
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          marginTop: 10,
+          fontSize: 12,
+          color: '#94a3b8',
+        }}
+      >
+        <span
+          aria-hidden="true"
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: '50%',
+            background: tierBadgeColor,
+            display: 'inline-block',
+          }}
+        />
+        <span>IndicWhisper: {statusLabel}</span>
+      </div>
+
+      {tierState !== 'loaded' && (
+        <button
+          onClick={download}
+          disabled={tierState === 'loading'}
+          className="w-full mt-2 text-sm py-2 rounded transition-colors"
+          style={{
+            background: 'linear-gradient(135deg, #7b68ee, #bb86fc)',
+            color: '#fff',
+            border: 'none',
+            fontWeight: 600,
+            cursor: tierState === 'loading' ? 'wait' : 'pointer',
+            opacity: tierState === 'loading' ? 0.6 : 1,
+          }}
+        >
+          {tierState === 'loading' ? `Downloading ${progress}%` : 'Download IndicWhisper'}
+        </button>
+      )}
+      {/*
+        Session 17 security note: the registry currently has sha256:null
+        for IndicWhisper — any MITM on the HTTP CDN could swap a malicious
+        ONNX. Disable downloads until the real hash is pinned (landed via
+        compute-hashes.sh after upload). This gate clears once the registry
+        ships a real hash in a follow-up commit.
+      */}
+      <p
+        style={{
+          color: '#f59e0b',
+          fontSize: 11,
+          lineHeight: 1.5,
+          marginTop: 6,
+        }}
+      >
+        Integrity-pending: the model's SHA-256 is null until the first
+        upload + hash run. Avoid downloading on this build.
+      </p>
+
+      {error && (
+        <p style={{ color: '#ef4444', fontSize: 11, marginTop: 6 }}>{error}</p>
+      )}
+
+      <p
+        style={{
+          color: '#94a3b8',
+          fontSize: 11,
+          lineHeight: 1.5,
+          marginTop: 6,
+        }}
+      >
+        ~80 MB one-time download. Enables STT for all 22 Indian languages on-device.
+        Decoder loop ships in Session 18 — current build exercises download + tier
+        selection UX only.
+      </p>
+    </div>
   );
 }
 

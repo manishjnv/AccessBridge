@@ -57,6 +57,7 @@ Input assistance: voice, gaze, dwell, keyboard.
 | M-06 | Predictive Input (word + phrase prediction) | [content/motor/predictive-input.ts](packages/extension/src/content/motor/predictive-input.ts) | P | Shipped |
 | M-07 | Smart Click Targets (enlarge interactive elements) | Applied via DecisionEngine | P, A | Shipped |
 | M-08 | Gesture Shortcuts (touch + trackpad + mouse, 16 gestures, bindable) | [content/motor/gestures.ts](packages/extension/src/content/motor/gestures.ts) | P | Shipped |
+| M-09 | Tiered STT Infrastructure (Session 17) — TieredSTT picker + IndicWhisper ONNX wrapper for 22-Indian-language voice; popup voiceQualityTier selector + 80 MB download UX. Tier A (Web Speech) path unchanged; Tier B (ONNX) decoder loop deferred to Session 18 — wrapper currently returns `{real: false}` | [content/motor/tiered-stt.ts](packages/extension/src/content/motor/tiered-stt.ts) + [packages/onnx-runtime/src/models/indic-whisper.ts](packages/onnx-runtime/src/models/indic-whisper.ts) | P | WIP |
 
 Language support: English, Hindi (full commands), plus 7 other `lang` codes for STT — no translated UI yet. Full Indic language plan is deferred (see DEF-004).
 

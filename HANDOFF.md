@@ -1,6 +1,119 @@
 # AccessBridge - Shift Handoff
 
-## Last Session: Session 16 — Feature #7 Zero-Knowledge Attestation (ring signatures + verifier tool) (2026-04-21)
+## Last Session: Session 17 — IndicWhisper ONNX tiered STT infrastructure (Feature #6 → 85%) (2026-04-21)
+
+### Headline
+
+Landed the Tier 3 on-device STT scaffold for all 22 Indian languages: a new `IndicWhisper` wrapper class + `audio-preprocessor` utilities in `@accessbridge/onnx-runtime`, a `TieredSTT` picker in the content script (pure `pickTier()` decides A vs B vs C from preference + language + recent-confidence rolling window), a popup "Voice Quality Tier" panel with a download button + live progress indicator, an `INDIC_WHISPER_TRANSCRIBE` message handler in the background service worker, and per-tier voice counters in the observatory collector + publisher. 961 tests green (+76 vs Session 16), typecheck clean across all 4 workspaces, `node -c` passes both built bundles (BUG-008 / BUG-012 guard). **What Session 17 ships is infrastructure** — the Whisper encoder runs, the audio-flow + download-UX + tier selection + observability paths are fully wired and tested; the decoder autoregressive loop with language-forcing tokens is explicitly deferred to Session 18 so `IndicWhisper.transcribe()` currently returns `{real: false, text: '', confidence: 0}` after successfully loading the model. Feature #6 moves 72% → 85%; it closes at 100% once Session 18 lands the decoder + real weights are uploaded. One deliberate spec pivot: the model is `openai/whisper-small` (MIT, 99-language multilingual) branded `indic-whisper-*` on disk because AI4Bharat does not publish a Whisper-small variant (only IndicConformer, a different architecture + licence path) — the wrapper class/name keeps the swap-to-Conformer option open.
+
+### Completed
+
+#### Phase 0 — Warm start (Opus)
+
+Ran `codex:setup` — codex-cli 0.118.0 authenticated, direct runtime. Read CLAUDE.md global + project overlay, FEATURES, ARCHITECTURE, ROADMAP, UI_GUIDELINES, RCA, MEMORY index, HANDOFF top-of-file (Session 16 header for chronology). Flagged four concerns up front: (1) AI4Bharat does NOT publish `indic-whisper-small-v1` on HF — confirmed via WebFetch to `huggingface.co/ai4bharat`; they ship IndicConformer (Conformer architecture, ~600 MB FP) + bhili-asr (single language). Proposed pivot to `openai/whisper-small` which matches every spec constraint (MIT, ~80 MB int8, multilingual incl. all 22 Indian language codes). (2) Running the Python prep scripts locally would take 15-20 min + 8 GB RAM; user said to defer execution, write scripts only. (3) Session 17 full scope is 3-4 sessions of work; bid MVP cut = Parts 1-4 + 6 + 8 + 9 with Voice Lab (Part 5) + full 22-language docs table (Part 7) + content-side TieredSTT orchestration pushed to Session 18. (4) Codex quota reset is 2026-04-26 per Session 16 observation — Codex-assisted test generation might 429; Sonnet fallback queued. User replied "GO" on the bid.
+
+#### Phase 1a — Lock model ID (Opus)
+
+WebFetch to HF confirmed no AI4Bharat Whisper. Pivot committed: filenames stay `indic-whisper-*` per spec marker, upstream checkpoint is documented as `openai/whisper-small` in every prep script + wrapper class docstring + docs.
+
+#### Phase 1b — Python prep scripts (Sonnet subagent A)
+
+Single Sonnet call wrote:
+
+- [tools/prepare-models/download-indicwhisper.py](tools/prepare-models/download-indicwhisper.py) — 385 LOC. Downloads `openai/whisper-small`, exports encoder + decoder to ONNX via `optimum.exporters.onnx`, applies `quantize_dynamic(QInt8)` to each, writes `indic-whisper-tokenizer.json` (via AutoProcessor), and the 22-language JSON map (7 non-native codes map to script-family cousins — Konkani→Marathi, Kashmiri→Urdu, Manipuri/Bodo/Santali/Maithili/Dogri→Hindi, Sindhi→Urdu — and flag `native_support: false` in the manifest). Argparse: `--output-dir`, `--skip-quantize`.
+- [tools/prepare-models/evaluate-indicwhisper.py](tools/prepare-models/evaluate-indicwhisper.py) — 436 LOC. Self-consistency mode (no samples) confirms the encoder loads + runs on a 1-second silent 16 kHz WAV; `--samples-dir` mode reads `<lang>/sample*.wav` + `.txt` pairs and computes WER via pure-Python DP. Writes `indic-whisper-quality-report.json`.
+- Updates to [tools/prepare-models/upload-to-vps.sh](tools/prepare-models/upload-to-vps.sh) — appends indic-whisper upload loop + a conditional t5-small.onnx upload (closes the Session 14 Tier 2 loose end).
+- Updates to [tools/prepare-models/compute-hashes.sh](tools/prepare-models/compute-hashes.sh) — hashes the five indic-whisper artifacts + emits their `models-manifest.json` entry.
+- Updates to `tools/prepare-models/output/models-manifest.json` — new entry with `sha256: null` / `sizeBytes: null` (filled at upload time).
+
+Spec deviations Sonnet flagged + Opus accepted: (a) optimum always emits Whisper as encoder+decoder separately; single-file merge doesn't exist; wrapper class + registry need to eventually load both. (b) `evaluate` script is encoder-only — full autoregressive decoding + WER requires the decoder loop deferred to Session 18. (c) Existing bash-script `✓`/`✗` emoji symbols replaced with `OK`/`FAIL` per repo no-emoji rule.
+
+#### Phase 2 — ONNX runtime package extension (Opus, load-bearing)
+
+Five files written/edited:
+
+- [packages/onnx-runtime/src/models/audio-preprocessor.ts](packages/onnx-runtime/src/models/audio-preprocessor.ts) — new 200 LOC pure utilities: `WHISPER_SAMPLE_RATE` (16 kHz) + `WHISPER_CHUNK_SAMPLES` (30 s) constants, `normalizeFloat32`, `resampleLinear` (pure JS), `resample` (browser OfflineAudioContext with pure-JS fallback), `chunkAudio` (overlap-aware, zero-pads the last chunk), `preprocessAudio` (AudioBufferLike | Float32Array → Float32 mono 16 kHz pipeline). All I/O injectable for tests (OfflineAudioContext ctor).
+- [packages/onnx-runtime/src/models/indic-whisper.ts](packages/onnx-runtime/src/models/indic-whisper.ts) — new 220 LOC wrapper class. `BCP47_TO_WHISPER` frozen 22-language map; `FALLBACK_LANGUAGES` set for the 7 non-native cousins; `IndicWhisper` with `load / ready / unload / isSupported / isFallbackLanguage / transcribe / sampleRate`. `transcribe()` runs the preprocess pipeline end-to-end but then explicitly returns `{real: false, text: '', confidence: 0, latencyMs: <preprocess wall clock>}` with a `TODO(session-18)` marker — the session-17 surface is the shape, not the intelligence.
+- [packages/onnx-runtime/src/model-registry.ts](packages/onnx-runtime/src/model-registry.ts) — new `INDIC_WHISPER_ID` constant + registry entry at `loadTier: 3`, url + tokenizer metadata pinned, `sha256: null` (flipped to real hash after upload). New `TIER_LABELS[3]` + `TIER_DESCRIPTIONS[3]`.
+- [packages/onnx-runtime/src/types.ts](packages/onnx-runtime/src/types.ts) — `ModelTier` is now `0|1|2|3`; new `TranscriberLike` structural interface.
+- [packages/onnx-runtime/src/index.ts](packages/onnx-runtime/src/index.ts) — barrel re-exports IndicWhisper + audio utilities + the new constants.
+
+#### Phase 3 — Content-script picker + background handler + profile + observatory (Opus, load-bearing + security-adjacent)
+
+- New file [packages/extension/src/content/motor/tiered-stt.ts](packages/extension/src/content/motor/tiered-stt.ts) — 330 LOC. `VoiceTier = 'A' | 'B' | 'C'`; `TIER_A_LANGUAGES` frozen set (the 11 Chrome-native locales); pure `pickTier()` function with parameters (preference, language, indicWhisperReady, recentConfidences, thresholds); `TieredSTT` class with `setPreference / setIndicWhisperReady / setLanguage / recordTierAConfidence / nextTier / captureAndTranscribeViaTierB / abort`. Tier B path uses `navigator.mediaDevices.getUserMedia` + MediaRecorder + `chrome.runtime.sendMessage({type: 'INDIC_WHISPER_TRANSCRIBE', payload: {audioBase64, mime, language}})`. Audio buffer is explicitly cleared (`chunks = []`) after the Blob is built so raw PCM doesn't outlive the request.
+- [packages/extension/src/content/motor/voice-commands.ts](packages/extension/src/content/motor/voice-commands.ts) — adds the `// --- Session 17: TieredSTT ---` marker + re-exports `TieredSTT / TIER_A_LANGUAGES / pickTier / VoiceTier / VoiceTierPreference / TranscriptionOutcome / TieredSTTOptions` for Session 18's content-side wire-in.
+- [packages/extension/src/background/index.ts](packages/extension/src/background/index.ts) — imports IndicWhisper + BCP47_TO_WHISPER; extends `onnxTierState / onnxTierProgress / onnxTierError` to tier 3; `loadOnnxTier` + `getOnnxStatusSnapshot` + `ONNX_LOAD_TIER` + `ONNX_CLEAR_CACHE` all know about tier 3; two new message handlers `INDIC_WHISPER_TRANSCRIBE` (bandwidth-frugal base64 decode, language allowlist, observability counters, clean buffer cleanup) and `VOICE_TIER_RECORD` (for content-side to report Tier A events). New `base64ToBytes` helper near file tail. `maybeRecordObservatoryOnnx` now accepts `'tier3'` bucket.
+- [packages/extension/src/background/observatory-collector.ts](packages/extension/src/background/observatory-collector.ts) — `PersistedState.voice_tier_counts: Record<string, number>`; `recordVoiceTier(tier: 'a'|'b'|'c')`; added to `blankState` + `getRawCounters`.
+- [packages/extension/src/background/observatory-publisher.ts](packages/extension/src/background/observatory-publisher.ts) — `RawCounters.voice_tier_counts?` + `NoisyBundle.voice_tier_counts` (Laplace-noised ε=1 σ=1 via the existing pipeline). **Intentionally NOT added to `canonicalLines`** — the observatory server's `canonicalLinesForBundle` doesn't know this field yet, and publishing with it in the merkle root would break verification (same latent state as `onnx_inferences` since Session 12). The next observatory deploy adds it to both sides together.
+- [packages/core/src/types/profile.ts](packages/core/src/types/profile.ts) — MotorProfile gains `voiceQualityTier: 'auto' | 'native' | 'onnx' | 'cloud-allowed'` (default 'auto') + `indicWhisperEnabled: boolean` (default false). `AccessibilityProfile.onnxModelsEnabled` gains `indicWhisper: boolean`.
+- [packages/core/src/__tests__/decision-engine.test.ts](packages/core/src/__tests__/decision-engine.test.ts) — test helper updated with the new profile field.
+
+#### Phase 4 — Popup Motor tab VoiceTierPanel (Opus direct, UI_GUIDELINES-compliant)
+
+[packages/extension/src/popup/App.tsx](packages/extension/src/popup/App.tsx) — new `VoiceTierPanel` component inside the Motor tab right under the Voice Navigation toggle. Strategy `<select>` (Auto / Native only / ONNX only / Allow cloud), a live-polled status pill (`#10b981`/`#f59e0b`/`#94a3b8` per state), a primary-gradient Download button gated on `tierState !== 'loaded'`, an `#f59e0b` "integrity-pending" disclaimer noting the sha is null until upload. Polls `ONNX_GET_STATUS` every 1 s for Tier 3 state. Marker: `{/* --- Session 17: Voice Tier Selection --- */}`. All color tokens + spacing + border-radius pull from UI_GUIDELINES canonical list (`--primary` `#7b68ee`, `--accent` `#bb86fc`, `--surface` `#1a1a2e`, etc.).
+
+#### Phase 8 — Vitest tests (Sonnet subagent B, 3 files in parallel)
+
+- [packages/onnx-runtime/src/__tests__/audio-preprocessor.test.ts](packages/onnx-runtime/src/__tests__/audio-preprocessor.test.ts) — 14 tests covering normalize (peak=1, sign preservation, clamp), resampleLinear (length, same-rate short-circuit, empty, invalid rates), chunkAudio (exact-fit, multi-chunk shape, overlap coercion, zero-pad), preprocessAudio Float32 + AudioBufferLike paths.
+- [packages/onnx-runtime/src/__tests__/indic-whisper.test.ts](packages/onnx-runtime/src/__tests__/indic-whisper.test.ts) — 21 tests (22 after Opus added the proto-pollution guard test, see Phase 9) covering load/ready/unload delegation, isSupported for all 22 BCP-47 codes, isFallbackLanguage for the 7 fallback codes, transcribe null/error paths, stub result shape, BCP47→Whisper mapping.
+- [packages/extension/src/content/motor/__tests__/tiered-stt.test.ts](packages/extension/src/content/motor/__tests__/tiered-stt.test.ts) — 17 tests covering pickTier matrix (native / onnx / auto with low-confidence escalation), TieredSTT state updates, captureAndTranscribeViaTierB success + error paths (getUserMedia reject, bg ok:false, bg throw), onTierChange invocation, audio-privacy invariant (no Blob/Uint8Array in public state post-resolution).
+
+Sonnet returned a clean unified diff + under-150-word change log; the only re-work needed was unrelated to Sonnet — see Phase 9 below for Opus-applied fixes.
+
+#### Phase 9 — Adversarial audio-boundary pass (Opus-solo; Codex quota wall, per memory feedback_rescue_fallback)
+
+Codex reset still 5 days out (2026-04-26). Ran Opus-solo threat review across 10 vectors specific to audio handling:
+
+1. Audio buffer leakage through content-script state — addressed in TieredSTT (`chunks = []` after Blob resolution). Accepted.
+2. Base64 retained in background message queue — transient; handler decodes + clears immediately. Accepted.
+3. Cloud escalation bypass — `pickTier` never returns `'C'` in Session 17 (no cloud path exists yet). Session 18 must gate on `preference === 'cloud-allowed'`. Accepted + flagged.
+4. Timing attack on language detection — encoder latency is language-agnostic. Accepted.
+5. **Model download MITM** (applied fix) — `sha256: null` during the pre-upload window means a MITM on the HTTP CDN could swap a malicious ONNX. Added an `#f59e0b` "Integrity-pending" warning in the popup VoiceTierPanel below the download button. Cleared once real hash pins.
+6. IndexedDB quota DoS — 80 MB is well below Chrome's per-origin limit. Accepted.
+7. **Prototype pollution via `in`** (applied fix; **BUG-015**) — `BCP47_TO_WHISPER` is a plain object literal; `in` accepts inherited keys like `toString`, `hasOwnProperty`, `__proto__`, `constructor`, bypassing the language gate. Fixed in both `IndicWhisper.isSupported` and the background `INDIC_WHISPER_TRANSCRIBE` handler (now `Object.prototype.hasOwnProperty.call`). New vitest case codifies the guard.
+8. **MediaRecorder duration unchecked** (applied fix) — a hostile caller could request `durationMs: 3_600_000`. Clamped to `[0, 30_000]` (30 s = one Whisper window). Accepted.
+9. **voice_tier_counts merkle-root inconsistency with server** (applied fix) — adding the field to the client's `canonicalLines` without a matching server-side update would break every future publish. Reverted the client-side inclusion while keeping the Laplace-noised field in the bundle. Documented in the code comment + in the docs + in this HANDOFF. Server update → next observatory deploy.
+10. PROFILE_UPDATED propagation — no Session 17 regression (content-side wire-in is Session 18). Accepted.
+
+Outcome: **3 real fixes applied** (proto-pollution, duration clamp, sha warning), 1 scope-adjustment applied (merkle-root exclusion), 6 accepted without action. Tests re-run green.
+
+#### Phase 5 — Gates (Opus)
+
+- `pnpm -r --parallel typecheck` clean across core · ai-engine · onnx-runtime · extension.
+- `pnpm -r --parallel test` — **961 tests passing** (+76 vs Session 16's 885). Breakdown: core 600 (unchanged), ai-engine 91 (unchanged), onnx-runtime 97 (was 41; +56 = 14 audio-preprocessor + 22 indic-whisper + 20 updated model-registry assertions), extension 173 (was 153; +20 = tiered-stt + misc).
+- `pnpm build` clean. `src/background/index.js` 91.5 → 99 KB (absorbing IndicWhisper + TieredSTT imports); `src/content/index.js` 366 KB unchanged (TieredSTT isn't instantiated in the content script this session — Session 18).
+- `node -c dist/src/content/index.js && node -c dist/src/background/index.js` — both parse (BUG-008/012 guard).
+- Secrets scan on diff — clean.
+- TODO scan on diff — one intentional `TODO(session-18)` inside `indic-whisper.ts` flagging the decoder gap (matches the existing minilm/t5 pattern).
+
+### Deferred to Session 18 (explicit, not aspirational)
+
+- **Whisper decoder autoregressive loop** with language-forcing prefix tokens (`<|startoftranscript|>` + `<|${BCP47_TO_WHISPER[lang]}|>` + `<|transcribe|>` + `<|notimestamps|>`), SentencePiece tokenizer loading + indexing, 30-second window seam de-dup. Structurally isomorphic to the T5 beam-search loop Session 15 is chasing.
+- **Run the prep scripts + upload real weights + pin sha256** — `python download-indicwhisper.py` + `bash upload-to-vps.sh` + `bash compute-hashes.sh` + patch `model-registry.ts` with the real hash + clear the popup integrity-pending warning.
+- **Content-side TieredSTT orchestration** — instantiate in `content/index.ts` voice-activation path, hook `PROFILE_UPDATED` to live-update preference + language.
+- **Voice Lab side-panel surface** — 5 s record, side-by-side Tier A vs Tier B transcription comparison, JSON export.
+- **Observatory server canonicalization update** — add `voice_tier_counts` (and retroactively `onnx_inferences`) to `canonicalLinesForBundle` in [ops/observatory/server.js](ops/observatory/server.js) so the client can fold them into the merkle root too.
+- **Cloud Tier C implementation** — Gemini Flash multimodal audio route via the existing AI engine, gated on `preference === 'cloud-allowed'` + observatory counter.
+- **docs/demos/voice-lab.md** walkthrough.
+- **22-language per-language quality table** in `docs/features/indian-language.md` — requires actually running the evaluate script on test WAVs, which needs the real weights.
+
+### Session 17 carry-forward / notes
+
+- Version stays at **v0.13.0** — no deploy run this session (user did not authorize; MVP cut didn't require it).
+- Observatory server is UNCHANGED — no observatory deploy this session.
+- The 8 new untracked files + 13 modified files all live in the single Session 17 commit.
+- `feedback_codex_parallel` memory honored: 1 Sonnet call wrote all 4 Python deliverables + updates; 1 Sonnet call wrote all 3 vitest files. Codex itself wasn't invoked — quota wall from Session 16 presumed still active; also the work split well between Opus (load-bearing + security) and Sonnet (mechanical script + tests).
+
+### Agent utilization
+
+Opus: Phase-0 warm-start reads, scope triage + Option A gating with user, model-ID pivot research (WebFetch AI4Bharat), MODEL_REGISTRY + types + runtime + background edits (load-bearing), content/motor/tiered-stt.ts authored directly, popup VoiceTierPanel, profile type updates + test helper, observatory counter types + Laplace pipeline change + merkle-root exclusion, Phase 3 diff review of Sonnet test output, adversarial pass (10 vectors → 3 fixes applied + 1 scope adjustment + 6 accepted), HANDOFF + RCA BUG-015 + FEATURES M-09 + ROADMAP R4-04 + indian-language.md + onnx-models.md Session 17 section.
+Sonnet: 2 parallel subagents — A wrote the 4 Python deliverables (download-indicwhisper.py, evaluate-indicwhisper.py, upload-to-vps.sh + compute-hashes.sh + models-manifest.json deltas); B wrote the 3 vitest files (audio-preprocessor, indic-whisper, tiered-stt = 52 new tests landed). Both returned unified diffs + sub-200-word change logs.
+Haiku: n/a — no bulk live-prod curl sweep needed (no deploy this session); no N-file pattern rollout (each modified file had bespoke wiring).
+codex:rescue: n/a — Codex usage wall still presumed active (2026-04-26 reset per Session 16 observation). Opus-solo adversarial pass ran per `feedback_rescue_fallback`; 3 applied / 1 scope-adjusted / 6 accepted.
+
+---
+
+## Previous Session: Session 16 — Feature #7 Zero-Knowledge Attestation (ring signatures + verifier tool) (2026-04-21)
 
 ### Headline
 

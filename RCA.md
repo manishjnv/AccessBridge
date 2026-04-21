@@ -207,6 +207,21 @@ Track every bug fix: what broke, why, how it was fixed, and how to prevent recur
 
 ---
 
+## BUG-015: IndicWhisper language gate used `in` operator — inherited keys like `toString` bypass the 22-language allowlist
+
+| Field | Detail |
+| ------- | -------- |
+| **Date** | 2026-04-21 |
+| **Severity** | Low (caught pre-production; Session 17 adversarial pass) |
+| **Symptom** | `IndicWhisper.isSupported('toString')` returned `true`. `isSupported('hasOwnProperty')`, `'__proto__'`, `'constructor'` all also returned `true`. The `INDIC_WHISPER_TRANSCRIBE` background handler used the same `in` operator to gate payload.language — so an attacker-controlled content-script sending `{language: 'toString'}` would pass both gates, reach `indicWhisper.transcribe()`, and then the Session-18 decoder would deref `BCP47_TO_WHISPER['toString']` which is a function, not a language code → decoder crash / potentially malformed inference path. Caught BEFORE any decoder code exists, so never reached production. |
+| **Root Cause** | `BCP47_TO_WHISPER` is created with `Object.freeze({...})`. Its prototype is still `Object.prototype`, so the `in` operator ("is this key reachable via the prototype chain?") returns `true` for inherited keys. The gate intended to check "is this a real BCP-47 entry?" but was testing the wrong property. |
+| **Fix** | [packages/onnx-runtime/src/models/indic-whisper.ts:125-138](packages/onnx-runtime/src/models/indic-whisper.ts#L125-L138) — `isSupported()` now uses `Object.prototype.hasOwnProperty.call(BCP47_TO_WHISPER, language)`. Same fix in [packages/extension/src/background/index.ts](packages/extension/src/background/index.ts) `INDIC_WHISPER_TRANSCRIBE` handler's language check. New vitest case `returns false for Object.prototype keys (proto-pollution guard)` in [packages/onnx-runtime/src/__tests__/indic-whisper.test.ts](packages/onnx-runtime/src/__tests__/indic-whisper.test.ts) covers `'toString'`, `'hasOwnProperty'`, `'__proto__'`, `'constructor'`. |
+| **Files Changed** | `packages/onnx-runtime/src/models/indic-whisper.ts`, `packages/extension/src/background/index.ts`, `packages/onnx-runtime/src/__tests__/indic-whisper.test.ts` |
+| **Commit** | (pending — Session 17 combined commit) |
+| **Prevention** | **Any `in` check against a static lookup object backed by a plain `{}` literal is a bug.** Canonical alternatives: (a) `Object.prototype.hasOwnProperty.call(obj, key)` — most portable; (b) `Object.hasOwn(obj, key)` — cleaner (ES2022+); (c) replace the literal with a `Map` and use `map.has(key)` which ignores the prototype chain by construction. Same class of bug would arise for any future 22-language / N-language allowlist — add a repo-wide grep as part of adversarial review: `in BCP47_TO_WHISPER`, `in SUPPORTED_LANGUAGES`, `in FEATURE_FLAGS`, etc. — if the target is an object literal, flag the check. |
+
+---
+
 ## BUG-014: Ring-signature keyImage domain included ringHash → mid-day ring rotation enabled double-publish
 
 | Field | Detail |

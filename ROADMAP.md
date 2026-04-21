@@ -242,7 +242,7 @@ WASM + WebGPU for privacy-preserving local inference — no cloud dependency.
 - **Effort:** 6-10 weeks
 - **Key tech:** ONNX Runtime Web, Transformers.js, quantized models
 - **Dependencies:** None; improves `@accessbridge/ai-engine` local tier
-- **Status:** Session 12 shipped the infrastructure — `@accessbridge/onnx-runtime` package, three-tier runtime with IDB cache + SHA-256 integrity, struggle detector `featurize()` + classifier blending, `LocalAIProvider.embed()`, semantic cache key generation, popup + sidepanel UI, observatory counters, ~70 new tests. **Deferred to Session 13+:** Python XGBoost training pipeline, uploading real quantized MiniLM/T5 binaries to the VPS CDN, WordPiece tokenizer, T5 beam-search decode. See [docs/features/onnx-models.md](docs/features/onnx-models.md).
+- **Status:** Session 12 shipped the infrastructure — `@accessbridge/onnx-runtime` package, three-tier runtime with IDB cache + SHA-256 integrity, struggle detector `featurize()` + classifier blending, `LocalAIProvider.embed()`, semantic cache key generation, popup + sidepanel UI, observatory counters, ~70 new tests. Session 14 landed Tier 0 (real XGBoost classifier, bundled). Session 17 extended the runtime to four tiers by adding Tier 3 IndicWhisper STT (wrapper class + audio preprocessor + 22-language BCP-47 mapping + TieredSTT picker + popup tier selector). **Deferred to Session 18+:** Whisper decoder autoregressive loop with language-forcing tokens, real weights upload to the VPS CDN for IndicWhisper + T5, content-side TieredSTT orchestration, Voice Lab demo surface. See [docs/features/onnx-models.md](docs/features/onnx-models.md).
 
 ---
 

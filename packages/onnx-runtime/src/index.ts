@@ -24,10 +24,34 @@ export { T5Summarizer } from './models/t5-summarizer.js';
 export type { SummarizeOptions } from './models/t5-summarizer.js';
 
 export {
+  IndicWhisper,
+  BCP47_TO_WHISPER,
+  FALLBACK_LANGUAGES,
+} from './models/indic-whisper.js';
+export type {
+  TranscribeResult,
+  TranscribeOptions,
+  WordTimestamp,
+} from './models/indic-whisper.js';
+
+export {
+  WHISPER_SAMPLE_RATE,
+  WHISPER_CHUNK_SAMPLES,
+  DEFAULT_CHUNK_OVERLAP,
+  normalizeFloat32,
+  resampleLinear,
+  resample,
+  chunkAudio,
+  preprocessAudio,
+} from './models/audio-preprocessor.js';
+export type { AudioBufferLike } from './models/audio-preprocessor.js';
+
+export {
   MODEL_REGISTRY,
   STRUGGLE_CLASSIFIER_ID,
   MINILM_EMBEDDINGS_ID,
   T5_SUMMARIZER_ID,
+  INDIC_WHISPER_ID,
   TIER_LABELS,
   TIER_DESCRIPTIONS,
   getModelMetadata,
@@ -45,4 +69,5 @@ export type {
   StruggleClassifierLike,
   EmbedderLike,
   SummarizerLike,
+  TranscriberLike,
 } from './types.js';

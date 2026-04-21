@@ -3,14 +3,30 @@
 ## Overview
 
 AccessBridge ships first-class voice-command and transliteration support for
-**10 Indian languages plus English**, reaching roughly **3.1 billion speakers**
-— about **39% of the world population** — in their native script.
+**10 Indian languages plus English** natively through the Web Speech API, plus
+**IndicWhisper ONNX Tier B STT infrastructure** (Session 17) that unlocks
+**all 22 Indian languages** once the decoder loop lands in Session 18 —
+reaching roughly **3.1 billion speakers**, about **39% of the world
+population**, in their native script.
 
 The goal: accessibility in your own language, not in a translation of someone
-else's. Voice recognition runs through the Web Speech API's native BCP-47
-locale set (Chrome ships recognition models for each of these languages), and
-the matcher is a native-script phrase dictionary so users speak the way they
-actually speak.
+else's. Voice recognition routes through a **three-tier STT chain**:
+
+- **Tier A (fastest, free)** — Chrome Web Speech API for the 11 natively
+  supported locales (hi-IN · bn-IN · ta-IN · te-IN · mr-IN · gu-IN · kn-IN ·
+  ml-IN · pa-IN · ur-IN · as-IN).
+- **Tier B (on-device ONNX, ~80 MB)** — IndicWhisper-small int8 for the
+  remaining 11 (Sanskrit, Kashmiri, Konkani, Manipuri, Nepali, Bodo, Santali,
+  Maithili, Dogri, Sindhi, Odia) and as a quality-upgrade path for Tier A
+  languages in low-signal situations. **Session 17 shipped: model wrapper,
+  download UX, popup tier selector, tiered fallback logic. Session 18 ships:
+  the Whisper decoder loop + language-forcing tokens.**
+- **Tier C (cloud fallback)** — Gemini Flash multimodal audio, only when the
+  user explicitly opts in via `voiceQualityTier = 'cloud-allowed'`.
+
+User preference lives on `profile.motor.voiceQualityTier`
+(`'auto' | 'native' | 'onnx' | 'cloud-allowed'`) — the popup's Motor tab
+"Voice Quality Tier" panel picks it live.
 
 ## Supported Languages
 

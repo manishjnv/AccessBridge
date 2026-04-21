@@ -19,6 +19,8 @@ const VPS_MODEL_BASE = 'http://72.61.227.64:8300/models';
 export const STRUGGLE_CLASSIFIER_ID = 'struggle-classifier-v1';
 export const MINILM_EMBEDDINGS_ID = 'minilm-l6-v2';
 export const T5_SUMMARIZER_ID = 't5-small';
+// --- Session 17: Indic Whisper STT ---
+export const INDIC_WHISPER_ID = 'indic-whisper-small';
 
 export const MODEL_REGISTRY: Record<string, ModelMetadata> = {
   [STRUGGLE_CLASSIFIER_ID]: {
@@ -72,6 +74,31 @@ export const MODEL_REGISTRY: Record<string, ModelMetadata> = {
     description:
       'T5-small quantized: abstractive summarization (beam-search decoding required — deferred to Session 15).',
   },
+  // --- Session 17: Indic Whisper STT ---
+  // Upstream: openai/whisper-small (MIT, 99-language multilingual incl. all
+  // 22 Indian languages). Branded indic-whisper-* on disk for AccessBridge
+  // spec compatibility + future swap to AI4Bharat IndicConformer without
+  // caller churn. Sha null until tools/prepare-models/download-indicwhisper.py
+  // runs + upload-to-vps.sh + compute-hashes.sh populates it.
+  [INDIC_WHISPER_ID]: {
+    id: INDIC_WHISPER_ID,
+    version: 'v1',
+    url: `${VPS_MODEL_BASE}/indic-whisper-small-int8.onnx`,
+    bundledPath: null,
+    sha256: null,
+    sizeBytes: 80 * 1024 * 1024,
+    loadTier: 3,
+    inputNames: ['input_features'],
+    outputNames: ['last_hidden_state'],
+    description:
+      'Whisper-small int8: STT for 22 Indian languages (decoder loop deferred to Session 18).',
+    tokenizer: {
+      url: `${VPS_MODEL_BASE}/indic-whisper-tokenizer.json`,
+      bundledPath: null,
+      sha256: null,
+      sizeBytes: 2 * 1024 * 1024,
+    },
+  },
 };
 
 export function getModelMetadata(id: string): ModelMetadata | null {
@@ -86,10 +113,12 @@ export const TIER_LABELS: Record<ModelTier, string> = {
   0: 'Struggle Classifier',
   1: 'Embeddings (MiniLM)',
   2: 'Summarizer (T5-small)',
+  3: 'Voice STT (IndicWhisper)',
 };
 
 export const TIER_DESCRIPTIONS: Record<ModelTier, string> = {
   0: 'Always-on baseline classifier (~0.9 MB, bundled). Loads instantly at startup.',
   1: 'On-demand semantic embeddings (~22 MB, downloads from CDN).',
   2: 'On-demand abstractive summarization (~242 MB). Deferred to Session 15.',
+  3: 'On-demand 22-language voice STT (~80 MB). Opt-in download; decoder loop Session 18.',
 };

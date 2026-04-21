@@ -39,8 +39,10 @@ export interface RawCounters {
   languages_used: string[];
   domain_connectors_activated: Record<string, number>;
   estimated_accessibility_score_improvement: number;
-  /** Session 12: on-device ONNX inference counters per tier. Keys: 'tier0', 'tier1', 'tier2', 'fallback'. */
+  /** Session 12: on-device ONNX inference counters per tier. Keys: 'tier0', 'tier1', 'tier2', 'fallback'. Session 17 adds 'tier3'. */
   onnx_inferences?: Record<string, number>;
+  /** Session 17: voice STT tier usage counts. Keys: 'a' (Web Speech), 'b' (IndicWhisper ONNX), 'c' (cloud). */
+  voice_tier_counts?: Record<string, number>;
 }
 
 export interface NoisyBundle {
@@ -53,6 +55,8 @@ export interface NoisyBundle {
   estimated_accessibility_score_improvement: number;
   /** Session 12: Laplace-noised ONNX inference counters per tier + fallback. */
   onnx_inferences: Record<string, number>;
+  /** Session 17: Laplace-noised voice-STT tier usage counts. */
+  voice_tier_counts: Record<string, number>;
   merkle_root: string;
   schema_version: 1;
 }
@@ -174,6 +178,7 @@ function canonicalLines(bundle: {
   languages_used: string[];
   estimated_accessibility_score_improvement: number;
   onnx_inferences?: Record<string, number>;
+  voice_tier_counts?: Record<string, number>;
 }): string[] {
   const lines: string[] = [];
   for (const [k, v] of Object.entries(bundle.adaptations_applied)) {
@@ -189,6 +194,12 @@ function canonicalLines(bundle: {
   for (const [k, v] of Object.entries(bundle.onnx_inferences ?? {})) {
     lines.push(`onnx_inferences:${k}=${v}`);
   }
+  // Session 17: voice_tier_counts are carried on the raw bundle + noised payload
+  // but intentionally NOT folded into the merkle root — the observatory server's
+  // canonicalLinesForBundle() does not yet know about this field, so including
+  // it here would cause merkle_root mismatches and reject publishes. A future
+  // observatory deploy that adds voice_tier_counts to the server-side canonical
+  // line set can then mirror the addition here.
   const langs = [...new Set(bundle.languages_used)].sort();
   lines.push(`languages_used:=[${langs.join(',')}]`);
   lines.push(
@@ -242,6 +253,13 @@ export async function aggregateDailyBundle(
     onnx_inferences[k] = addLaplaceNoise(v, DP_EPSILON, DP_SENSITIVITY);
   }
 
+  // Session 17: voice-STT tier counts are DP-noised the same way. Keys
+  // are 'a' | 'b' | 'c' — per-utterance cardinality, one of three slots.
+  const voice_tier_counts: Record<string, number> = {};
+  for (const [k, v] of Object.entries(raw.voice_tier_counts ?? {})) {
+    voice_tier_counts[k] = addLaplaceNoise(v, DP_EPSILON, DP_SENSITIVITY);
+  }
+
   const partial = {
     date: todayLocalISO(),
     adaptations_applied,
@@ -251,6 +269,7 @@ export async function aggregateDailyBundle(
     domain_connectors_activated,
     estimated_accessibility_score_improvement,
     onnx_inferences,
+    voice_tier_counts,
   };
   const lines = canonicalLines(partial);
   const merkle_root = await merkleRoot(lines);

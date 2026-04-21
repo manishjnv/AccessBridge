@@ -32,6 +32,11 @@ import {
   TIER_LABELS,
 } from '@accessbridge/onnx-runtime';
 import type { ModelTier } from '@accessbridge/onnx-runtime';
+// --- Session 17: Indic Whisper STT ---
+import {
+  IndicWhisper,
+  BCP47_TO_WHISPER,
+} from '@accessbridge/onnx-runtime';
 
 // Compliance Observatory — anonymous, DP-noised daily metrics (Feature #10)
 import {
@@ -133,10 +138,12 @@ let onnxRuntime: ONNXRuntime | null = null;
 let struggleClassifier: StruggleClassifier | null = null;
 let miniLM: MiniLMEmbeddings | null = null;
 let t5Summarizer: T5Summarizer | null = null;
+// --- Session 17: Indic Whisper STT ---
+let indicWhisper: IndicWhisper | null = null;
 
-const onnxTierState: Record<ModelTier, OnnxTierState> = { 0: 'idle', 1: 'idle', 2: 'idle' };
-const onnxTierProgress: Record<ModelTier, number> = { 0: 0, 1: 0, 2: 0 };
-const onnxTierError: Record<ModelTier, string | null> = { 0: null, 1: null, 2: null };
+const onnxTierState: Record<ModelTier, OnnxTierState> = { 0: 'idle', 1: 'idle', 2: 'idle', 3: 'idle' };
+const onnxTierProgress: Record<ModelTier, number> = { 0: 0, 1: 0, 2: 0, 3: 0 };
+const onnxTierError: Record<ModelTier, string | null> = { 0: null, 1: null, 2: null, 3: null };
 
 function getOnnxRuntime(): ONNXRuntime {
   if (!onnxRuntime) {
@@ -156,6 +163,7 @@ function getOnnxRuntime(): ONNXRuntime {
     struggleClassifier = new StruggleClassifier(onnxRuntime);
     miniLM = new MiniLMEmbeddings(onnxRuntime);
     t5Summarizer = new T5Summarizer(onnxRuntime);
+    indicWhisper = new IndicWhisper(onnxRuntime);
     wireOnnxModelsIntoPipeline();
   }
   return onnxRuntime;
@@ -210,11 +218,21 @@ function onnxForceFallback(): boolean {
 }
 
 function maybeRecordObservatoryOnnx(
-  bucket: 'tier0' | 'tier1' | 'tier2' | 'fallback',
+  bucket: 'tier0' | 'tier1' | 'tier2' | 'tier3' | 'fallback',
 ): void {
   if (currentProfile?.shareAnonymousMetrics) {
     observatoryCollector.recordOnnxInference(bucket);
   }
+}
+
+// --- Session 17: Indic Whisper STT ---
+function maybeRecordVoiceTier(
+  tier: 'a' | 'b' | 'c',
+  language?: string,
+): void {
+  if (!currentProfile?.shareAnonymousMetrics) return;
+  observatoryCollector.recordVoiceTier?.(tier);
+  if (language) observatoryCollector.recordLanguageUsed?.(language);
 }
 
 async function loadOnnxTier(tier: ModelTier): Promise<{ ok: boolean; error?: string }> {
@@ -226,7 +244,8 @@ async function loadOnnxTier(tier: ModelTier): Promise<{ ok: boolean; error?: str
   const model =
     tier === 0 ? struggleClassifier :
     tier === 1 ? miniLM :
-    t5Summarizer;
+    tier === 2 ? t5Summarizer :
+    indicWhisper;
   if (!model) {
     onnxTierState[tier] = 'failed';
     onnxTierError[tier] = 'model-instance-missing';
@@ -289,7 +308,7 @@ async function getOnnxStatusSnapshot(): Promise<{
     };
   };
   return {
-    tiers: { 0: tierMeta(0), 1: tierMeta(1), 2: tierMeta(2) },
+    tiers: { 0: tierMeta(0), 1: tierMeta(1), 2: tierMeta(2), 3: tierMeta(3) },
     runtime: runtimeStats,
     forceFallback: onnxForceFallback(),
   };
@@ -463,7 +482,10 @@ type MessageType =
   | 'ONNX_SET_FORCE_FALLBACK'
   | 'ONNX_RUN_BENCHMARK'
   // --- Session 16: ZK attestation ---
-  | 'OBSERVATORY_ROTATE_KEY';
+  | 'OBSERVATORY_ROTATE_KEY'
+  // --- Session 17: Indic Whisper STT ---
+  | 'INDIC_WHISPER_TRANSCRIBE'
+  | 'VOICE_TIER_RECORD';
 
 interface Message {
   type: MessageType;
@@ -814,7 +836,7 @@ async function handleMessage(
 
     case 'ONNX_LOAD_TIER': {
       const { tier } = message.payload as { tier: ModelTier };
-      if (tier !== 0 && tier !== 1 && tier !== 2) {
+      if (tier !== 0 && tier !== 1 && tier !== 2 && tier !== 3) {
         return { ok: false, error: `invalid-tier:${tier}` };
       }
       // Fire-and-forget so the popup can poll progress via ONNX_GET_STATUS.
@@ -836,8 +858,8 @@ async function handleMessage(
 
     case 'ONNX_CLEAR_CACHE': {
       if (onnxRuntime) await onnxRuntime.clearCache();
-      onnxTierState[0] = onnxTierState[1] = onnxTierState[2] = 'idle';
-      onnxTierProgress[0] = onnxTierProgress[1] = onnxTierProgress[2] = 0;
+      onnxTierState[0] = onnxTierState[1] = onnxTierState[2] = onnxTierState[3] = 'idle';
+      onnxTierProgress[0] = onnxTierProgress[1] = onnxTierProgress[2] = onnxTierProgress[3] = 0;
       return { ok: true };
     }
 
@@ -871,6 +893,68 @@ async function handleMessage(
         classifierScores,
         heuristicScores,
       };
+    }
+
+    // --- Session 17: Indic Whisper STT ---
+    case 'INDIC_WHISPER_TRANSCRIBE': {
+      const payload = message.payload as {
+        audioBase64?: string;
+        mime?: string;
+        language?: string;
+      } | undefined;
+      if (!payload || typeof payload.audioBase64 !== 'string' || typeof payload.language !== 'string') {
+        return { ok: false, error: 'bad-payload' };
+      }
+      // Security-boundary note (RCA: audio is privacy-class input):
+      //   - We never persist audioBase64 anywhere; it is decoded into a
+      //     Uint8Array local to this block and dropped once inference resolves.
+      //   - Whisper sample rate is set by the wrapper; we pass 16 000 as a
+      //     placeholder and let IndicWhisper resample if upstream didn't.
+      //   - No logging of audio bytes under any logger; only metadata + lengths.
+      if (!indicWhisper || !indicWhisper.ready()) {
+        return { ok: false, error: 'indic-whisper-not-loaded' };
+      }
+      // Session 17 adversarial finding: the `in` operator accepts
+      // inherited keys like 'toString' / 'hasOwnProperty', which would
+      // bypass the language gate. hasOwnProperty.call is the correct check.
+      if (!Object.prototype.hasOwnProperty.call(BCP47_TO_WHISPER, payload.language)) {
+        return { ok: false, error: `unsupported-language:${payload.language}` };
+      }
+      let audioBytes: Uint8Array;
+      try {
+        audioBytes = base64ToBytes(payload.audioBase64);
+      } catch (err) {
+        return { ok: false, error: `decode-failed:${String(err)}` };
+      }
+      // TODO(session-18): decode the container (webm/opus) into Float32 PCM.
+      // For now we pass an empty Float32Array; IndicWhisper returns a
+      // structured null-ish result so the wiring is exercised end-to-end
+      // without pretending to transcribe.
+      const pcm = new Float32Array(0);
+      audioBytes = new Uint8Array(0); // drop the buffer
+      void audioBytes;
+      const result = await indicWhisper.transcribe(pcm, 16_000, {
+        language: payload.language,
+      });
+      maybeRecordVoiceTier('b', payload.language);
+      maybeRecordObservatoryOnnx(result ? 'tier3' : 'fallback');
+      if (!result) return { ok: false, error: 'inference-returned-null' };
+      return {
+        ok: true,
+        text: result.text,
+        confidence: result.confidence,
+        language: result.language,
+        latencyMs: result.latencyMs,
+        real: result.real,
+      };
+    }
+
+    case 'VOICE_TIER_RECORD': {
+      const p = message.payload as { tier?: 'a' | 'b' | 'c'; language?: string } | undefined;
+      if (p && (p.tier === 'a' || p.tier === 'b' || p.tier === 'c')) {
+        maybeRecordVoiceTier(p.tier, p.language);
+      }
+      return { ok: true };
     }
 
     // --- Session 16: ZK attestation ---
@@ -998,6 +1082,19 @@ async function handleTabCommand(command: string): Promise<unknown> {
     default:
       return { error: `Unknown tab command: ${command}` };
   }
+}
+
+// --- Session 17: Indic Whisper STT ---
+
+function base64ToBytes(b64: string): Uint8Array {
+  if (typeof atob === 'function') {
+    const bin = atob(b64);
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+  // Node fallback — service worker always has atob, but be defensive for tests.
+  return new Uint8Array(Buffer.from(b64, 'base64'));
 }
 
 // ---------- Version comparison ----------

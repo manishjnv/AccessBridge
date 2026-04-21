@@ -125,10 +125,19 @@
       font-size: 11px;
       font-weight: 700;
       letter-spacing: 0.6px;
-      padding: 3px 8px;
+      padding: 3px 10px;
       border-radius: 999px;
       background: rgba(123, 104, 238, 0.15);
-      color: var(--accent);
+      color: var(--accent) !important;
+      -webkit-text-fill-color: var(--accent) !important;
+      text-decoration: none;
+      opacity: 1 !important;
+      transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+    }
+    .navbar-version:hover {
+      background: rgba(123, 104, 238, 0.28);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px var(--glow);
     }
     .btn-version {
       font-size: 11px;
@@ -2258,11 +2267,7 @@
         <a href="#/team" data-route="/team">Team</a>
         <a href="#/enterprise" data-route="/enterprise">Enterprise</a>
         <a href="#/github" data-route="/github">GitHub</a>
-        <span class="app-version navbar-version" aria-label="Current version">v…</span>
-        <a href="#install" class="navbar-cta">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-          Install
-        </a>
+        <a href="#install" class="app-version navbar-version" aria-label="Current version — jump to install section" title="Download extension">v…</a>
       </div>
       <button class="navbar-toggle" id="nav-toggle" aria-label="Toggle navigation menu">
         <span></span><span></span><span></span>

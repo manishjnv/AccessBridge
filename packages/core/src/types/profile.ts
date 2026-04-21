@@ -122,6 +122,15 @@ export interface AccessibilityProfile {
   onnxDownloadOnMeteredNetwork: boolean;
   /** Debug: force all ONNX calls to fail so the heuristic path runs. Useful for demos. */
   onnxForceFallback: boolean;
+  // --- Session 16: Zero-Knowledge Attestation (Feature #7) ---
+  /** Device is enrolled in the observatory ring (public key submitted). */
+  observatoryEnrolled: boolean;
+  /** Ring version the device last synced; re-enroll if the server's version diverges. */
+  observatoryRingVersion: number;
+  /** Cached key image hex for the current publish date; null outside the active publish day. */
+  observatoryKeyImage: string | null;
+  /** Date (YYYY-MM-DD) the cached keyImage belongs to; null when unset. */
+  observatoryKeyImageDate: string | null;
 }
 
 export const DEFAULT_SENSORY_PROFILE: SensoryProfile = {
@@ -207,4 +216,9 @@ export const DEFAULT_PROFILE: AccessibilityProfile = {
   },
   onnxDownloadOnMeteredNetwork: false,
   onnxForceFallback: false,
+  // --- Session 16: Zero-Knowledge Attestation (Feature #7) ---
+  observatoryEnrolled: false,
+  observatoryRingVersion: 0,
+  observatoryKeyImage: null,
+  observatoryKeyImageDate: null,
 };

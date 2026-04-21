@@ -10,6 +10,7 @@ import {
   aggregateDailyBundle,
   publishDailyBundle,
   recordPublish,
+  runDailyAttestation,
   shouldPublishNow,
   type RawCounters,
 } from './observatory-publisher.js';
@@ -221,7 +222,13 @@ export function installDailyAlarm(
       await collector.persistToStorage();
       const raw = collector.getRawCounters();
       const bundle = await aggregateDailyBundle(raw);
-      const result = await publishDailyBundle(bundle);
+      // Session 16: ring-signed attestation is the primary path. The legacy
+      // publishDailyBundle is retained but only invoked as a fallback if the
+      // ring is empty (bootstrap phase — waiting on 2nd device to enroll).
+      let result = await runDailyAttestation({ bundle });
+      if (!result.ok && result.error && /ring-size-too-small/.test(result.error)) {
+        result = await publishDailyBundle(bundle);
+      }
       if (result.ok) {
         await recordPublish(Date.now());
         await incrementDaysContributed();

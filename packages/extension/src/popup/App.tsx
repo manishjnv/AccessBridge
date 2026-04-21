@@ -835,6 +835,32 @@ function MotorTab({
   );
 }
 
+// --- Session 16: ZK attestation storage types for popup ---
+interface ObservatoryRingCache {
+  version: number;
+  pubKeys: string[];
+  ringHash: string;
+  fetchedAt: number;
+}
+interface ObservatoryLastAttestation {
+  date: string;
+  valid: boolean;
+  reason?: string;
+}
+
+function abbrevKey(hex: string): string {
+  if (hex.length < 8) return hex;
+  return `${hex.slice(0, 4)}…${hex.slice(-4)}`;
+}
+
+function todayISO(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 function SettingsTab({
   profile,
   onSave,
@@ -855,14 +881,41 @@ function SettingsTab({
   const [lastPublish, setLastPublish] = useState<number | null>(null);
   const [daysContributed, setDaysContributed] = useState<number>(0);
 
-  useEffect(() => {
+  // --- Session 16: ZK attestation state ---
+  const [devicePubkey, setDevicePubkey] = useState<string>('');
+  const [ringCache, setRingCache] = useState<ObservatoryRingCache | null>(null);
+  const [lastAttestation, setLastAttestation] = useState<ObservatoryLastAttestation | null>(null);
+  const [rotatingKey, setRotatingKey] = useState(false);
+  const [copiedUrl, setCopiedUrl] = useState(false);
+  const [showRotateConfirm, setShowRotateConfirm] = useState(false);
+
+  const loadObservatoryState = () => {
     chrome.storage.local
-      .get(['observatory_last_publish', 'observatory_days_contributed'])
+      .get([
+        'observatory_last_publish',
+        'observatory_days_contributed',
+        'observatory_device_pubkey',
+        'observatory_ring_cache',
+        'observatory_last_attestation',
+      ])
       .then((res) => {
         setLastPublish((res.observatory_last_publish as number) ?? null);
         setDaysContributed((res.observatory_days_contributed as number) ?? 0);
+        setDevicePubkey((res.observatory_device_pubkey as string) ?? '');
+        const rc = res.observatory_ring_cache;
+        setRingCache(rc && typeof rc === 'object' ? (rc as ObservatoryRingCache) : null);
+        const la = res.observatory_last_attestation;
+        setLastAttestation(la && typeof la === 'object' ? (la as ObservatoryLastAttestation) : null);
       })
       .catch(() => {});
+  };
+
+  useEffect(() => {
+    loadObservatoryState();
+    // Poll every 10 s for live attestation status
+    const iv = setInterval(loadObservatoryState, 10_000);
+    return () => clearInterval(iv);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile.shareAnonymousMetrics]);
 
   const formatLastPublish = (ts: number | null): string => {
@@ -871,6 +924,34 @@ function SettingsTab({
     if (hoursAgo < 1) return 'Under an hour ago';
     if (hoursAgo < 48) return `${hoursAgo} h ago`;
     return `${Math.floor(hoursAgo / 24)} d ago`;
+  };
+
+  // Derive enrollment status: profile flag + pubkey present + pubkey in ring
+  const isEnrolled =
+    profile.observatoryEnrolled === true &&
+    devicePubkey.length === 64 &&
+    (ringCache?.pubKeys ?? []).includes(devicePubkey);
+
+  const handleRotateKey = async () => {
+    setShowRotateConfirm(false);
+    setRotatingKey(true);
+    try {
+      await chrome.runtime.sendMessage({ type: 'OBSERVATORY_ROTATE_KEY' });
+      loadObservatoryState();
+    } catch {
+      // ignore
+    } finally {
+      setRotatingKey(false);
+    }
+  };
+
+  const handleCopyVerifierUrl = () => {
+    const today = todayISO();
+    const url = `http://72.61.227.64:8300/observatory/verifier?date=${today}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopiedUrl(true);
+      setTimeout(() => setCopiedUrl(false), 2000);
+    }).catch(() => {});
   };
 
   return (
@@ -915,16 +996,177 @@ function SettingsTab({
           content, and browsing history are never collected.
         </p>
         {profile.shareAnonymousMetrics && (
-          <div className="mt-3 space-y-1 text-xs">
-            <div className="flex justify-between">
-              <span className="text-a11y-muted">Last publish</span>
-              <span className="text-a11y-text font-mono">{formatLastPublish(lastPublish)}</span>
+          <>
+            <div className="mt-3 space-y-1 text-xs">
+              <div className="flex justify-between">
+                <span className="text-a11y-muted">Last publish</span>
+                <span className="text-a11y-text font-mono">{formatLastPublish(lastPublish)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-a11y-muted">Days contributed</span>
+                <span className="text-a11y-text font-mono">{daysContributed}</span>
+              </div>
             </div>
-            <div className="flex justify-between">
-              <span className="text-a11y-muted">Days contributed</span>
-              <span className="text-a11y-text font-mono">{daysContributed}</span>
+
+            {/* --- Session 16: ZK Attestation detail panel --- */}
+            <div
+              className="mt-3 rounded-lg p-3 space-y-2"
+              style={{
+                background: '#0a0a1a',
+                border: '1px solid rgba(123,104,238,0.18)',
+              }}
+            >
+              {/* Enrollment status */}
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-a11y-muted">Status</span>
+                <span className="flex items-center gap-1.5 text-xs font-semibold">
+                  <span
+                    className="inline-block w-2 h-2 rounded-full flex-shrink-0"
+                    style={{ background: isEnrolled ? '#10b981' : '#94a3b8' }}
+                    aria-hidden="true"
+                  />
+                  <span style={{ color: isEnrolled ? '#10b981' : '#94a3b8' }}>
+                    {isEnrolled ? 'Enrolled' : 'Not enrolled'}
+                  </span>
+                </span>
+              </div>
+
+              {/* Device key (abbreviated) */}
+              {devicePubkey && (
+                <div className="space-y-0.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-a11y-muted">Device key</span>
+                    <span
+                      className="text-xs font-mono"
+                      style={{ color: '#bb86fc' }}
+                      title={devicePubkey}
+                    >
+                      {abbrevKey(devicePubkey)}
+                    </span>
+                  </div>
+                  <p className="text-xs" style={{ color: '#94a3b8', lineHeight: 1.4 }}>
+                    Your ring membership fingerprint — share with an auditor to verify your attestation was included.
+                  </p>
+                </div>
+              )}
+
+              {/* Ring size */}
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-a11y-muted">Ring size</span>
+                <span className="text-xs font-mono" style={{ color: '#e2e8f0' }}>
+                  {ringCache ? ringCache.pubKeys.length : '—'}
+                </span>
+              </div>
+
+              {/* Last attestation */}
+              {lastAttestation && (
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-a11y-muted">Last attestation</span>
+                  <span className="flex items-center gap-1 text-xs">
+                    <span style={{ color: '#e2e8f0' }}>{lastAttestation.date}</span>
+                    {lastAttestation.valid ? (
+                      <svg
+                        width="14" height="14" viewBox="0 0 24 24"
+                        fill="none" stroke="#10b981" strokeWidth="2.5"
+                        strokeLinecap="round" strokeLinejoin="round"
+                        aria-label="Valid"
+                      >
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    ) : (
+                      <span
+                        title={lastAttestation.reason ?? 'Invalid attestation'}
+                        style={{ cursor: 'help' }}
+                      >
+                        <svg
+                          width="14" height="14" viewBox="0 0 24 24"
+                          fill="none" stroke="#ef4444" strokeWidth="2.5"
+                          strokeLinecap="round" strokeLinejoin="round"
+                          aria-label={`Invalid: ${lastAttestation.reason ?? 'unknown reason'}`}
+                        >
+                          <line x1="18" y1="6" x2="6" y2="18" />
+                          <line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                      </span>
+                    )}
+                  </span>
+                </div>
+              )}
+
+              {/* Action buttons */}
+              <div className="flex gap-2 pt-1">
+                {/* Rotate device key */}
+                {!showRotateConfirm ? (
+                  <button
+                    onClick={() => setShowRotateConfirm(true)}
+                    disabled={rotatingKey}
+                    className="flex items-center gap-1 text-xs px-2 py-1.5 rounded transition-colors disabled:opacity-50"
+                    style={{
+                      background: 'rgba(123,104,238,0.12)',
+                      color: '#bb86fc',
+                      border: '1px solid rgba(123,104,238,0.3)',
+                      cursor: rotatingKey ? 'not-allowed' : 'pointer',
+                    }}
+                    aria-label="Rotate device key"
+                  >
+                    <svg
+                      width="14" height="14" viewBox="0 0 24 24"
+                      fill="none" stroke="currentColor" strokeWidth="2.5"
+                      strokeLinecap="round" strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <polyline points="23 4 23 10 17 10" />
+                      <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+                    </svg>
+                    {rotatingKey ? 'Rotating…' : 'Rotate key'}
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-2 text-xs" style={{ color: '#e2e8f0' }}>
+                    <span style={{ color: '#f59e0b' }}>Rotating invalidates today's attestation. Continue?</span>
+                    <button
+                      onClick={() => void handleRotateKey()}
+                      className="px-2 py-1 rounded text-xs"
+                      style={{ background: '#ef4444', color: '#fff', border: 'none', cursor: 'pointer' }}
+                    >
+                      Yes
+                    </button>
+                    <button
+                      onClick={() => setShowRotateConfirm(false)}
+                      className="px-2 py-1 rounded text-xs"
+                      style={{ background: 'rgba(255,255,255,0.08)', color: '#94a3b8', border: 'none', cursor: 'pointer' }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
+
+                {/* Copy verification URL */}
+                <button
+                  onClick={handleCopyVerifierUrl}
+                  className="flex items-center gap-1 text-xs px-2 py-1.5 rounded transition-colors"
+                  style={{
+                    background: 'rgba(123,104,238,0.12)',
+                    color: copiedUrl ? '#10b981' : '#bb86fc',
+                    border: `1px solid ${copiedUrl ? 'rgba(16,185,129,0.4)' : 'rgba(123,104,238,0.3)'}`,
+                    cursor: 'pointer',
+                  }}
+                  aria-label="Copy verification URL"
+                >
+                  {copiedUrl ? (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  ) : (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                    </svg>
+                  )}
+                  {copiedUrl ? 'Copied!' : 'Copy verify URL'}
+                </button>
+              </div>
             </div>
-          </div>
+          </>
         )}
         <a
           href="http://72.61.227.64:8300/observatory/"

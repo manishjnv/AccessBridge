@@ -49,6 +49,11 @@ function makeProfile(
     },
     onnxDownloadOnMeteredNetwork: false,
     onnxForceFallback: false,
+    // --- Session 16: Zero-Knowledge Attestation ---
+    observatoryEnrolled: false,
+    observatoryRingVersion: 0,
+    observatoryKeyImage: null,
+    observatoryKeyImageDate: null,
     ...overrides,
   };
 }

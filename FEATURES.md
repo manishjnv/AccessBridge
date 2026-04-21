@@ -142,6 +142,22 @@ Anonymous, differentially-private daily metrics stream from the extension to a V
 
 Live dashboard: `http://72.61.227.64:8300/observatory/`. The landing page exposes an in-page `#observatory` help section (what it is + privacy guarantees + 3 capability cards) that deep-links to the full dashboard via an "Open full dashboard" CTA — nav and footer both anchor-scroll to that section instead of navigating away. Docs: [docs/features/compliance-observatory.md](docs/features/compliance-observatory.md).
 
+---
+
+## Zero-Knowledge Attestation (Feature #7, Session 16)
+
+Layers cryptographic authenticity on top of the Observatory. Each opt-in device holds a Ristretto255 keypair (generated at first publish); daily bundles are signed with a SAG linkable ring signature against the current ring of enrolled devices. The server verifies every signature and enforces UNIQUE(date, keyImage) to prevent double-publish. A standalone auditor verifier page at `/observatory/verifier` re-runs every signature check client-side with pinned CDN libs — the server is untrusted.
+
+| ID | Component | File | Role |
+|----|-----------|------|------|
+| ZK-01 | SAG ring-signature crypto (Ristretto255) | [packages/core/src/crypto/ring-signature/](packages/core/src/crypto/ring-signature/) | `generateKeypair` · `sign` · `verify` · `deriveKeyImage` · `hashRing` · `buildAttestation` · `verifyAttestation` |
+| ZK-02 | Extension enrollment + ring-signed publish | [packages/extension/src/background/observatory-publisher.ts](packages/extension/src/background/observatory-publisher.ts) | `getOrCreateDeviceKeypair` · `enrollDevice` · `fetchRing` · `runDailyAttestation` |
+| ZK-03 | VPS endpoints + Node-side verify | [ops/observatory/server.js](ops/observatory/server.js) + [ops/observatory/crypto-verify.js](ops/observatory/crypto-verify.js) | POST `/api/enroll` · GET `/api/ring` · POST `/api/publish` (now ring-signed) · GET `/api/verify/:date` |
+| ZK-04 | Standalone auditor verifier web tool | [ops/observatory/public/verifier.html](ops/observatory/public/verifier.html) + `verifier.js` + `verifier.css` | 100% client-side verify, PDF export, audit certificate hash; served at `/observatory/verifier` |
+| ZK-05 | Popup + sidepanel Compliance UI | [packages/extension/src/popup/App.tsx](packages/extension/src/popup/App.tsx) + [packages/extension/src/sidepanel/index.tsx](packages/extension/src/sidepanel/index.tsx) | Enrollment status, rotate-key button, verifier-URL copy, Compliance tab with 30-day log + export |
+
+Docs: [docs/features/zero-knowledge-attestation.md](docs/features/zero-knowledge-attestation.md). Tests: 52 TypeScript vitest cases + 11 Node cross-check scenarios = 63 new tests (885 total workspace).
+
 Security invariants enforced at multiple layers: (a) opt-in gate on every `record*` call in background; (b) allowlist of metric keys server-side; (c) UNIQUE(date, merkle_root) + server-side merkle verification for replay/forge resistance; (d) k-anonymity floor of 5 devices before a categorical appears in top-N lists; (e) rate limit 60 req/60 s per IP.
 
 ---
@@ -156,6 +172,7 @@ Security invariants enforced at multiple layers: (a) opt-in gate on every `recor
 | Domains | 6 |
 | AI engine features | 1 (+ engine layer) |
 | Core engine components | 5 |
+| Observatory + ZK Attestation | 12 (OBS-01..07 + ZK-01..05) |
 | **Total user-facing features** | **29** |
 
 ---

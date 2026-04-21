@@ -8,6 +8,10 @@ const path = require('path');
 const crypto = require('crypto');
 const express = require('express');
 const Database = require('better-sqlite3');
+const {
+  verifyAttestation,
+  hashRing,
+} = require('./crypto-verify');
 
 const PORT = Number(process.env.PORT || 8200);
 const DB_PATH = path.join(__dirname, 'data.db');
@@ -37,6 +41,12 @@ const LANGUAGE_CODES = new Set([
 const MAX_KEYS_PER_RECORD = 32;
 const MAX_LANGS = 6;
 
+// --- Session 16: Zero-Knowledge Attestation limits ---
+const MAX_ENROLLED_DEVICES = 10000;
+const ENROLL_RATE_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+const ENROLL_RATE_LIMIT = 1; // enrollments per IP per hour
+const PUBKEY_HEX_RE = /^[0-9a-f]{64}$/;
+
 const app = express();
 const db = new Database(DB_PATH);
 
@@ -64,6 +74,34 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_agg_date ON aggregated_daily(date);
   CREATE INDEX IF NOT EXISTS idx_agg_metric ON aggregated_daily(metric);
+
+  -- Session 16: Zero-Knowledge Attestation schema
+  CREATE TABLE IF NOT EXISTS enrolled_devices (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    pub_key_hex TEXT NOT NULL UNIQUE,
+    enrolled_at INTEGER NOT NULL,
+    ring_version_at_enrollment INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS rings (
+    version INTEGER PRIMARY KEY AUTOINCREMENT,
+    pub_keys_json TEXT NOT NULL,
+    ring_hash TEXT NOT NULL UNIQUE,
+    created_at INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS attestations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT NOT NULL,
+    ring_version INTEGER NOT NULL,
+    key_image TEXT NOT NULL,
+    merkle_root TEXT NOT NULL,
+    attestation_json TEXT NOT NULL,
+    received_at INTEGER NOT NULL,
+    UNIQUE(date, key_image)
+  );
+  CREATE INDEX IF NOT EXISTS idx_attestations_date ON attestations(date);
+  CREATE INDEX IF NOT EXISTS idx_attestations_ring ON attestations(ring_version);
 `);
 
 // ---------- Middleware ----------
@@ -122,6 +160,33 @@ setInterval(() => {
     if (now - v.windowStart > RATE_WINDOW_MS * 5) rateBuckets.delete(k);
   }
 }, RATE_WINDOW_MS).unref();
+
+// --- Session 16: enroll rate limiter (separate bucket, tighter window) ---
+const enrollBuckets = new Map();
+function enrollRateLimit(req, res, next) {
+  const ip = req.ip || req.headers['x-forwarded-for'] || 'unknown';
+  const now = Date.now();
+  let bucket = enrollBuckets.get(ip);
+  if (!bucket) {
+    bucket = { count: 0, windowStart: now };
+    enrollBuckets.set(ip, bucket);
+  }
+  if (now - bucket.windowStart > ENROLL_RATE_WINDOW_MS) {
+    bucket.count = 0;
+    bucket.windowStart = now;
+  }
+  bucket.count += 1;
+  if (bucket.count > ENROLL_RATE_LIMIT) {
+    return res.status(429).json({ error: 'enroll rate limited' });
+  }
+  next();
+}
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, v] of enrollBuckets.entries()) {
+    if (now - v.windowStart > ENROLL_RATE_WINDOW_MS * 3) enrollBuckets.delete(k);
+  }
+}, ENROLL_RATE_WINDOW_MS).unref();
 
 // ---------- Validation ----------
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -220,6 +285,33 @@ const upsertAggregate = db.prepare(`
 
 const findSubmission = db.prepare(
   'SELECT id FROM daily_submissions WHERE date = ? AND merkle_root = ?',
+);
+
+// --- Session 16 prepared statements ---
+const findDeviceByPubKey = db.prepare(
+  'SELECT id FROM enrolled_devices WHERE pub_key_hex = ?',
+);
+const insertDevice = db.prepare(
+  'INSERT INTO enrolled_devices (pub_key_hex, enrolled_at, ring_version_at_enrollment) VALUES (?, ?, ?)',
+);
+const countDevices = db.prepare('SELECT COUNT(*) AS n FROM enrolled_devices');
+const allDevicesOrdered = db.prepare(
+  'SELECT pub_key_hex FROM enrolled_devices ORDER BY id ASC',
+);
+const insertRing = db.prepare(
+  'INSERT INTO rings (pub_keys_json, ring_hash, created_at) VALUES (?, ?, ?)',
+);
+const findRingByHash = db.prepare('SELECT * FROM rings WHERE ring_hash = ?');
+const findRingByVersion = db.prepare('SELECT * FROM rings WHERE version = ?');
+const latestRing = db.prepare('SELECT * FROM rings ORDER BY version DESC LIMIT 1');
+const insertAttestation = db.prepare(
+  'INSERT INTO attestations (date, ring_version, key_image, merkle_root, attestation_json, received_at) VALUES (?, ?, ?, ?, ?, ?)',
+);
+const findAttestationByKeyImage = db.prepare(
+  'SELECT id FROM attestations WHERE date = ? AND key_image = ?',
+);
+const attestationsForDate = db.prepare(
+  'SELECT attestation_json, key_image, merkle_root, ring_version, received_at FROM attestations WHERE date = ? ORDER BY received_at ASC',
 );
 
 const aggregateBundle = db.transaction((bundle) => {
@@ -328,18 +420,242 @@ function getSummary(days) {
   };
 }
 
+// ---------- Session 16 ring helpers ----------
+
+function hexBytes(s) {
+  if (typeof s !== 'string' || s.length % 2 !== 0) throw new Error('bad hex');
+  const out = new Uint8Array(s.length / 2);
+  for (let i = 0; i < out.length; i++) out[i] = parseInt(s.substr(i * 2, 2), 16);
+  return out;
+}
+
+function currentRingRow() {
+  return latestRing.get();
+}
+
+function ringFromRow(row) {
+  if (!row) return null;
+  const pubKeys = JSON.parse(row.pub_keys_json);
+  return { version: row.version, pubKeys, ringHash: row.ring_hash };
+}
+
+/** Create a fresh ring snapshot from the current set of enrolled devices.
+ *  Returns the new ring row. Idempotent on ring_hash collision (i.e. if the
+ *  device set didn't change since the last ring version). */
+function rotateRing() {
+  const devices = allDevicesOrdered.all();
+  const pubKeys = devices.map((d) => d.pub_key_hex);
+  const bytes = pubKeys.map(hexBytes);
+  const ringHash = hashRing(bytes);
+  const existing = findRingByHash.get(ringHash);
+  if (existing) return existing;
+  const info = insertRing.run(JSON.stringify(pubKeys), ringHash, Date.now());
+  return findRingByVersion.get(info.lastInsertRowid);
+}
+
 // ---------- Routes ----------
+
+// Session 16: publish route now accepts EITHER:
+//   (a) Legacy plain JSON bundle { schema_version: 1, date, ... }
+//   (b) Ring-signed attestation { attestation: { format: 1, ..., signature, counters } }
 app.post('/api/publish', rateLimit, (req, res) => {
   try {
-    const err = validateBundle(req.body);
+    const body = req.body;
+    if (body && body.attestation) {
+      return handleRingSignedPublish(body.attestation, res);
+    }
+    const err = validateBundle(body);
     if (err) return res.status(400).json({ error: 'invalid bundle' });
     // Reject forged bundles: client-declared merkle_root must match the canonical
     // hash we would independently compute. Prevents metric fabrication.
-    if (!verifyMerkle(req.body)) return res.status(400).json({ error: 'invalid bundle' });
-    const result = aggregateBundle(req.body);
+    if (!verifyMerkle(body)) return res.status(400).json({ error: 'invalid bundle' });
+    const result = aggregateBundle(body);
     res.json({ ok: true, id: result.id, duplicate: result.duplicate });
   } catch (e) {
     console.error('[publish]', e);
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
+function handleRingSignedPublish(attestation, res) {
+  if (
+    !attestation ||
+    attestation.format !== 1 ||
+    typeof attestation.date !== 'string' ||
+    !DATE_RE.test(attestation.date) ||
+    typeof attestation.ringVersion !== 'number' ||
+    typeof attestation.ringHash !== 'string' ||
+    typeof attestation.merkleRoot !== 'string' ||
+    !attestation.signature ||
+    typeof attestation.signature.keyImage !== 'string' ||
+    !PUBKEY_HEX_RE.test(attestation.signature.keyImage)
+  ) {
+    return res.status(400).json({ error: 'invalid attestation shape' });
+  }
+  // Date freshness window (same as legacy path)
+  const delta = daysBetween(attestation.date, todayISO());
+  if (delta < 0 || delta > 7) {
+    return res.status(400).json({ error: 'date out of window' });
+  }
+
+  const ringRow = findRingByVersion.get(attestation.ringVersion);
+  if (!ringRow) return res.status(404).json({ error: 'unknown ringVersion' });
+  if (ringRow.ring_hash !== attestation.ringHash) {
+    return res.status(400).json({ error: 'ringHash mismatch' });
+  }
+
+  const ringPubKeys = JSON.parse(ringRow.pub_keys_json);
+  const result = verifyAttestation(attestation, ringPubKeys);
+  if (!result.valid) {
+    return res.status(400).json({ error: 'invalid attestation', reason: result.reason });
+  }
+
+  // Replay / double-publish protection via UNIQUE(date, key_image).
+  const existing = findAttestationByKeyImage.get(
+    attestation.date,
+    attestation.signature.keyImage,
+  );
+  if (existing) {
+    return res.status(409).json({ error: 'duplicate attestation', id: existing.id });
+  }
+
+  // Validate counter allowlists before aggregation so the attestation
+  // cannot inject unknown metric keys even with a valid signature.
+  // Build a legacy-shaped bundle wrapper for validateBundle.
+  const legacyBundle = {
+    schema_version: 1,
+    date: attestation.date,
+    merkle_root: attestation.merkleRoot,
+    ...(attestation.counters || {}),
+  };
+  const valErr = validateBundle(legacyBundle);
+  if (valErr) return res.status(400).json({ error: 'invalid counters', reason: valErr });
+
+  let insertedId;
+  const tx = db.transaction(() => {
+    const info = insertAttestation.run(
+      attestation.date,
+      attestation.ringVersion,
+      attestation.signature.keyImage,
+      attestation.merkleRoot,
+      JSON.stringify(attestation),
+      Date.now(),
+    );
+    insertedId = info.lastInsertRowid;
+    // Also aggregate into aggregated_daily via the existing path so the
+    // dashboard continues to work. Merkle-verified counters go straight in.
+    aggregateBundle(legacyBundle);
+  });
+  tx();
+  res.json({ ok: true, id: insertedId, keyImage: attestation.signature.keyImage });
+}
+
+// POST /api/enroll — register a device pubkey, return ring info.
+app.post('/api/enroll', enrollRateLimit, (req, res) => {
+  try {
+    const pubKey = req.body && req.body.pubKey;
+    if (typeof pubKey !== 'string' || !PUBKEY_HEX_RE.test(pubKey)) {
+      return res.status(400).json({ error: 'invalid pubKey' });
+    }
+    // Validate curve point
+    try {
+      hexBytes(pubKey);
+    } catch {
+      return res.status(400).json({ error: 'invalid pubKey encoding' });
+    }
+
+    const existing = findDeviceByPubKey.get(pubKey);
+    if (existing) {
+      const row = currentRingRow();
+      const ring = ringFromRow(row);
+      if (!ring) return res.status(500).json({ error: 'ring inconsistent' });
+      const yourIndex = ring.pubKeys.indexOf(pubKey);
+      return res.json({
+        ringHash: ring.ringHash,
+        ringVersion: ring.version,
+        ringSize: ring.pubKeys.length,
+        yourIndex,
+        alreadyEnrolled: true,
+      });
+    }
+
+    const { n } = countDevices.get();
+    if (n >= MAX_ENROLLED_DEVICES) {
+      return res.status(503).json({ error: 'ring at capacity' });
+    }
+
+    // Bump the ring as a single transaction so concurrent enrolls don't
+    // produce a partial state.
+    let ring;
+    const tx = db.transaction(() => {
+      const current = currentRingRow();
+      const nextRingVersionGuess = current ? current.version + 1 : 1;
+      insertDevice.run(pubKey, Date.now(), nextRingVersionGuess);
+      ring = ringFromRow(rotateRing());
+    });
+    tx();
+
+    const yourIndex = ring.pubKeys.indexOf(pubKey);
+    res.json({
+      ringHash: ring.ringHash,
+      ringVersion: ring.version,
+      ringSize: ring.pubKeys.length,
+      yourIndex,
+      alreadyEnrolled: false,
+    });
+  } catch (e) {
+    console.error('[enroll]', e);
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
+// GET /api/ring — return the most recent ring snapshot.
+app.get('/api/ring', (req, res) => {
+  try {
+    const ring = ringFromRow(currentRingRow());
+    if (!ring) {
+      return res.json({ version: 0, pubKeys: [], ringHash: '' });
+    }
+    res.json(ring);
+  } catch (e) {
+    console.error('[ring]', e);
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
+// GET /api/verify/:date — return all stored attestations for that date plus
+// the ring(s) referenced by them, for client-side re-verification.
+app.get('/api/verify/:date', (req, res) => {
+  try {
+    const date = req.params.date;
+    if (!DATE_RE.test(date)) return res.status(400).json({ error: 'bad date' });
+    const rows = attestationsForDate.all(date);
+    const attestations = rows
+      .map((r) => {
+        try {
+          return JSON.parse(r.attestation_json);
+        } catch {
+          return null;
+        }
+      })
+      .filter((a) => a !== null);
+
+    // Attach every ring referenced by at least one attestation.
+    const versions = [...new Set(attestations.map((a) => a.ringVersion))];
+    const rings = versions
+      .map((v) => ringFromRow(findRingByVersion.get(v)))
+      .filter(Boolean);
+    // Include the current ring too so auditors can compare.
+    const current = ringFromRow(currentRingRow());
+    res.json({
+      date,
+      count: attestations.length,
+      attestations,
+      rings,
+      currentRing: current,
+    });
+  } catch (e) {
+    console.error('[verify]', e);
     res.status(500).json({ error: 'internal' });
   }
 });
@@ -450,7 +766,12 @@ app.get('/api/compliance-report', (req, res) => {
   }
 });
 
-// ---------- Static dashboard ----------
+// ---------- Static dashboard + verifier ----------
+// Pretty URL for the auditor verifier tool (the HTML file is
+// public/verifier.html; this alias saves auditors from typing .html).
+app.get('/verifier', (req, res) => {
+  res.sendFile(path.join(PUBLIC_DIR, 'verifier.html'));
+});
 app.use(express.static(PUBLIC_DIR));
 
 // ---------- Boot ----------

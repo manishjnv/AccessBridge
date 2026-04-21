@@ -1,13 +1,31 @@
 /**
- * Compliance Observatory — metrics publisher (Feature #10).
+ * Compliance Observatory — metrics publisher (Feature #10 + Feature #7).
  *
- * Pure helpers + a daily publish routine. Collects no identity, no content,
- * no URLs, no IP — only noised integer counters and a Merkle commitment of
- * that day's counter bundle. See docs/features/compliance-observatory.md.
+ * Session 10 shipped the DP-noise + Merkle-commitment publish path. Session 16
+ * layers SAG linkable ring signatures on top: each enrolled device holds a
+ * Ristretto255 keypair, every publish is a ring signature over
+ * (date, ringHash, merkleRoot, ringVersion), and the server rejects any
+ * bundle whose key image already appears for the same date. See
+ * docs/features/zero-knowledge-attestation.md.
  */
+
+import {
+  generateKeypair,
+  buildAttestation,
+  type Attestation,
+  type KeyPair,
+} from '@accessbridge/core/crypto';
 
 export const OBSERVATORY_ENDPOINT =
   'http://72.61.227.64:8300/observatory/api/publish';
+
+// --- Session 16: Zero-Knowledge Attestation (Feature #7) ---
+export const OBSERVATORY_ENROLL_ENDPOINT =
+  'http://72.61.227.64:8300/observatory/api/enroll';
+export const OBSERVATORY_RING_ENDPOINT =
+  'http://72.61.227.64:8300/observatory/api/ring';
+/** Re-fetch the ring at most weekly. Ring changes are monotonic + rare. */
+export const RING_REFRESH_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
 
 export const DP_EPSILON = 1.0;
 export const DP_SENSITIVITY = 1;
@@ -249,6 +267,13 @@ export async function aggregateDailyBundle(
 const STORAGE_LAST_PUBLISH = 'observatory_last_publish';
 const PUBLISH_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
+// --- Session 16: ZK attestation storage keys ---
+const STORAGE_DEVICE_SECKEY = 'observatory_device_seckey'; // 32 bytes, hex
+const STORAGE_DEVICE_PUBKEY = 'observatory_device_pubkey'; // 32 bytes, hex
+const STORAGE_RING_CACHE = 'observatory_ring_cache';       // { version, pubKeys[], ringHash, fetchedAt }
+const STORAGE_LAST_KEY_IMAGE = 'observatory_last_key_image'; // { date, hex }
+const STORAGE_LAST_ATTESTATION = 'observatory_last_attestation'; // { date, valid, reason? }
+
 export async function getLastPublish(): Promise<number | null> {
   const result = await chrome.storage.local.get(STORAGE_LAST_PUBLISH);
   const v = result[STORAGE_LAST_PUBLISH];
@@ -265,6 +290,321 @@ export async function shouldPublishNow(): Promise<boolean> {
   return Date.now() - last >= PUBLISH_INTERVAL_MS;
 }
 
+// --- Session 16: enrolment + ring-signed publish ---
+
+export interface RingCache {
+  version: number;
+  /** Hex-encoded 32-byte Ristretto255 public keys in ring order. */
+  pubKeys: string[];
+  ringHash: string;
+  fetchedAt: number;
+}
+
+export interface EnrollResponse {
+  ringHash: string;
+  ringVersion: number;
+  ringSize: number;
+  yourIndex: number;
+}
+
+function hexEncode(bytes: Uint8Array): string {
+  let out = '';
+  for (let i = 0; i < bytes.length; i++) out += bytes[i].toString(16).padStart(2, '0');
+  return out;
+}
+
+function hexDecode(s: string): Uint8Array {
+  if (s.length % 2 !== 0) throw new Error('invalid hex length');
+  const out = new Uint8Array(s.length / 2);
+  for (let i = 0; i < out.length; i++) {
+    out[i] = parseInt(s.substr(i * 2, 2), 16);
+  }
+  return out;
+}
+
+/**
+ * Load the device's observatory keypair, generating one on first call.
+ * The secret key is persisted to chrome.storage.local; at rest it is
+ * protected by Chrome's built-in profile encryption (tied to the user's
+ * OS account). Additional AES-GCM wrapping would require storing a key
+ * alongside the ciphertext, which provides no marginal security.
+ */
+export async function getOrCreateDeviceKeypair(): Promise<KeyPair> {
+  const res = await chrome.storage.local.get([
+    STORAGE_DEVICE_SECKEY,
+    STORAGE_DEVICE_PUBKEY,
+  ]);
+  const sec = res[STORAGE_DEVICE_SECKEY];
+  const pub = res[STORAGE_DEVICE_PUBKEY];
+  if (typeof sec === 'string' && typeof pub === 'string' && sec.length === 64 && pub.length === 64) {
+    return { secKey: hexDecode(sec), pubKey: hexDecode(pub) };
+  }
+  const kp = generateKeypair();
+  await chrome.storage.local.set({
+    [STORAGE_DEVICE_SECKEY]: hexEncode(kp.secKey),
+    [STORAGE_DEVICE_PUBKEY]: hexEncode(kp.pubKey),
+  });
+  return kp;
+}
+
+/**
+ * Rotate the device keypair — used by the "Re-enroll" button. The caller is
+ * responsible for calling enrollDevice() afterward so the server picks up
+ * the new pubkey.
+ */
+export async function rotateDeviceKeypair(): Promise<KeyPair> {
+  const kp = generateKeypair();
+  await chrome.storage.local.set({
+    [STORAGE_DEVICE_SECKEY]: hexEncode(kp.secKey),
+    [STORAGE_DEVICE_PUBKEY]: hexEncode(kp.pubKey),
+  });
+  return kp;
+}
+
+export async function getCachedRing(): Promise<RingCache | null> {
+  const res = await chrome.storage.local.get(STORAGE_RING_CACHE);
+  const v = res[STORAGE_RING_CACHE];
+  if (!v || typeof v !== 'object') return null;
+  const cache = v as RingCache;
+  if (
+    typeof cache.version !== 'number' ||
+    !Array.isArray(cache.pubKeys) ||
+    typeof cache.ringHash !== 'string' ||
+    typeof cache.fetchedAt !== 'number'
+  ) {
+    return null;
+  }
+  return cache;
+}
+
+export async function setCachedRing(cache: RingCache): Promise<void> {
+  await chrome.storage.local.set({ [STORAGE_RING_CACHE]: cache });
+}
+
+/**
+ * Enroll the device's pubkey with the observatory server. Idempotent on the
+ * server side (re-submitting a known pubkey returns the existing ring index).
+ */
+export async function enrollDevice(
+  pubKey: Uint8Array,
+  fetchImpl: typeof fetch = fetch,
+  endpoint: string = OBSERVATORY_ENROLL_ENDPOINT,
+): Promise<EnrollResponse> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15_000);
+  try {
+    const res = await fetchImpl(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pubKey: hexEncode(pubKey) }),
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error(`enroll HTTP ${res.status}`);
+    const body = (await res.json()) as EnrollResponse;
+    if (
+      typeof body.ringHash !== 'string' ||
+      typeof body.ringVersion !== 'number' ||
+      typeof body.ringSize !== 'number' ||
+      typeof body.yourIndex !== 'number'
+    ) {
+      throw new Error('enroll: malformed response');
+    }
+    return body;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export interface FetchedRing {
+  version: number;
+  pubKeys: Uint8Array[];
+  ringHash: string;
+}
+
+export async function fetchRing(
+  fetchImpl: typeof fetch = fetch,
+  endpoint: string = OBSERVATORY_RING_ENDPOINT,
+): Promise<FetchedRing> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15_000);
+  try {
+    const res = await fetchImpl(endpoint, { signal: controller.signal });
+    if (!res.ok) throw new Error(`ring HTTP ${res.status}`);
+    const body = (await res.json()) as {
+      version: number;
+      pubKeys: string[];
+      ringHash: string;
+    };
+    if (
+      typeof body.version !== 'number' ||
+      !Array.isArray(body.pubKeys) ||
+      typeof body.ringHash !== 'string'
+    ) {
+      throw new Error('ring: malformed response');
+    }
+    return {
+      version: body.version,
+      pubKeys: body.pubKeys.map(hexDecode),
+      ringHash: body.ringHash,
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Return a ring that's freshly fetched when the cache is stale, else cached.
+ * Caller may pass `forceRefresh=true` after a "Re-enroll" action so the
+ * new pubkey is picked up immediately.
+ */
+export async function getOrRefreshRing(
+  forceRefresh = false,
+  fetchImpl: typeof fetch = fetch,
+): Promise<FetchedRing> {
+  if (!forceRefresh) {
+    const cached = await getCachedRing();
+    if (cached && Date.now() - cached.fetchedAt < RING_REFRESH_INTERVAL_MS) {
+      return {
+        version: cached.version,
+        pubKeys: cached.pubKeys.map(hexDecode),
+        ringHash: cached.ringHash,
+      };
+    }
+  }
+  const fresh = await fetchRing(fetchImpl);
+  await setCachedRing({
+    version: fresh.version,
+    pubKeys: fresh.pubKeys.map(hexEncode),
+    ringHash: fresh.ringHash,
+    fetchedAt: Date.now(),
+  });
+  return fresh;
+}
+
+function findSelfIndex(ring: Uint8Array[], self: Uint8Array): number {
+  const target = hexEncode(self);
+  for (let i = 0; i < ring.length; i++) {
+    if (hexEncode(ring[i]) === target) return i;
+  }
+  return -1;
+}
+
+/** Build a ring-signed Attestation bundle for the given noised counters. */
+export function buildRingSignedAttestation(args: {
+  bundle: NoisyBundle;
+  ring: Uint8Array[];
+  ringVersion: number;
+  signerIndex: number;
+  secKey: Uint8Array;
+}): Attestation {
+  const { bundle, ring, ringVersion, signerIndex, secKey } = args;
+  return buildAttestation({
+    date: bundle.date,
+    counters: bundle as unknown as Record<string, unknown>,
+    merkleRoot: bundle.merkle_root,
+    ring,
+    ringVersion,
+    signerIndex,
+    secKey,
+  });
+}
+
+export async function publishAttestation(
+  attestation: Attestation,
+  fetchImpl: typeof fetch = fetch,
+): Promise<PublishResult> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15_000);
+  try {
+    const res = await fetchImpl(OBSERVATORY_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ attestation }),
+      signal: controller.signal,
+    });
+    if (res.ok) return { ok: true, status: res.status };
+    return { ok: false, status: res.status, error: `HTTP ${res.status}` };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * High-level daily flow: ensure device is enrolled + ring is up-to-date,
+ * then sign + publish a noised counter bundle. Called by the collector's
+ * alarm handler when the opt-in is on and it's time to publish.
+ *
+ * Returns { ok, reason? }. On success, also stamps
+ * observatory_last_key_image so the popup can show "you published today".
+ */
+export async function runDailyAttestation(args: {
+  bundle: NoisyBundle;
+  fetchImpl?: typeof fetch;
+}): Promise<PublishResult & { keyImageHex?: string }> {
+  const fetchImpl = args.fetchImpl ?? fetch;
+  try {
+    const kp = await getOrCreateDeviceKeypair();
+    let ring = await getOrRefreshRing(false, fetchImpl);
+    let selfIndex = findSelfIndex(ring.pubKeys, kp.pubKey);
+    if (selfIndex < 0) {
+      // Not in the ring yet — enroll then re-fetch.
+      await enrollDevice(kp.pubKey, fetchImpl);
+      ring = await getOrRefreshRing(true, fetchImpl);
+      selfIndex = findSelfIndex(ring.pubKeys, kp.pubKey);
+      if (selfIndex < 0) {
+        return { ok: false, error: 'post-enroll ring missing self' };
+      }
+    }
+    if (ring.pubKeys.length < 2) {
+      return {
+        ok: false,
+        error: 'ring-size-too-small (need at least 2 enrolled devices)',
+      };
+    }
+
+    const attestation = buildRingSignedAttestation({
+      bundle: args.bundle,
+      ring: ring.pubKeys,
+      ringVersion: ring.version,
+      signerIndex: selfIndex,
+      secKey: kp.secKey,
+    });
+
+    const result = await publishAttestation(attestation, fetchImpl);
+    if (result.ok) {
+      await chrome.storage.local.set({
+        [STORAGE_LAST_KEY_IMAGE]: {
+          date: attestation.date,
+          hex: attestation.signature.keyImage,
+        },
+        [STORAGE_LAST_ATTESTATION]: {
+          date: attestation.date,
+          valid: true,
+        },
+      });
+      return { ...result, keyImageHex: attestation.signature.keyImage };
+    }
+    await chrome.storage.local.set({
+      [STORAGE_LAST_ATTESTATION]: {
+        date: attestation.date,
+        valid: false,
+        reason: result.error ?? `HTTP ${result.status ?? 'unknown'}`,
+      },
+    });
+    return result;
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+// Legacy publishDailyBundle — pre-Session-16 plain JSON path. Retained for
+// tests and for the server's v1-format fallback acceptance. New callers
+// should use runDailyAttestation.
 export async function publishDailyBundle(
   bundle: NoisyBundle,
 ): Promise<PublishResult> {

@@ -38,6 +38,11 @@ import {
   ObservatoryCollector,
   installDailyAlarm,
 } from './observatory-collector.js';
+// Session 16: ZK attestation helpers
+import {
+  rotateDeviceKeypair,
+  getOrRefreshRing,
+} from './observatory-publisher.js';
 
 const observatoryCollector = new ObservatoryCollector();
 observatoryCollector.hydrateFromStorage().catch(() => {});
@@ -456,7 +461,9 @@ type MessageType =
   | 'ONNX_UNLOAD_TIER'
   | 'ONNX_CLEAR_CACHE'
   | 'ONNX_SET_FORCE_FALLBACK'
-  | 'ONNX_RUN_BENCHMARK';
+  | 'ONNX_RUN_BENCHMARK'
+  // --- Session 16: ZK attestation ---
+  | 'OBSERVATORY_ROTATE_KEY';
 
 interface Message {
   type: MessageType;
@@ -864,6 +871,18 @@ async function handleMessage(
         classifierScores,
         heuristicScores,
       };
+    }
+
+    // --- Session 16: ZK attestation ---
+    case 'OBSERVATORY_ROTATE_KEY': {
+      try {
+        await rotateDeviceKeypair();
+        // Force-refresh the ring so the new pubkey is picked up
+        await getOrRefreshRing(true);
+        return { ok: true };
+      } catch (err) {
+        return { ok: false, error: String(err) };
+      }
     }
 
     default: {

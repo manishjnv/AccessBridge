@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AccessBridge — Auditor Verifier</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./verifier.css" />
+  <!-- jsPDF for PDF export — loaded eagerly so it's available on demand -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
+</head>
+<body>
+  <nav class="nav" role="navigation" aria-label="Site navigation">
+    <div class="nav-brand">
+      <svg width="28" height="28" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+        <defs>
+          <linearGradient id="ab-grad" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#7b68ee"/>
+            <stop offset="1" stop-color="#bb86fc"/>
+          </linearGradient>
+        </defs>
+        <rect width="64" height="64" rx="14" fill="url(#ab-grad)"/>
+        <path d="M20 46 L32 18 L44 46" stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M24 36 L40 36" stroke="#fff" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+        <path d="M14 53 Q32 47 50 53" stroke="#fff" stroke-width="2.8" fill="none" stroke-linecap="round" opacity="0.85"/>
+      </svg>
+      <span class="brand-text">AccessBridge</span>
+    </div>
+    <a href="/observatory/" class="nav-back" aria-label="Back to Observatory Dashboard">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+        <polyline points="15 18 9 12 15 6"/>
+      </svg>
+      Dashboard
+    </a>
+  </nav>
+
+  <main id="main-content" class="main-content">
+    <header class="page-header">
+      <h1 class="page-title">Auditor Verifier</h1>
+      <p class="page-subtitle">
+        All cryptography runs entirely in your browser. The server is <strong>not trusted</strong> for verification —
+        signatures are re-verified client-side using the same SAG Ristretto255 algorithm that produced them.
+        Disconnect your network after the page loads and JSON-paste mode still verifies locally.
+      </p>
+    </header>
+
+    <div class="dp-disclaimer" role="note" aria-label="Differential privacy notice">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+      </svg>
+      <span>All metrics include Laplace noise (ε=1.0). Individual devices cannot be identified.
+        Ring signatures prove <em>someone</em> in the ring attested on this date, not <em>which</em> device.</span>
+    </div>
+
+    <!-- Report / summary card — always visible after a run -->
+    <section class="card report-card" id="report-section" aria-live="polite" aria-label="Verification report">
+      <div class="card-header">
+        <h2 class="card-title">Verification Report</h2>
+        <button id="btn-download-pdf" class="btn-primary btn-sm" disabled aria-label="Download PDF audit report">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          Download PDF
+        </button>
+      </div>
+      <div id="report-empty" class="report-empty">
+        <p>Run a verification below to see results here.</p>
+      </div>
+      <div id="report-summary" class="report-summary" hidden>
+        <div class="stat-grid">
+          <div class="stat-tile">
+            <span class="stat-label">Total</span>
+            <span class="stat-value" id="stat-total">—</span>
+          </div>
+          <div class="stat-tile stat-tile--success">
+            <span class="stat-label">Valid</span>
+            <span class="stat-value" id="stat-valid">—</span>
+          </div>
+          <div class="stat-tile stat-tile--danger">
+            <span class="stat-label">Invalid</span>
+            <span class="stat-value" id="stat-invalid">—</span>
+          </div>
+          <div class="stat-tile">
+            <span class="stat-label">Ring Size</span>
+            <span class="stat-value" id="stat-ring-size">—</span>
+          </div>
+        </div>
+        <div class="meta-row">
+          <span class="meta-label">Ring Hash</span>
+          <code id="stat-ring-hash" class="meta-value mono">—</code>
+        </div>
+        <div class="meta-row">
+          <span class="meta-label">Ring Version</span>
+          <code id="stat-ring-version" class="meta-value mono">—</code>
+        </div>
+        <div class="meta-row">
+          <span class="meta-label">Audit Certificate Hash</span>
+          <code id="stat-cert-hash" class="meta-value mono cert-hash">—</code>
+        </div>
+      </div>
+    </section>
+
+    <!-- Attestation results table -->
+    <section class="card" id="results-section" hidden aria-label="Attestation results">
+      <h2 class="card-title">Attestation Results</h2>
+      <div class="table-wrapper" role="region" aria-label="Attestation table" tabindex="0">
+        <table id="results-table" class="results-table">
+          <thead>
+            <tr>
+              <th scope="col">Key Image</th>
+              <th scope="col">Merkle Root</th>
+              <th scope="col">Valid</th>
+              <th scope="col">Reason</th>
+            </tr>
+          </thead>
+          <tbody id="results-tbody">
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Verification controls -->
+    <div class="verify-grid">
+
+      <!-- Mode 1: Date -->
+      <section class="card verify-card" aria-labelledby="date-mode-title">
+        <h2 class="card-title" id="date-mode-title">Verify by Date</h2>
+        <p class="card-desc">Fetches all attestations for a given date from the server and re-verifies every ring signature client-side.</p>
+        <div class="field-group">
+          <label for="date-input" class="field-label">Date (YYYY-MM-DD)</label>
+          <input
+            type="date"
+            id="date-input"
+            class="field-input"
+            placeholder="YYYY-MM-DD"
+            pattern="\d{4}-\d{2}-\d{2}"
+            aria-describedby="date-input-hint"
+          />
+          <span id="date-input-hint" class="field-hint">ISO 8601 date, e.g. 2026-04-21</span>
+        </div>
+        <button id="btn-verify-date" class="btn-primary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+          Verify Date
+        </button>
+      </section>
+
+      <!-- Mode 2: JSON Paste -->
+      <section class="card verify-card" aria-labelledby="paste-mode-title">
+        <h2 class="card-title" id="paste-mode-title">Verify Pasted Attestation</h2>
+        <p class="card-desc">
+          Paste a single attestation JSON exported from the extension popup. The current ring is fetched from the server;
+          if the attestation's <code>ringVersion</code> differs from the live ring, verification may fail — the server
+          only vends the <em>current</em> ring, not historical snapshots.
+        </p>
+        <div class="field-group">
+          <label for="paste-input" class="field-label">Attestation JSON</label>
+          <textarea
+            id="paste-input"
+            class="field-textarea"
+            rows="8"
+            placeholder='{"format":1,"date":"2026-04-21","ringVersion":1,...}'
+            aria-describedby="paste-input-hint"
+          ></textarea>
+          <span id="paste-input-hint" class="field-hint">Paste the full attestation object.</span>
+        </div>
+        <button id="btn-verify-paste" class="btn-primary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+          Verify Pasted Attestation
+        </button>
+      </section>
+
+    </div><!-- /.verify-grid -->
+
+    <!-- Loading spinner overlay -->
+    <div id="spinner" class="spinner-overlay" hidden aria-live="assertive" aria-label="Verifying, please wait">
+      <div class="spinner-box" role="status">
+        <div class="spinner-ring" aria-hidden="true"></div>
+        <span id="spinner-label" class="spinner-label">Verifying…</span>
+      </div>
+    </div>
+
+    <!-- Error banner -->
+    <div id="error-banner" class="error-banner" hidden role="alert" aria-live="assertive"></div>
+
+  </main>
+
+  <footer class="footer">
+    <div>Manish Kumar — AccessBridge Compliance Observatory</div>
+    <div class="footer-sub">
+      Client-side cryptographic verifier. No data is sent to any server during verification.
+      Signatures use SAG Ristretto255 ring signatures over SHA-256 commitments.
+    </div>
+  </footer>
+
+  <script type="module" src="./verifier.js"></script>
+</body>
+</html>

@@ -12,7 +12,7 @@ import VisionPanel from './vision/VisionPanel.js';
 // --- Session 11: Multi-Modal Fusion ---
 import IntelligencePanel from './intelligence/IntelligencePanel.js';
 
-type SidePanelTab = 'dashboard' | 'audit' | 'actions' | 'vision' | 'intelligence';
+type SidePanelTab = 'dashboard' | 'audit' | 'actions' | 'vision' | 'intelligence' | 'compliance';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -693,12 +693,16 @@ function SidePanel() {
         <TabButton label="Vision" active={tab === 'vision'} onClick={() => setTab('vision')} />
         {/* --- Session 11: Multi-Modal Fusion --- */}
         <TabButton label="Intelligence" active={tab === 'intelligence'} onClick={() => setTab('intelligence')} />
+        {/* --- Session 16: ZK Attestation --- */}
+        <TabButton label="Compliance" active={tab === 'compliance'} onClick={() => setTab('compliance')} />
       </nav>
 
       {/* ── Body ───────────────────────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3">
         {/* --- Priority 1: Captions + Actions --- */}
-        {tab === 'intelligence' ? (
+        {tab === 'compliance' ? (
+          <CompliancePanel />
+        ) : tab === 'intelligence' ? (
           <IntelligencePanel />
         ) : tab === 'vision' ? (
           <VisionPanel />
@@ -1321,6 +1325,391 @@ function OnnxModelPanel() {
           </div>
         );
       })()}
+    </div>
+  );
+}
+
+// ─── Session 16: Compliance Observatory panel ────────────────────────────────
+
+interface ComplianceRingCache {
+  version: number;
+  pubKeys: string[];
+  ringHash: string;
+  fetchedAt: number;
+}
+
+interface ComplianceAttestation {
+  date: string;
+  valid: boolean;
+  reason?: string;
+}
+
+interface ComplianceLastKeyImage {
+  date: string;
+  hex: string;
+}
+
+interface AttestationLogRow {
+  date: string;
+  keyImagePrefix: string;
+  valid: boolean;
+  reason?: string;
+}
+
+function todayISOCompliance(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const mo = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${mo}-${day}`;
+}
+
+function CompliancePanel() {
+  const [ringCache, setRingCache] = useState<ComplianceRingCache | null>(null);
+  const [lastAttestation, setLastAttestation] = useState<ComplianceAttestation | null>(null);
+  const [lastKeyImage, setLastKeyImage] = useState<ComplianceLastKeyImage | null>(null);
+  const [daysContributed, setDaysContributed] = useState(0);
+  const [rawCounters, setRawCounters] = useState<Record<string, unknown> | null>(null);
+  const [logRows, setLogRows] = useState<AttestationLogRow[]>([]);
+  const [logLoading, setLogLoading] = useState(true);
+  const [exportBusy, setExportBusy] = useState(false);
+  const [copiedVerifier, setCopiedVerifier] = useState(false);
+
+  // Load from chrome.storage on mount
+  useEffect(() => {
+    if (typeof chrome === 'undefined' || !chrome.storage) return;
+
+    chrome.storage.local
+      .get([
+        'observatory_ring_cache',
+        'observatory_last_attestation',
+        'observatory_last_key_image',
+        'observatory_days_contributed',
+        'observatory_counters',
+      ])
+      .then((res) => {
+        const rc = res.observatory_ring_cache;
+        setRingCache(rc && typeof rc === 'object' ? (rc as ComplianceRingCache) : null);
+        const la = res.observatory_last_attestation;
+        setLastAttestation(la && typeof la === 'object' ? (la as ComplianceAttestation) : null);
+        const lki = res.observatory_last_key_image;
+        setLastKeyImage(lki && typeof lki === 'object' ? (lki as ComplianceLastKeyImage) : null);
+        setDaysContributed(typeof res.observatory_days_contributed === 'number' ? res.observatory_days_contributed : 0);
+        const ctr = res.observatory_counters;
+        setRawCounters(ctr && typeof ctr === 'object' ? (ctr as Record<string, unknown>) : null);
+      })
+      .catch(() => {})
+      .finally(() => {
+        // Build attestation log from stored data (last 30 days where we contributed)
+        buildLogRows();
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const buildLogRows = () => {
+    setLogLoading(true);
+    chrome.storage.local
+      .get(['observatory_last_attestation', 'observatory_last_key_image', 'observatory_days_contributed'])
+      .then((res) => {
+        const contributed = typeof res.observatory_days_contributed === 'number' ? res.observatory_days_contributed : 0;
+        if (contributed === 0) {
+          setLogRows([]);
+          return;
+        }
+        // Build rows for the last 30 calendar days; mark days where we have an attestation record
+        const la = res.observatory_last_attestation as ComplianceAttestation | undefined;
+        const lki = res.observatory_last_key_image as ComplianceLastKeyImage | undefined;
+        const rows: AttestationLogRow[] = [];
+        const today = new Date();
+        for (let i = 0; i < 30; i++) {
+          const d = new Date(today);
+          d.setDate(today.getDate() - i);
+          const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+          // Only include dates that match stored attestation (client-side only — no server fetch to avoid CORS in sidepanel)
+          if (la && la.date === iso) {
+            rows.push({
+              date: iso,
+              keyImagePrefix: lki?.hex ? lki.hex.slice(0, 12) + '…' : '—',
+              valid: la.valid,
+              reason: la.reason,
+            });
+          }
+        }
+        setLogRows(rows);
+      })
+      .catch(() => {})
+      .finally(() => setLogLoading(false));
+  };
+
+  const handleExport = () => {
+    setExportBusy(true);
+    const today = todayISOCompliance();
+    const bundle = {
+      attestation: lastAttestation ?? null,
+      keyImage: lastKeyImage ?? null,
+      ring: ringCache
+        ? {
+            version: ringCache.version,
+            ringHash: ringCache.ringHash,
+            ringSize: ringCache.pubKeys.length,
+            fetchedAt: new Date(ringCache.fetchedAt).toISOString(),
+          }
+        : null,
+      counters: rawCounters ?? null,
+      exportedAt: new Date().toISOString(),
+      date: today,
+    };
+    const json = JSON.stringify(bundle, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `accessbridge-compliance-${today}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setExportBusy(false);
+  };
+
+  const handleCopyVerifier = () => {
+    const today = todayISOCompliance();
+    const url = `http://72.61.227.64:8300/observatory/verifier?date=${today}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopiedVerifier(true);
+      setTimeout(() => setCopiedVerifier(false), 2000);
+    }).catch(() => {});
+  };
+
+  const VERIFIER_URL = `http://72.61.227.64:8300/observatory/verifier?date=${todayISOCompliance()}`;
+
+  return (
+    <div className="space-y-3">
+      {/* Header */}
+      <div
+        className="rounded-xl p-4"
+        style={{
+          background: '#1a1a2e',
+          border: '1px solid rgba(123,104,238,0.18)',
+          borderTop: '4px solid transparent',
+          borderImage: 'linear-gradient(135deg, #7b68ee, #bb86fc) 1',
+        }}
+      >
+        <div className="flex items-center gap-3 mb-1">
+          {/* Brand mark */}
+          <svg width="22" height="22" viewBox="0 0 64 64" aria-hidden="true">
+            <rect width="64" height="64" rx="14" fill="url(#cg)" />
+            <defs>
+              <linearGradient id="cg" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stopColor="#7b68ee" />
+                <stop offset="100%" stopColor="#bb86fc" />
+              </linearGradient>
+            </defs>
+            <polyline points="18,32 27,42 46,22" fill="none" stroke="#fff" strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <div>
+            <h2 className="text-sm font-bold" style={{ color: '#e2e8f0' }}>Compliance Observatory</h2>
+            <p className="text-xs" style={{ color: '#94a3b8' }}>Zero-knowledge ring attestation</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Ring snapshot */}
+      <div
+        className="rounded-xl p-3 space-y-2 text-xs"
+        style={{ background: '#1a1a2e', border: '1px solid rgba(123,104,238,0.18)' }}
+      >
+        <div className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: '#bb86fc', letterSpacing: '1.2px' }}>
+          Ring Snapshot
+        </div>
+        <div className="flex justify-between">
+          <span style={{ color: '#94a3b8' }}>Ring size</span>
+          <span className="font-mono" style={{ color: '#e2e8f0' }}>{ringCache ? ringCache.pubKeys.length : '—'}</span>
+        </div>
+        <div className="flex justify-between">
+          <span style={{ color: '#94a3b8' }}>Ring version</span>
+          <span className="font-mono" style={{ color: '#e2e8f0' }}>{ringCache ? ringCache.version : '—'}</span>
+        </div>
+        <div className="flex justify-between">
+          <span style={{ color: '#94a3b8' }}>Days contributed</span>
+          <span className="font-mono" style={{ color: '#e2e8f0' }}>{daysContributed}</span>
+        </div>
+        {lastKeyImage && (
+          <div className="flex justify-between">
+            <span style={{ color: '#94a3b8' }}>Last key image</span>
+            <span className="font-mono text-xs" style={{ color: '#bb86fc' }} title={lastKeyImage.hex}>
+              {lastKeyImage.hex.slice(0, 12)}…
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Attestation log */}
+      <div
+        className="rounded-xl p-3"
+        style={{ background: '#1a1a2e', border: '1px solid rgba(123,104,238,0.18)' }}
+      >
+        <div className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: '#bb86fc', letterSpacing: '1.2px' }}>
+          Attestation Log (last 30 days)
+        </div>
+        {logLoading ? (
+          <div className="text-xs text-center py-4" style={{ color: '#94a3b8' }}>
+            <span className="inline-block animate-spin mr-1">⟳</span> Loading…
+          </div>
+        ) : logRows.length === 0 ? (
+          <div
+            className="text-xs text-center py-4 rounded-lg"
+            style={{ color: '#94a3b8', background: '#0a0a1a' }}
+          >
+            No attestations recorded yet.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid rgba(123,104,238,0.2)' }}>
+                  {['Date', 'Attested', 'Valid', 'Key image'].map((h) => (
+                    <th
+                      key={h}
+                      style={{ padding: '4px 6px', textAlign: 'left', color: '#94a3b8', fontWeight: 600, fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.8px' }}
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {logRows.map((row) => (
+                  <tr key={row.date} style={{ borderBottom: '1px solid rgba(123,104,238,0.08)' }}>
+                    <td style={{ padding: '5px 6px', color: '#e2e8f0', fontFamily: 'monospace' }}>{row.date}</td>
+                    <td style={{ padding: '5px 6px' }}>
+                      <span
+                        style={{
+                          padding: '2px 8px',
+                          borderRadius: '999px',
+                          fontSize: '10px',
+                          fontWeight: 700,
+                          letterSpacing: '0.8px',
+                          textTransform: 'uppercase',
+                          background: 'rgba(123,104,238,0.15)',
+                          color: '#bb86fc',
+                        }}
+                      >
+                        You
+                      </span>
+                    </td>
+                    <td style={{ padding: '5px 6px' }}>
+                      {row.valid ? (
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-label="Valid">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      ) : (
+                        <span title={row.reason ?? 'Invalid'} style={{ cursor: 'help' }}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-label={`Invalid: ${row.reason ?? ''}`}>
+                            <line x1="18" y1="6" x2="6" y2="18" />
+                            <line x1="6" y1="6" x2="18" y2="18" />
+                          </svg>
+                        </span>
+                      )}
+                    </td>
+                    <td style={{ padding: '5px 6px', color: '#94a3b8', fontFamily: 'monospace', fontSize: '10px' }}>{row.keyImagePrefix}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Export bundle */}
+      <button
+        onClick={handleExport}
+        disabled={exportBusy}
+        style={{
+          width: '100%',
+          padding: '10px 16px',
+          borderRadius: '10px',
+          fontSize: '13px',
+          fontWeight: 600,
+          background: 'linear-gradient(135deg, #7b68ee, #bb86fc)',
+          color: '#fff',
+          border: 'none',
+          cursor: exportBusy ? 'not-allowed' : 'pointer',
+          opacity: exportBusy ? 0.6 : 1,
+          boxShadow: '0 4px 12px rgba(123,104,238,0.35)',
+          transition: 'opacity 0.2s, transform 0.2s',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '8px',
+        }}
+        aria-busy={exportBusy}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <polyline points="7 10 12 15 17 10" />
+          <line x1="12" y1="15" x2="12" y2="3" />
+        </svg>
+        {exportBusy ? 'Exporting…' : 'Export today\'s bundle'}
+      </button>
+
+      {/* Verifier URL */}
+      <div
+        className="rounded-xl p-3 space-y-2"
+        style={{ background: '#1a1a2e', border: '1px solid rgba(123,104,238,0.18)' }}
+      >
+        <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: '#bb86fc', letterSpacing: '1.2px' }}>
+          Verifier URL
+        </div>
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            readOnly
+            value={VERIFIER_URL}
+            className="flex-1 rounded text-xs font-mono"
+            style={{
+              background: '#0a0a1a',
+              border: '1px solid rgba(123,104,238,0.2)',
+              color: '#94a3b8',
+              padding: '6px 8px',
+              outline: 'none',
+            }}
+            aria-label="Verifier URL"
+          />
+          <button
+            onClick={handleCopyVerifier}
+            style={{
+              padding: '6px 10px',
+              borderRadius: '8px',
+              fontSize: '12px',
+              fontWeight: 600,
+              background: copiedVerifier ? 'rgba(16,185,129,0.15)' : 'rgba(123,104,238,0.15)',
+              color: copiedVerifier ? '#10b981' : '#bb86fc',
+              border: `1px solid ${copiedVerifier ? 'rgba(16,185,129,0.4)' : 'rgba(123,104,238,0.3)'}`,
+              cursor: 'pointer',
+              transition: 'color 0.2s, background 0.2s, border-color 0.2s',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              flexShrink: 0,
+            }}
+            aria-label="Copy verifier URL"
+          >
+            {copiedVerifier ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+              </svg>
+            )}
+            {copiedVerifier ? 'Copied!' : 'Copy'}
+          </button>
+        </div>
+        <p className="text-xs" style={{ color: '#94a3b8', lineHeight: 1.4 }}>
+          Share this link with an auditor to let them verify your ring membership without revealing your identity.
+        </p>
+      </div>
     </div>
   );
 }

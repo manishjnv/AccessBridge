@@ -207,6 +207,21 @@ Track every bug fix: what broke, why, how it was fixed, and how to prevent recur
 
 ---
 
+## BUG-014: Ring-signature keyImage domain included ringHash → mid-day ring rotation enabled double-publish
+
+| Field | Detail |
+| ------- | -------- |
+| **Date** | 2026-04-21 |
+| **Severity** | Medium (counter inflation, bounded by DP noise; not catastrophic) |
+| **Symptom** | A client device enrolled in the observatory could publish twice on the same date by signing one attestation against the pre-rotation ring snapshot (ring v1) and another against the post-rotation ring (ring v2) when a new enrollment landed mid-day. Both signatures verify; both keyImages differ (because `H_p(date, ringHash_v1) ≠ H_p(date, ringHash_v2)`); the server's UNIQUE(date, key_image) constraint therefore doesn't fire; `aggregated_daily` inflates by 2×. Caught by the Session-16 Opus-solo adversarial pass before deploy — NOT hit in production. |
+| **Root Cause** | Session 16's first-draft `attestationKeyImageDomain(date, ringHash)` used `"accessbridge-obs-v1:" + date + ":" + ringHash`. The intent was per-(device, date, ring) linkability, but that accidentally relaxes per-device-per-day uniqueness: same secret key + two distinct ringHash values → two distinct keyImages → two distinct DB rows. |
+| **Fix** | Changed the keyImage domain to `"accessbridge-obs-v1:" + date` (date only). The `ringHash` parameter is retained in the signature for source-compat but ignored. The attestation's *message bytes* still include `ringHash` + `ringVersion`, so the signature continues to bind the ring identity; only the keyImage derivation was decoupled. Applied in three places for byte-identical behavior: [packages/core/src/crypto/ring-signature/commitment.ts](packages/core/src/crypto/ring-signature/commitment.ts), [ops/observatory/crypto-verify.js](ops/observatory/crypto-verify.js), [ops/observatory/public/verifier.js](ops/observatory/public/verifier.js). One vitest case (`domain encodes both date and ringHash`) was inverted to codify the safer behavior (`domain is scoped by date only`). 52 TS + 11 Node cross-check tests re-ran green. |
+| **Files Changed** | `packages/core/src/crypto/ring-signature/commitment.ts`, `packages/core/src/crypto/ring-signature/__tests__/commitment-verifier.test.ts`, `ops/observatory/crypto-verify.js`, `ops/observatory/public/verifier.js` |
+| **Commit** | (pending — Session 16 combined commit) |
+| **Prevention** | When designing a domain-separation scheme for a linkable identifier (ring-sig keyImages, HIBE tags, VRF outputs): the domain must fix EVERY dimension the "same-event" check wants to collapse. If the server uses `UNIQUE(X, tag)` to prevent duplicates, then `tag` MUST depend ONLY on quantities in `X` plus the device secret — NOT on anything the client can vary. Adversarial review checklist: for every `UNIQUE(...)` SQL constraint downstream of a client-chosen cryptographic value, trace the derivation of that value and confirm no client-controlled field alters it. Also: inversions of "what should be the same" tests are a red flag during review — a test that expects *different* output from the same secret key with only a public-parameter change is often encoding a bug as an invariant. |
+
+---
+
 ## Checklist: Version Bump — AUTOMATED (post-commit `a4bd6a1`)
 
 Version bumping is now driven by `./deploy.sh` → `scripts/bump-version.sh --auto` — do **not** hand-edit versions. The checklist is only included here for manual overrides.

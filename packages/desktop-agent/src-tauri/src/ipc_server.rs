@@ -442,21 +442,16 @@ fn extract_request_id(msg: &AgentMessage) -> Option<String> {
 // Pair key helpers
 // ---------------------------------------------------------------------------
 
+/// Return the platform-appropriate path for the PSK pair-key file.
+///
+/// Delegates to [`crate::xdg_paths::psk_path`] which implements XDG
+/// `$XDG_RUNTIME_DIR` on Linux (ephemeral, cleared on logout), the
+/// Windows `%LOCALAPPDATA%` path, and macOS `Application Support`.
+///
+/// When `$XDG_RUNTIME_DIR` is unset on Linux the call falls back to
+/// `~/.cache/accessbridge/pair.key` and emits a `tracing::warn`.
 pub fn pair_key_path() -> PathBuf {
-    let mut base: PathBuf = if cfg!(windows) {
-        std::env::var_os("LOCALAPPDATA")
-            .map(PathBuf::from)
-            .unwrap_or_else(|| PathBuf::from("."))
-    } else if let Some(home) = std::env::var_os("HOME") {
-        let mut p = PathBuf::from(home);
-        p.push(".local/share");
-        p
-    } else {
-        PathBuf::from(".")
-    };
-    base.push("AccessBridge");
-    base.push("pair.key");
-    base
+    crate::xdg_paths::psk_path()
 }
 
 pub fn load_or_create_pair_key() -> anyhow::Result<Psk> {
@@ -470,13 +465,61 @@ pub fn load_or_create_pair_key() -> anyhow::Result<Psk> {
         return Ok(psk);
     }
     let (file, psk) = crate::crypto::PairKeyFile::new_with_random_psk();
-    std::fs::write(&path, file.to_json()?)?;
+    // Write the PSK file with 0o600 permissions from creation (no umask race).
+    // On Unix we use OpenOptionsExt::mode(0o600) so the file is never world-readable,
+    // then chmod again in case the file pre-existed with broader perms.
+    // On non-Unix platforms we fall back to a plain write (Windows uses ACLs).
     #[cfg(unix)]
     {
-        use std::os::unix::fs::PermissionsExt;
+        use std::io::Write;
+        use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+        let mut f = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .mode(0o600)
+            .open(&path)?;
+        f.write_all(file.to_json()?.as_bytes())?;
+        // chmod again in case the file pre-existed with broader perms
+        // (OpenOptionsExt::mode only applies on creation).
         let mut perms = std::fs::metadata(&path)?.permissions();
         perms.set_mode(0o600);
         std::fs::set_permissions(&path, perms)?;
+    }
+    #[cfg(not(unix))]
+    {
+        std::fs::write(&path, file.to_json()?)?;
+    }
+    Ok(psk)
+}
+
+/// Internal helper: write a freshly-generated PSK to an arbitrary path using
+/// the same secure-create logic as `load_or_create_pair_key`.  Exposed for
+/// unit-testing the 0o600 permission invariant without touching the real
+/// `pair_key_path()` location.
+pub(crate) fn write_pair_key_at(path: &std::path::Path) -> anyhow::Result<Psk> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let (file, psk) = crate::crypto::PairKeyFile::new_with_random_psk();
+    #[cfg(unix)]
+    {
+        use std::io::Write;
+        use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+        let mut f = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .mode(0o600)
+            .open(path)?;
+        f.write_all(file.to_json()?.as_bytes())?;
+        let mut perms = std::fs::metadata(path)?.permissions();
+        perms.set_mode(0o600);
+        std::fs::set_permissions(path, perms)?;
+    }
+    #[cfg(not(unix))]
+    {
+        std::fs::write(path, file.to_json()?)?;
     }
     Ok(psk)
 }
@@ -527,6 +570,7 @@ mod tests {
                 version: "0.1.0".to_string(),
                 platform: "test".to_string(),
                 capabilities: vec!["ipc".to_string()],
+                distro_hint: None,
             },
             profile_store: ProfileStore::new(),
             uia,
@@ -714,6 +758,19 @@ mod tests {
         let nonce_dec = URL_SAFE_NO_PAD.decode(&nonce_b64).unwrap();
         let server_hash = hex::encode(psk_hash(&psk, &nonce_dec));
         assert!(constant_time_eq(server_hash.as_bytes(), expected_hash.as_bytes()));
+    }
+
+    // --- load_or_create_pair_key permission invariant (Unix only) ---
+
+    #[cfg(unix)]
+    #[test]
+    fn write_pair_key_at_creates_file_with_0o600() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let key_path = dir.path().join("pair.key");
+        write_pair_key_at(&key_path).expect("write_pair_key_at failed");
+        let mode = std::fs::metadata(&key_path).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600, "pair.key must be 0o600, got 0o{mode:03o}");
     }
 
     #[tokio::test]

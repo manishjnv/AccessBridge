@@ -6,12 +6,14 @@
 
 pub mod bridge;
 pub mod crypto;
+pub mod distro;
 pub mod ipc_protocol;
 pub mod ipc_server;
 pub mod permissions;
 pub mod platform;
 pub mod profile_store;
 pub mod tray;
+pub mod xdg_paths;
 
 use std::sync::Arc;
 
@@ -25,6 +27,7 @@ fn default_agent_info() -> ipc_protocol::AgentInfo {
         version: env!("CARGO_PKG_VERSION").to_string(),
         platform: std::env::consts::OS.to_string(),
         capabilities: agent_capabilities(),
+        distro_hint: distro::detect_distro_hint(),
     }
 }
 

@@ -1,6 +1,6 @@
 {
   "name": "@accessbridge/desktop-agent",
-  "version": "0.19.0",
+  "version": "0.21.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,7 +10,8 @@
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --passWithNoTests",
+    "test:smoke": "vitest run __tests__/linux-packaging.smoke.test.ts"
   },
   "dependencies": {
     "@accessbridge/core": "workspace:*",

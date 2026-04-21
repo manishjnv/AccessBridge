@@ -1,6 +1,6 @@
-# Desktop Agent (Sessions 19 + 21)
+# Desktop Agent (Sessions 19 + 21 + 22)
 
-**Status:** Session 19 (2026-04-21) shipped the Windows MVP. **Session 21 (2026-04-21) added cross-platform parity — see [desktop-agent-macos.md](desktop-agent-macos.md) for the macOS adapter + NSAccessibility integration; a Linux AT-SPI stub; a SQLCipher-backed persistent profile store replacing the in-memory Session-19 stub; OS-keyring-backed master-key management; a cross-platform accessibility-permission module; and a GitHub Actions matrix build producing Windows MSI + macOS DMG/PKG artifacts. The original MVP below remains accurate for Session 19 behaviour; Session 21 layered on top without breaking the wire protocol or the PSK handshake.**
+**Status:** Session 19 (2026-04-21) shipped the Windows MVP. Session 21 (2026-04-21) added macOS NSAccessibility — see [desktop-agent-macos.md](desktop-agent-macos.md). **Session 22 (2026-04-21) adds Linux AT-SPI integration + .deb/.rpm/AppImage/Flatpak packaging → three-OS parity. See [desktop-agent-linux.md](desktop-agent-linux.md) for the Linux-specific guide.** Session 21 also shipped: a SQLCipher-backed persistent profile store replacing the in-memory Session-19 stub; OS-keyring-backed master-key management; a cross-platform accessibility-permission module; and a GitHub Actions matrix build producing Windows MSI + macOS DMG/PKG artifacts. The original MVP below remains accurate for Session 19 behaviour; Sessions 21–22 layered on top without breaking the wire protocol or the PSK handshake.
 
 ---
 
@@ -36,7 +36,7 @@ The AccessBridge Desktop Agent extends the browser extension's reach into native
 
 - **Per-process DPI font scaling is not implemented.** The `adapter.rs` function `apply_process_dpi()` returns `UiaError::Platform("per-process DPI override requires a shim DLL (Phase 2 feature)")` for both `font-scale` and `process-dpi` adaptation kinds. `SetProcessDpiAwarenessContext` only operates on the current process; true per-app DPI scaling requires DLL injection into the target process, which is out of scope for Phase 1. The extension will receive `ADAPTATION_APPLY_RESULT` with `ok: false` and the reason string, and should surface "Native font scaling: not yet supported — use the browser Sensory adapter instead."
 - Settings window is read-only in MVP (profile edits from the settings window are Phase 2; the WS push path is wired but the Tauri → profile-store write is deferred).
-- macOS and Linux dispatchers are no-op stubs (`packages/desktop-agent/src-tauri/src/uia_stub.rs`).
+- macOS dispatcher was a no-op stub (replaced by the NSAccessibility adapter in Session 21). Linux dispatcher was a no-op stub (replaced by the AT-SPI2 adapter in Session 22).
 - MSI installer is configured (`WiX`) but is not built in CI — the CI image does not have Rust + MSVC + WiX installed.
 - AES-GCM payload encryption is implemented in `crypto.rs` but unused in MVP; the handshake hash is sent in plaintext over the loopback socket (defense-in-depth rationale: loopback + PSK gate already prevents remote access; encryption reserved for future messages that carry locally sensitive content).
 
@@ -94,7 +94,9 @@ The AccessBridge Desktop Agent extends the browser extension's reach into native
 | WS server | `packages/desktop-agent/src-tauri/src/ipc_server.rs` | axum; 127.0.0.1:8901; 1-client gate; dispatch loop |
 | Crypto | `packages/desktop-agent/src-tauri/src/crypto.rs` | PSK type; `psk_hash()`; `constant_time_eq()`; AES-GCM helpers |
 | UIA dispatcher (Windows) | `packages/desktop-agent/src-tauri/src/uia/` | `WindowsUiaDispatcher` (inspect works; apply returns UnsupportedTarget) |
-| UIA stub (non-Windows) | `packages/desktop-agent/src-tauri/src/uia_stub.rs` | No-op; returns empty element list |
+| macOS adapter | `packages/desktop-agent/src-tauri/src/platform/macos.rs` | NSAccessibility-based inspect + font-scale via AXFontSize (Session 21) |
+| Linux adapter | `packages/desktop-agent/src-tauri/src/platform/linux.rs` | AT-SPI2/D-Bus inspect + gsettings/kdeglobals adaptations (Session 22) |
+| Platform factory | `packages/desktop-agent/src-tauri/src/platform/factory.rs` | Compile-time cfg dispatch — selects Windows, macOS, or Linux adapter |
 | Profile store | `packages/desktop-agent/src-tauri/src/profile_store.rs` | In-memory store with tokio broadcast for push notifications |
 | Tauri bridge commands | `packages/desktop-agent/src-tauri/src/bridge.rs` | `bridge_agent_info`, `bridge_get_pair_key_path`, `bridge_read_pair_key_b64`, `bridge_get_profile` |
 | Settings window | `packages/desktop-agent/src/App.tsx` | React 18; Overview / Profile / Logs tabs |
@@ -202,7 +204,19 @@ The WS session loop uses `tokio::select!` to multiplex incoming frames with prof
 
 ---
 
-## 8. Installation
+## 8. Platform Support
+
+As of Session 22, three platforms are fully supported:
+
+| Platform | Inspect | Apply (font-scale) | Revert | Notes |
+| --- | --- | --- | --- | --- |
+| Windows | UIA / `uiautomation` crate | Returns `UnsupportedTarget` (DPI shim DLL, Phase 2) | — | Session 19 |
+| macOS | NSAccessibility (`AXUIElementRef` FFI) | Works on `AXFontSize`-exposing controls | Works | Session 21. See [desktop-agent-macos.md](desktop-agent-macos.md) |
+| Linux | AT-SPI2 / `atspi` + `zbus` | GNOME/Cinnamon/MATE/Budgie via `gsettings`; KDE via `kdeglobals` (restart required) | Works | Session 22. See [desktop-agent-linux.md](desktop-agent-linux.md) |
+
+---
+
+## 8a. Installation (Windows)
 
 **Prerequisites** (see [`packages/desktop-agent/README.md`](../../packages/desktop-agent/README.md) for detailed commands):
 
@@ -256,10 +270,10 @@ The following capabilities are explicitly deferred:
 | Item | Detail |
 |------|--------|
 | Per-process DPI shim DLL | `SetProcessDpiAwarenessContext` only works on the current process. A shim DLL injected into the target process (or a dedicated host process with DLL injection) is required. The adapter stub and `RevertToken::DpiScale` type are already wired; only the injection layer is missing. |
-| macOS NSAccessibility dispatcher | `uia_stub::StubDispatcher` will be replaced with an AXUIElement-based adapter. `#[cfg(target_os = "macos")]` guards are already in place. |
-| Linux AT-SPI dispatcher | Same stub path; AT-SPI2 via the `atspi` crate. |
+| macOS NSAccessibility dispatcher | **Shipped in Session 21.** `platform::macos::MacOsAdapter` implements `AccessibilityAdapter` via raw AXUIElement FFI. See [desktop-agent-macos.md](desktop-agent-macos.md). |
+| Linux AT-SPI dispatcher | **Shipped in Session 22.** `platform::linux::LinuxAdapter` implements `AccessibilityAdapter` via the `atspi` crate (v0.22) + `zbus` (v4.4). See [desktop-agent-linux.md](desktop-agent-linux.md). |
 | Settings window profile editing | The Profile tab is read-only in MVP. Adding a write path through `ProfileStore` triggers the existing `PROFILE_UPDATED` broadcast automatically. |
-| SQLCipher persistent profile | The in-memory `ProfileStore` will be replaced with an encrypted SQLite store (SQLCipher via `rusqlite + sqlcipher`) so the profile survives agent restarts without an extension round-trip. |
+| SQLCipher persistent profile | **Shipped in Session 21.** The in-memory `ProfileStore` is replaced with an encrypted SQLite store. |
 | Rich UIA inspection | The current inspector returns top-level windows. Phase 2 will walk the UIA element tree to return the full control hierarchy. |
 | Code signing | The MSI will be signed with a cross-signed EV certificate to eliminate the SmartScreen warning. |
 | Auto-update | Tauri's built-in updater will be configured to check `https://accessbridge.space/api/version` and apply delta updates. |

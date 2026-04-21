@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=AccessBridge Desktop Agent
+GenericName=Accessibility Companion
+Comment=Runs alongside the AccessBridge browser extension to adapt native apps
+Exec=accessbridge-agent
+Icon=accessbridge-agent
+Terminal=false
+Categories=Accessibility;Utility;
+StartupNotify=true
+StartupWMClass=accessbridge-agent
+Keywords=accessibility;a11y;font;contrast;screen reader;
+X-GNOME-UsesNotifications=true

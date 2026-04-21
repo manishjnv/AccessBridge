@@ -1,0 +1,52 @@
+# Flatpak manifest for AccessBridge Desktop Agent
+#
+# SECURITY TRADEOFF — --share=network (flag for codex:rescue review):
+#
+#   The agent binds a loopback WebSocket (127.0.0.1:PORT) that the browser
+#   extension (running OUTSIDE this Flatpak sandbox) must reach.
+#   Flatpak's default isolated network namespace blocks inbound connections
+#   from the host, so the extension CANNOT reach 127.0.0.1 inside the
+#   sandbox without --share=network.
+#
+#   --share=network grants access to the full host network namespace — this
+#   is broader than strictly necessary (we only need loopback). No narrower
+#   Flatpak portal currently exists for "loopback only." Alternatives:
+#     1. Unix-domain socket via --filesystem=xdg-run/accessbridge.sock:create
+#        (requires extension-side changes to use a socket path, not a port)
+#     2. Accept --share=network and rely on PSK authentication in ipc_server.rs
+#        to gate all connections (current approach — defense in depth).
+#
+#   Decision: keep --share=network with PSK auth guard. Tag for security team
+#   review. If future Flatpak portals allow loopback-only namespacing, migrate.
+
+app-id: io.accessbridge.Desktop
+runtime: org.freedesktop.Platform
+runtime-version: "23.08"
+sdk: org.freedesktop.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+command: accessbridge-agent
+finish-args:
+  - --share=ipc
+  - --socket=x11
+  - --socket=wayland
+  - --socket=session-bus      # AT-SPI requires session bus
+  - --talk-name=org.a11y.Bus
+  - --talk-name=org.a11y.atspi.Registry
+  - --filesystem=xdg-config/accessbridge:create
+  - --filesystem=xdg-data/accessbridge:create
+  - --filesystem=xdg-cache/accessbridge:create
+  - --device=dri
+  - --share=network           # loopback WebSocket to browser extension (see tradeoff note above)
+modules:
+  - name: accessbridge-agent
+    buildsystem: simple
+    build-commands:
+      - cargo build --release --manifest-path Cargo.toml
+      - install -Dm755 target/release/accessbridge-desktop-agent /app/bin/accessbridge-agent
+      - install -Dm644 resources/linux/accessbridge.desktop /app/share/applications/io.accessbridge.Desktop.desktop
+      - install -Dm644 resources/linux/io.accessbridge.Desktop.metainfo.xml /app/share/metainfo/io.accessbridge.Desktop.metainfo.xml
+      - install -Dm644 icons/128x128.png /app/share/icons/hicolor/128x128/apps/io.accessbridge.Desktop.png
+    sources:
+      - type: dir
+        path: ../../..

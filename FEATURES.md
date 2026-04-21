@@ -172,19 +172,20 @@ Security invariants enforced at multiple layers: (a) opt-in gate on every `recor
 | A11Y-03 | Source badge + filter (custom / axe / both) | SP | Shipped | Session 18. Side panel shows per-finding provenance + per-source tally in header; filter chips toggle sources on/off. |
 | A11Y-04 | Multi-page PDF export | SP | Shipped | `pdf-generator.ts` — valid `%PDF-…%%EOF` file with scored findings + element selectors. |
 
-## Desktop Agent (Session 19)
+## Desktop Agent (Sessions 19 + 21 + 22)
 
-Tauri 2 Rust companion process that pairs with the extension over a loopback WebSocket and exposes Windows UIA inspection. Extension works fully standalone when the agent is absent.
+Tauri 2 Rust companion process that pairs with the extension over a loopback WebSocket and exposes native accessibility inspection and adaptation across Windows, macOS, and Linux. Three-OS parity is complete as of Session 22. Extension works fully standalone when the agent is absent.
 
 | ID | Feature | Status | Notes |
 |----|---------|--------|-------|
 | DA-01 | Tauri 2 Rust agent binary — system-tray icon + settings window (React 18, Overview / Profile / Logs tabs) + axum WS server on 127.0.0.1:8901 | Shipped | [packages/desktop-agent/src-tauri/src/lib.rs](packages/desktop-agent/src-tauri/src/lib.rs) |
 | DA-02 | IPC wire protocol — 15 message variants (HELLO handshake, profile CRUD, UIA inspect, adaptation apply/revert, ping/pong, error); TS discriminated union + Rust serde mirror; PSK handshake (sha256(psk‖nonce), constant-time compare) | Shipped | [packages/core/src/ipc/](packages/core/src/ipc/) + [packages/desktop-agent/src-tauri/src/ipc_protocol.rs](packages/desktop-agent/src-tauri/src/ipc_protocol.rs) |
 | DA-03 | AgentBridge extension integration — `AgentBridge` SW singleton wrapping `AgentClient`; chrome.storage.local PSK + status persistence; pair dialog in popup; Native Apps tab in sidepanel | Shipped | [packages/extension/src/background/agent-bridge.ts](packages/extension/src/background/agent-bridge.ts) |
-| DA-04 | Windows UIA inspection — `WindowsUiaDispatcher` lists native windows and elements via the `uiautomation` crate; `apply()` for font-scale/process-dpi returns `UnsupportedTarget` pending Phase 2 DPI shim DLL; macOS + Linux get no-op stubs | Shipped (inspect); WIP (adapt) | [packages/desktop-agent/src-tauri/src/uia/](packages/desktop-agent/src-tauri/src/uia/) |
-| DA-05 | Cross-surface profile sync foundation — last-write-wins on `profile.updatedAt`; extension pushes on connect + `SAVE_PROFILE`; agent pushes `PROFILE_UPDATED` via tokio broadcast; graceful degradation when agent absent | Shipped | [packages/desktop-agent/src-tauri/src/profile_store.rs](packages/desktop-agent/src-tauri/src/profile_store.rs) |
+| DA-04 | Windows UIA inspection — `WindowsUiaDispatcher` lists native windows and elements via the `uiautomation` crate; `apply()` for font-scale/process-dpi returns `UnsupportedTarget` pending Phase 2 DPI shim DLL | Shipped (inspect); WIP (adapt) | [packages/desktop-agent/src-tauri/src/uia/](packages/desktop-agent/src-tauri/src/uia/) |
+| DA-05 | Cross-surface profile sync — last-write-wins on `profile.updatedAt`; SQLCipher persistent store (Session 21); extension pushes on connect + `SAVE_PROFILE`; agent pushes `PROFILE_UPDATED` via tokio broadcast; graceful degradation when agent absent | Shipped | [packages/desktop-agent/src-tauri/src/profile_store.rs](packages/desktop-agent/src-tauri/src/profile_store.rs) |
+| DA-06 | Linux AT-SPI adapter + .deb/.rpm/AppImage/Flatpak packaging + systemd user service + XDG compliance | Shipped | Session 22. See [docs/features/desktop-agent-linux.md](docs/features/desktop-agent-linux.md). |
 
-Docs: [docs/features/desktop-agent.md](docs/features/desktop-agent.md).
+Docs: [docs/features/desktop-agent.md](docs/features/desktop-agent.md) (cross-platform overview) · [docs/features/desktop-agent-macos.md](docs/features/desktop-agent-macos.md) (macOS) · [docs/features/desktop-agent-linux.md](docs/features/desktop-agent-linux.md) (Linux).
 
 ---
 

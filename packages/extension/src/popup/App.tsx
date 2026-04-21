@@ -40,12 +40,12 @@ export default function App() {
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [updateStep, setUpdateStep] = useState<'idle' | 'downloading' | 'downloaded' | 'reloading'>('idle');
-  // --- Session 19 / 21: Desktop Agent ---
+  // --- Session 19 / 21 / 22: Desktop Agent ---
   const [agentStatus, setAgentStatus] = useState<{
     connected: boolean;
     state: string;
     server: { version: string; platform?: string; capabilities?: string[] } | null;
-    agentInfo: { version: string; platform: string; capabilities: string[] } | null;
+    agentInfo: { version: string; platform: string; capabilities: string[]; distroHint?: string } | null;
   }>({ connected: false, state: 'idle', server: null, agentInfo: null });
   const [showPairDialog, setShowPairDialog] = useState(false);
   const [pskInput, setPskInput] = useState('');
@@ -421,13 +421,24 @@ export default function App() {
 
 // ---------- Tab panels ----------
 
-// --- Session 21: platform display helper ---
-function formatPlatform(p: string): string {
-  if (p === 'macos') return 'macOS';
-  if (p === 'windows') return 'Windows';
-  if (p === 'linux') return 'Linux';
+// --- Session 21 / 22: platform display helper ---
+// Accepts the full AgentInfo shape so distroHint can be used for Linux.
+export function formatPlatform(info: { platform: string; distroHint?: string }): string {
+  if (info.platform === 'macos') return 'macOS';
+  if (info.platform === 'windows') return 'Windows';
+  if (info.platform === 'linux') {
+    if (info.distroHint) {
+      // Parse "<id>-<version>" — id part is everything before the first numeric segment
+      const match = info.distroHint.match(/^([a-z]+)-(\d[\w.]*)$/i);
+      if (match) {
+        const id = match[1].charAt(0).toUpperCase() + match[1].slice(1);
+        return `${id} ${match[2]}`;
+      }
+    }
+    return 'Linux';
+  }
   // Capitalise first letter for unknown platforms
-  return p.charAt(0).toUpperCase() + p.slice(1);
+  return info.platform.charAt(0).toUpperCase() + info.platform.slice(1);
 }
 
 function OverviewTab({ score, activeCount, agentStatus, onPairClick }: {
@@ -437,7 +448,7 @@ function OverviewTab({ score, activeCount, agentStatus, onPairClick }: {
     connected: boolean;
     state: string;
     server: { version: string; platform?: string; capabilities?: string[] } | null;
-    agentInfo: { version: string; platform: string; capabilities: string[] } | null;
+    agentInfo: { version: string; platform: string; capabilities: string[]; distroHint?: string } | null;
   };
   onPairClick: () => void;
 }) {
@@ -487,7 +498,7 @@ function OverviewTab({ score, activeCount, agentStatus, onPairClick }: {
             <div style={{ fontSize: 11, color: '#94a3b8' }}>
               {agentStatus.connected
                 ? agentStatus.agentInfo
-                  ? `Connected (${formatPlatform(agentStatus.agentInfo.platform)}, v${agentStatus.agentInfo.version})`
+                  ? `Connected (${formatPlatform(agentStatus.agentInfo)}, v${agentStatus.agentInfo.version})`
                   : `Connected (v${agentStatus.server?.version ?? '?'})`
                 : agentStatus.state === 'handshaking' ? 'Pairing...'
                 : agentStatus.state === 'connecting' ? 'Connecting...'

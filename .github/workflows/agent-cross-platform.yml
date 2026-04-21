@@ -1,0 +1,161 @@
+name: Agent Cross-Platform
+
+on:
+  pull_request:
+    paths:
+      - 'packages/desktop-agent/**'
+      - 'packages/core/src/ipc/**'
+      - '.github/workflows/agent-cross-platform.yml'
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+concurrency:
+  group: agent-cross-platform-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: build + test (${{ matrix.platform_name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform_name: windows
+            tauri_target: x86_64-pc-windows-msvc
+            bundle_artifacts: 'packages/desktop-agent/src-tauri/target/release/bundle/msi/*.msi'
+            rust_install_deps: ''
+          - os: macos-latest
+            platform_name: macos
+            tauri_target: x86_64-apple-darwin
+            bundle_artifacts: 'packages/desktop-agent/src-tauri/target/release/bundle/macos/*.app,packages/desktop-agent/src-tauri/target/release/bundle/dmg/*.dmg'
+            rust_install_deps: ''
+          - os: ubuntu-latest
+            platform_name: linux
+            tauri_target: x86_64-unknown-linux-gnu
+            bundle_artifacts: 'packages/desktop-agent/src-tauri/target/release/bundle/deb/*.deb,packages/desktop-agent/src-tauri/target/release/bundle/rpm/*.rpm,packages/desktop-agent/src-tauri/target/release/bundle/appimage/*.AppImage'
+            rust_install_deps: |
+              sudo apt-get update
+              sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev at-spi2-core dbus-x11 libdbus-1-dev pkg-config
+
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    env:
+      DISPLAY: ':99'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.tauri_target }}
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            packages/desktop-agent/src-tauri/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('packages/desktop-agent/src-tauri/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Install Linux system deps
+        if: matrix.platform_name == 'linux'
+        run: ${{ matrix.rust_install_deps }}
+
+      - name: Start Xvfb + AT-SPI bus (Linux only)
+        if: matrix.platform_name == 'linux'
+        run: |
+          sudo apt-get install -y xvfb
+          Xvfb :99 -screen 0 1024x768x24 &
+          sleep 1
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Vitest (workspace)
+        run: pnpm -r test
+
+      - name: Rust unit tests
+        working-directory: packages/desktop-agent/src-tauri
+        run: cargo test --locked
+
+      - name: Rust integration tests (Linux with D-Bus)
+        if: matrix.platform_name == 'linux'
+        working-directory: packages/desktop-agent/src-tauri
+        run: dbus-run-session -- cargo test --test cross_platform --locked
+
+      - name: Build agent (tauri bundle)
+        run: pnpm --filter @accessbridge/desktop-agent tauri build --target ${{ matrix.tauri_target }}
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ''
+          APPLE_SIGNING_IDENTITY: ''
+
+      - name: Package-build smoke tests (Linux only)
+        if: matrix.platform_name == 'linux'
+        env:
+          AGENT_BUILD_DONE: '1'
+        run: pnpm --filter @accessbridge/desktop-agent test:smoke || true
+
+      - name: Upload platform artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: agent-${{ matrix.platform_name }}
+          path: |
+            packages/desktop-agent/src-tauri/target/release/bundle/**/*
+            !packages/desktop-agent/src-tauri/target/release/bundle/**/*.sig
+          retention-days: 14
+          if-no-files-found: warn
+
+  release:
+    name: Publish GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build-and-test
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: List staged files (diagnostic)
+        run: find artifacts/ -type f | sort
+
+      - name: Publish to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/agent-windows/**/*.msi
+            artifacts/agent-macos/**/*.dmg
+            artifacts/agent-macos/**/*.pkg
+            artifacts/agent-linux/**/*.deb
+            artifacts/agent-linux/**/*.rpm
+            artifacts/agent-linux/**/*.AppImage
+          generate_release_notes: true
+          draft: false
+          fail_on_unmatched_files: false

@@ -381,6 +381,90 @@ With all three in place, the lockdown becomes cryptographically enforced end-to-
 
 ---
 
+## Linux Package Signing
+
+Linux artifacts ship in three formats — `.deb`, `.rpm`, and AppImage — plus a Flatpak that is signed by the build system's ostree metadata. Each format uses GPG for artifact integrity.
+
+> **Warning:** MSI and DMG signing are handled by the CI matrix (Windows and macOS runners). Linux signing currently requires the maintainer's GPG key, which is out-of-tree. See `DEFERRED.md` for the roadmap item to integrate Linux GPG signing into CI.
+
+### .deb — sign with dpkg-sig
+
+```bash
+# Sign the .deb with the maintainer's GPG key
+gpg --detach-sign -o accessbridge-agent.deb.sig accessbridge-agent.deb
+
+# Alternative: embed the signature inside the .deb using dpkg-sig
+dpkg-sig --sign builder accessbridge-agent.deb
+```
+
+Users verify a dpkg-sig-signed package with:
+
+```bash
+dpkg-sig --verify accessbridge-agent.deb
+```
+
+For a standalone detached signature:
+
+```bash
+gpg --verify accessbridge-agent.deb.sig accessbridge-agent.deb
+```
+
+### .rpm — sign with rpmsign
+
+```bash
+# Ensure ~/.rpmmacros contains:
+#   %_gpg_name  Manish Kumar <your-gpg-email>
+
+rpmsign --addsign accessbridge-agent.rpm
+```
+
+Users verify with:
+
+```bash
+rpm --checksig accessbridge-agent.rpm
+```
+
+The verifying machine must have the public key imported: `rpm --import accessbridge-gpg-pubkey.asc`.
+
+### AppImage — detached GPG signature + zsyncmake
+
+```bash
+# Sign the AppImage
+gpg --detach-sign -o accessbridge-agent.AppImage.sig accessbridge-agent.AppImage
+
+# Generate a zsync file for delta updates
+zsyncmake accessbridge-agent.AppImage -o accessbridge-agent.AppImage.zsync
+```
+
+Publish `accessbridge-agent.AppImage`, `accessbridge-agent.AppImage.sig`, and `accessbridge-agent.AppImage.zsync` alongside each other. Users verify:
+
+```bash
+gpg --verify accessbridge-agent.AppImage.sig accessbridge-agent.AppImage
+```
+
+### Flatpak — ostree repo signing
+
+When publishing to a self-hosted Flatpak repository (not Flathub), the ostree metadata must be GPG-signed so clients can verify the repo:
+
+```bash
+# Sign the ostree commit when publishing to the repo
+flatpak build-sign <build-dir> --gpg-sign=<key-id> --gpg-homedir=~/.gnupg
+
+# Sign the repo summary (required for remote add --gpg-import to work)
+flatpak build-update-repo <repo-dir> --gpg-sign=<key-id>
+```
+
+Users add the repo with:
+
+```bash
+flatpak remote-add --gpg-import=accessbridge-gpg-pubkey.asc \
+  accessbridge https://accessbridge.space/flatpak/repo
+```
+
+The Flathub path (future) handles signing transparently — Flathub's CI signs all ostree commits with the Flathub GPG key, which is bundled with `flatpak` on all supported distros.
+
+---
+
 ## Session 20 Status
 
 Current state of signing infrastructure:

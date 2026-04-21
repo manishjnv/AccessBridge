@@ -26,6 +26,14 @@
 #                      who want one download, and to individual files for surgical deploys.
 #                      Safe to omit when enterprise templates haven't changed — the
 #                      existing bundle + templates in deploy/enterprise/ still sync.
+#   --with-agent-linux  Session 22: build Linux .deb/.rpm/AppImage via
+#                      tools/build-agent-linux.sh, upload artifacts to
+#                      /opt/accessbridge/downloads/linux/ on the VPS, and update
+#                      agent-manifest.json. REQUIRES running on a Linux host
+#                      (the underlying tauri cross-build is not supported on
+#                      Windows or macOS). Safe to omit when no new Linux agent
+#                      release is being shipped — existing artifacts in
+#                      deploy/downloads/linux/ are still synced via upload_landing.
 #
 # Pipeline: bump → typecheck+build+test → re-zip → push → sync → VPS-verify → health
 # SSH alias: a11yos-vps
@@ -47,6 +55,7 @@ NO_CACHE=false
 WITH_AGENT=0
 WITH_AGENT_ALL_PLATFORMS=0
 WITH_ENTERPRISE=0
+WITH_AGENT_LINUX=0
 
 for arg in "$@"; do
   case "$arg" in
@@ -59,9 +68,33 @@ for arg in "$@"; do
     --with-agent)               WITH_AGENT=1               ;;
     --with-agent-all-platforms) WITH_AGENT_ALL_PLATFORMS=1 ;;  # Session 21 Part 4: cross-platform agent build
     --with-enterprise)          WITH_ENTERPRISE=1          ;;  # Session 20: zip ADMX bundle + sync enterprise templates
+    --with-agent-linux)         WITH_AGENT_LINUX=1         ;;  # Session 22: Linux deb/rpm/AppImage build
     *) echo "Unknown arg: $arg" >&2; exit 2 ;;
   esac
 done
+
+# ─────────────────────────────────────────────────────────
+# Early-exit guards for flags that impose environment requirements
+# ─────────────────────────────────────────────────────────
+if [ "${WITH_AGENT_LINUX}" = "1" ]; then
+  _HOST_OS=$(uname -s 2>/dev/null || echo "Unknown")
+  if [ "$_HOST_OS" != "Linux" ]; then
+    echo "ERROR: --with-agent-linux requires a Linux host. Detected: $_HOST_OS"
+    echo "       Run this flag on a Linux machine (or in the CI matrix)."
+    exit 1
+  fi
+  _LINUX_SCRIPT="$(pwd)/tools/build-agent-linux.sh"
+  if [ ! -f "$_LINUX_SCRIPT" ]; then
+    echo "ERROR: tools/build-agent-linux.sh not found at $_LINUX_SCRIPT"
+    echo "       Ensure the Session 22 script is present and committed."
+    exit 1
+  fi
+  if [ ! -x "$_LINUX_SCRIPT" ]; then
+    echo "ERROR: tools/build-agent-linux.sh is not executable."
+    echo "       Fix with: git update-index --chmod=+x tools/build-agent-linux.sh"
+    exit 1
+  fi
+fi
 
 # ─────────────────────────────────────────────────────────
 # [0/6] Auto-bump version from conventional commits since last v* tag
@@ -365,6 +398,28 @@ else
 fi
 
 # ─────────────────────────────────────────────────────────
+# [1.8/6] (optional) Build Linux agent packages (.deb/.rpm/AppImage)
+#           — only with --with-agent-linux. Must run on a Linux host.
+# Delegates to tools/build-agent-linux.sh which:
+#   • runs `pnpm tauri build` for x86_64-unknown-linux-gnu
+#   • copies artifacts to deploy/downloads/linux/
+#   • updates deploy/downloads/agent-manifest.json with linux-x86_64 keys
+# The deploy/downloads/ tree is synced to the VPS by upload_landing below
+# (rsync -az --delete deploy/ covers the linux/ subdir automatically).
+# ─────────────────────────────────────────────────────────
+if [ "${WITH_AGENT_LINUX}" = "1" ]; then
+  echo "[1.8/6] Building Linux agent packages (--with-agent-linux)..."
+  if bash "$_LINUX_SCRIPT"; then
+    echo "  ✓ Linux agent packages built and staged into deploy/downloads/linux/"
+  else
+    echo "  ✗ Linux agent build failed — aborting deploy (exit code $?)."
+    exit 1
+  fi
+else
+  echo "[1.8/6] Skipping Linux agent build (pass --with-agent-linux to enable)"
+fi
+
+# ─────────────────────────────────────────────────────────
 # [2/6] Push to GitHub
 # ─────────────────────────────────────────────────────────
 if [ "$SKIP_PUSH" = false ]; then
@@ -562,6 +617,22 @@ if [ "$SKIP_CHECK" = false ]; then
     echo "    Got:      ${SERVED_VERSION:-<unparseable>}"
     echo "  Likely cause: rsync no-op, Caddy cache, or CDN serving stale artifact."
     exit 1
+  fi
+
+  # Linux artifact reachability probe — only when --with-agent-linux was used.
+  # HEAD request confirms the AppImage is reachable via nginx without
+  # downloading the full ~100MB binary. A non-200 means the rsync didn't
+  # land or nginx hasn't picked up the new path under /downloads/linux/.
+  if [ "${WITH_AGENT_LINUX}" = "1" ]; then
+    LINUX_APPIMAGE_URL="https://accessbridge.space/downloads/linux/accessbridge-agent.AppImage"
+    echo "  Verifying Linux AppImage reachability at $LINUX_APPIMAGE_URL ..."
+    if curl -sfL -I --max-time 15 -o /dev/null "$LINUX_APPIMAGE_URL"; then
+      echo "  ✓ Linux AppImage is reachable (HTTP 200)."
+    else
+      echo "  ✗ Linux AppImage not reachable: $LINUX_APPIMAGE_URL"
+      echo "    Check that rsync landed deploy/downloads/linux/ and nginx serves /downloads/."
+      exit 1
+    fi
   fi
 else
   echo "[5/6] Skipping health check"

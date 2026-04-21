@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.accessbridge.Desktop</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>AccessBridge Desktop Agent</name>
+  <summary>Ambient accessibility companion for native desktop apps</summary>
+  <description>
+    <p>
+      The AccessBridge Desktop Agent runs alongside the browser extension to extend
+      accessibility adaptations (font scaling, contrast, cursor size) into native
+      Linux applications via AT-SPI.
+    </p>
+    <p>Features:</p>
+    <ul>
+      <li>AT-SPI-based inspection of GNOME, KDE, Cinnamon, XFCE applications</li>
+      <li>Font scaling via gsettings (GNOME family) or kdeglobals (KDE)</li>
+      <li>Loopback IPC pairing with the browser extension (PSK-authenticated)</li>
+      <li>Cross-surface profile synchronization (last-write-wins)</li>
+    </ul>
+  </description>
+  <url type="homepage">https://accessbridge.space</url>
+  <url type="bugtracker">https://github.com/manishjnv/AccessBridge/issues</url>
+  <launchable type="desktop-id">accessbridge.desktop</launchable>
+  <provides>
+    <binary>accessbridge-agent</binary>
+  </provides>
+  <categories>
+    <category>Accessibility</category>
+    <category>Utility</category>
+  </categories>
+  <content_rating type="oars-1.1" />
+  <developer_name>Manish Kumar</developer_name>
+  <releases>
+    <release version="0.21.0" date="2026-04-21" />
+  </releases>
+</component>

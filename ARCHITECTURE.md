@@ -300,19 +300,18 @@ Docs: [docs/features/onnx-models.md](docs/features/onnx-models.md). Tests: ~70 (
 
 ---
 
-## 8d. Desktop Agent (Sessions 19 + 21)
+## 8d. Desktop Agent (Sessions 19 + 21 + 22)
 
 Tauri 2 Rust binary that pairs with the extension over a loopback WebSocket
-(127.0.0.1:8901). Session 19 shipped the Windows-only MVP; **Session 21
-(2026-04-21) adds cross-platform parity via a new `AccessibilityAdapter`
-trait, a macOS NSAccessibility adapter, a Linux AT-SPI stub, a SQLCipher-
-backed persistent profile store, OS-keyring-backed master-key management,
-a macOS accessibility-permission request module, and a GitHub Actions
-matrix build producing signed MSI + macOS DMG/PKG artifacts**. The
-extension still works fully standalone if the agent is absent; the pairing
-is strictly opt-in via a user-copied PSK.
+(127.0.0.1:8901). Session 19 shipped the Windows-only MVP; Session 21
+(2026-04-21) added macOS NSAccessibility + SQLCipher profile store + OS-keyring
+master-key + macOS permission module + GitHub Actions matrix build; **Session 22
+(2026-04-21) ships the Linux AT-SPI2 adapter + .deb/.rpm/AppImage/Flatpak
+packaging + systemd user service + XDG compliance — completing Windows + macOS
++ Linux parity**. The extension still works fully standalone if the agent is
+absent; the pairing is strictly opt-in via a user-copied PSK.
 
-- **Agent process** — [packages/desktop-agent/src-tauri/src/](packages/desktop-agent/src-tauri/src/). Rust 2021, axum WS server + tokio runtime + Tauri 2 UI shell. Windows-only UIA dispatcher via the `uiautomation` crate; macOS/Linux get a no-op stub (Phase 2 target).
+- **Agent process** — [packages/desktop-agent/src-tauri/src/](packages/desktop-agent/src-tauri/src/). Rust 2021, axum WS server + tokio runtime + Tauri 2 UI shell. Platform adapters: `platform::windows::WindowsUiaAdapter` (UIA), `platform::macos::MacOsAdapter` (NSAccessibility), `platform::linux::LinuxAdapter` (AT-SPI2 via `atspi` v0.22 + `zbus` v4.4).
 - **Shared wire protocol** — TypeScript discriminated union at [packages/core/src/ipc/types.ts](packages/core/src/ipc/types.ts); Rust serde mirror at [packages/desktop-agent/src-tauri/src/ipc_protocol.rs](packages/desktop-agent/src-tauri/src/ipc_protocol.rs). 15 message variants covering HELLO handshake, profile CRUD, UIA inspect, adaptation apply/revert, ping/pong, and error. camelCase over the wire, SCREAMING_SNAKE_CASE `type` discriminator.
 - **TS client** — [packages/core/src/ipc/client.ts](packages/core/src/ipc/client.ts). `AgentClient` class: PSK handshake (sha256(psk||nonce) hex over the wire; agent compares in constant time), exponential backoff reconnect, request/response with per-request timeout, push subscription for `PROFILE_UPDATED`. Never throws on connection failure — extension continues standalone.
 - **Extension bridge** — [packages/extension/src/background/agent-bridge.ts](packages/extension/src/background/agent-bridge.ts). `AgentBridge` singleton wraps `AgentClient` with chrome.storage.local-backed PSK + status persistence + profile push callback. Seven new background message types (`AGENT_GET_STATUS`, `AGENT_SET_PSK`, `AGENT_CLEAR_PSK`, `AGENT_HAS_PSK`, `AGENT_INSPECT_NATIVE`, `AGENT_APPLY_NATIVE`, `AGENT_REVERT_NATIVE`) surface the bridge to popup + sidepanel.
@@ -326,7 +325,7 @@ is strictly opt-in via a user-copied PSK.
 - AES-GCM payload encryption is defined but unused in MVP; reserved for future messages whose content is sensitive to a local packet sniffer.
 - No new extension-side host permissions. No new manifest permissions. The agent is a peer process, not a browser-granted capability.
 
-**Phase 2 upgrades:** macOS (NSAccessibility) and Linux (AT-SPI) dispatchers, SQLCipher-backed agent profile store, per-process DPI shim DLL for real font scaling on native Windows apps, code signing for the MSI, true cross-device profile sync via encrypted cloud relay, auto-update mechanism.
+**Phase 3 upgrades (remaining after three-OS parity):** per-process DPI shim DLL for real font scaling on native Windows apps, code signing for Linux packages (GPG — see `docs/operations/signing.md`), true cross-device profile sync via encrypted cloud relay, auto-update mechanism, Unix-domain-socket IPC to remove Flatpak `--share=network`.
 
 Tests: Rust inline (~53 across ipc_protocol/ipc_server/crypto/profile_store/filters — authored this session, not yet run in CI because toolchain is not installed in CI image); TS vitest (AgentClient tests in `core/ipc/__tests__/` + `extension/background/__tests__/agent-bridge.test.ts`).
 

@@ -1,6 +1,6 @@
 [package]
 name = "accessbridge-desktop-agent"
-version = "0.1.0"
+version = "0.21.0"
 description = "AccessBridge desktop companion"
 authors = ["Manish Kumar"]
 license = "MIT"
@@ -31,6 +31,7 @@ tower = "0.4"
 tower-http = { version = "0.5", features = ["cors", "trace"] }
 once_cell = "1"
 anyhow = "1"
+dirs = "5"
 
 # Session 21 — persistent profile store (SQLCipher) + OS-keyring-backed master key.
 # The `bundled-sqlcipher-vendored-openssl` feature compiles SQLCipher + OpenSSL
@@ -52,6 +53,14 @@ core-graphics = "0.24"
 objc2 = "0.5"
 objc2-foundation = { version = "0.2", features = ["NSString", "NSDictionary", "NSURL"] }
 objc2-app-kit = { version = "0.2", features = ["NSWorkspace", "NSRunningApplication"] }
+
+# Session 22 — Linux AT-SPI adapter deps. Gated to Linux so Windows and
+# macOS builds never pull in D-Bus / zbus / AT-SPI crates.
+# `atspi` defaults to `async-std`; override to tokio to match the agent runtime.
+# `zbus` is re-exported by atspi but listed explicitly for `zbus::fdo::DBusProxy`.
+[target.'cfg(target_os = "linux")'.dependencies]
+atspi = { version = "0.22", default-features = false, features = ["tokio"] }
+zbus = { version = "4.4", default-features = false, features = ["tokio"] }
 
 [dev-dependencies]
 tempfile = "3"

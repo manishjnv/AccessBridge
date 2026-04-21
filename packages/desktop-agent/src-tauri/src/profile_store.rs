@@ -1,8 +1,11 @@
 //! SQLCipher-backed AccessibilityProfile store.
 //!
-//! The database lives under `%LOCALAPPDATA%\AccessBridge\profile.db` on Windows
-//! and `~/.local/share/AccessBridge/profile.db` on other platforms.  The master
-//! key is supplied by the caller (see `crypto::get_or_create_db_key`).
+//! The database path is resolved by [`crate::xdg_paths::profile_db_path`]:
+//! - **Windows**: `%LOCALAPPDATA%\AccessBridge\profile.db`
+//! - **macOS**: `~/Library/Application Support/AccessBridge/profile.db`
+//! - **Linux**: `$XDG_DATA_HOME/accessbridge/profile.db` (fallback: `~/.local/share/accessbridge/profile.db`)
+//!
+//! The master key is supplied by the caller (see `crypto::get_or_create_db_key`).
 //!
 //! Public API surface is intentionally compatible with the previous in-memory
 //! implementation so that `ipc_server.rs` callers need no changes.
@@ -93,21 +96,18 @@ fn now_secs() -> i64 {
 }
 
 /// Platform-specific path to the profile database file.
+///
+/// Delegates to [`crate::xdg_paths::profile_db_path`] which implements the
+/// full XDG Base Directory Specification on Linux and platform-appropriate
+/// paths on Windows / macOS.
+///
+/// ## Platform paths (as of Session 22)
+/// - **Windows**: `%LOCALAPPDATA%\AccessBridge\profile.db` (unchanged)
+/// - **macOS**: `~/Library/Application Support/AccessBridge/profile.db`
+///   *(was `~/.local/share/AccessBridge/profile.db` in Session 21 — corrected)*
+/// - **Linux**: `$XDG_DATA_HOME/accessbridge/profile.db` (fallback: `~/.local/share/accessbridge/profile.db`)
 pub fn platform_profile_db_path() -> PathBuf {
-    let mut base: PathBuf = if cfg!(windows) {
-        std::env::var_os("LOCALAPPDATA")
-            .map(PathBuf::from)
-            .unwrap_or_else(|| PathBuf::from("."))
-    } else if let Some(home) = std::env::var_os("HOME") {
-        let mut p = PathBuf::from(home);
-        p.push(".local/share");
-        p
-    } else {
-        PathBuf::from(".")
-    };
-    base.push("AccessBridge");
-    base.push("profile.db");
-    base
+    crate::xdg_paths::profile_db_path()
 }
 
 /// Open a `Connection`, apply the SQLCipher PRAGMA key, check it is valid,
@@ -663,14 +663,22 @@ mod tests {
     #[test]
     fn open_default_creates_parent_directory() {
         let dir = TempDir::new().expect("tempdir");
-        // Override LOCALAPPDATA / HOME to point inside our tempdir so that
-        // `platform_profile_db_path()` resolves to a path we can inspect.
+        // Override the platform env var that `xdg_paths::profile_db_path()`
+        // reads so the test is hermetic and doesn't touch the real user home.
+        //
+        // - Windows: LOCALAPPDATA → %LOCALAPPDATA%\AccessBridge\profile.db
+        // - Linux:   XDG_DATA_HOME → $XDG_DATA_HOME/accessbridge/profile.db
+        // - macOS:   HOME is used indirectly via dirs::home_dir(); override HOME.
+        //
+        // Session 22: On Linux we now set XDG_DATA_HOME instead of HOME so
+        // the test exercises the XDG path rather than the home fallback.
         let fake_appdata = dir.path().join("FakeAppData");
-        // On all platforms we set the env var that `platform_profile_db_path`
-        // reads so the test is deterministic.
+
         #[cfg(windows)]
         std::env::set_var("LOCALAPPDATA", &fake_appdata);
-        #[cfg(not(windows))]
+        #[cfg(all(not(windows), not(target_os = "macos")))]
+        std::env::set_var("XDG_DATA_HOME", &fake_appdata);
+        #[cfg(target_os = "macos")]
         std::env::set_var("HOME", &fake_appdata);
 
         let expected_db = platform_profile_db_path();
@@ -686,7 +694,9 @@ mod tests {
         // Restore env (best effort; tests run in same process).
         #[cfg(windows)]
         std::env::remove_var("LOCALAPPDATA");
-        #[cfg(not(windows))]
+        #[cfg(all(not(windows), not(target_os = "macos")))]
+        std::env::remove_var("XDG_DATA_HOME");
+        #[cfg(target_os = "macos")]
         std::env::remove_var("HOME");
     }
 }

@@ -1,0 +1,20 @@
+[Unit]
+Description=AccessBridge Accessibility Agent
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/accessbridge-desktop-agent
+Restart=on-failure
+RestartSec=3
+# Security hardening (codex:rescue checklist)
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-write
+PrivateTmp=true
+# But we DO need AT-SPI D-Bus session access:
+# (no sandboxing of session bus — user's AT-SPI depends on it)
+
+[Install]
+WantedBy=default.target

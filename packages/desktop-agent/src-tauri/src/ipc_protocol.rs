@@ -14,6 +14,9 @@ pub struct AgentInfo {
     pub version: String,
     pub platform: String,
     pub capabilities: Vec<String>,
+    /// Linux distro hint, e.g. "ubuntu-24.04" or "fedora-40". None on Windows/macOS.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub distro_hint: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
@@ -161,6 +164,7 @@ mod tests {
             version: "0.1.0".to_string(),
             platform: "windows".to_string(),
             capabilities: vec!["uia".to_string(), "font-scale".to_string()],
+            distro_hint: None,
         }
     }
 
@@ -399,6 +403,7 @@ mod tests {
             version: "v".into(),
             platform: "p".into(),
             capabilities: vec!["a".into(), "b".into()],
+            distro_hint: None,
         };
         let s = serde_json::to_string(&agent).unwrap();
         assert!(s.contains("\"capabilities\":[\"a\",\"b\"]"), "got: {s}");

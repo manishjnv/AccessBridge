@@ -136,6 +136,15 @@ pub enum RevertState {
     },
     #[cfg(target_os = "macos")]
     MacOsAppleScriptReader,
+    /// Linux: restore `gsettings org.gnome.desktop.interface text-scaling-factor`.
+    #[cfg(target_os = "linux")]
+    LinuxGsettingsTextScale { previous: f64 },
+    /// Linux: restore `gsettings org.gnome.desktop.interface cursor-size`.
+    #[cfg(target_os = "linux")]
+    LinuxGsettingsCursorSize { previous: i32 },
+    /// Linux: restore `[General]/fontSize` in `~/.config/kdeglobals`.
+    #[cfg(target_os = "linux")]
+    LinuxKdeglobalsFontSize { previous: i32 },
     /// Revert is a no-op (for mocks and tests).
     None,
 }
@@ -245,6 +254,9 @@ pub mod macos;
 
 #[cfg(target_os = "linux")]
 pub mod linux;
+
+#[cfg(target_os = "linux")]
+pub mod linux_caps;
 
 pub mod factory;
 

@@ -1,5 +1,5 @@
 /**
- * Desktop Agent Bridge (Session 19)
+ * Desktop Agent Bridge (Session 19, updated Session 22)
  *
  * Pairs the extension with the local AccessBridge Desktop Agent over
  * ws://127.0.0.1:8901. PSK is loaded from chrome.storage.local
@@ -7,6 +7,17 @@
  * agent" dialog. If no PSK is present, the bridge stays idle and every
  * extension feature keeps working standalone (graceful degradation is
  * the load-bearing invariant).
+ *
+ * ## PSK file locations (for the "Pair manually" flow — documentation only;
+ *    browser extensions cannot read arbitrary filesystem paths)
+ *
+ *   Windows  : %APPDATA%\AccessBridge\pair.key
+ *   macOS    : ~/Library/Application Support/space.accessbridge.desktop/pair.key
+ *   Linux    : $XDG_RUNTIME_DIR/accessbridge/pair.key
+ *              (falls back to /run/user/<uid>/accessbridge/pair.key)
+ *
+ * The agent displays the base64 pair key in its Settings → Overview UI.
+ * Copy it there and paste it in the extension popup's "Pair" dialog.
  */
 
 import { AgentClient, base64UrlDecode } from '@accessbridge/core/ipc';

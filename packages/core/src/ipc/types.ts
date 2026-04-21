@@ -1,7 +1,8 @@
 export interface AgentInfo {
   version: string;
-  platform: string;
+  platform: string;       // "windows" | "macos" | "linux"
   capabilities: string[];
+  distroHint?: string;    // e.g. "ubuntu-24.04", "fedora-40"; Linux only
 }
 
 export interface NativeTargetHint {

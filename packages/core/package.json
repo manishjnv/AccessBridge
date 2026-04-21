@@ -1,6 +1,6 @@
 {
   "name": "@accessbridge/core",
-  "version": "0.17.0",
+  "version": "0.17.1",
   "private": true,
   "type": "module",
   "main": "src/index.ts",
@@ -24,7 +24,9 @@
     "./fusion": "./src/fusion/index.ts",
     "./fusion/*": "./src/fusion/*",
     "./crypto": "./src/crypto/index.ts",
-    "./crypto/*": "./src/crypto/*"
+    "./crypto/*": "./src/crypto/*",
+    "./ipc": "./src/ipc/index.ts",
+    "./ipc/*": "./src/ipc/*"
   },
   "scripts": {
     "test": "vitest run",

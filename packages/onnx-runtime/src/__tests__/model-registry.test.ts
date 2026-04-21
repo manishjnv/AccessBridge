@@ -41,10 +41,13 @@ describe('model-registry', () => {
     expect(MODEL_REGISTRY[MOONDREAM_TEXT_ID].loadTier).toBe(4);
   });
 
-  it('every URL is a VPS CDN path (port 8300), never the raw api port', () => {
+  it('every URL is served over HTTPS via the Caddy-fronted hostname (FINDING-EXT-001 regression guard)', () => {
     for (const model of Object.values(MODEL_REGISTRY)) {
-      expect(model.url).toMatch(/72\.61\.227\.64:8300\/models\//);
-      // Must NOT hit port 8100 (api) or 8200 (observatory)
+      // Must be HTTPS via the public hostname — never bare-IP HTTP.
+      expect(model.url).toMatch(/^https:\/\/accessbridge\.space\/models\//);
+      // Must NOT regress to the pre-Session-26 bare-IP HTTP endpoint.
+      expect(model.url).not.toMatch(/http:\/\/72\.61\.227\.64/);
+      // Must NOT hit the raw api port (8100) or observatory port (8200).
       expect(model.url).not.toMatch(/:8100/);
       expect(model.url).not.toMatch(/:8200/);
     }

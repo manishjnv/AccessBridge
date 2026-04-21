@@ -1490,14 +1490,14 @@ function CompliancePanel() {
 
   const handleCopyVerifier = () => {
     const today = todayISOCompliance();
-    const url = `http://72.61.227.64:8300/observatory/verifier?date=${today}`;
+    const url = `https://accessbridge.space/observatory/verifier?date=${today}`;
     navigator.clipboard.writeText(url).then(() => {
       setCopiedVerifier(true);
       setTimeout(() => setCopiedVerifier(false), 2000);
     }).catch(() => {});
   };
 
-  const VERIFIER_URL = `http://72.61.227.64:8300/observatory/verifier?date=${todayISOCompliance()}`;
+  const VERIFIER_URL = `https://accessbridge.space/observatory/verifier?date=${todayISOCompliance()}`;
 
   return (
     <div className="space-y-3">

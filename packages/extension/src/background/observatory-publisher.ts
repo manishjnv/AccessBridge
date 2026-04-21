@@ -17,13 +17,13 @@ import {
 } from '@accessbridge/core/crypto';
 
 export const OBSERVATORY_ENDPOINT =
-  'http://72.61.227.64:8300/observatory/api/publish';
+  'https://accessbridge.space/observatory/api/publish';
 
 // --- Session 16: Zero-Knowledge Attestation (Feature #7) ---
 export const OBSERVATORY_ENROLL_ENDPOINT =
-  'http://72.61.227.64:8300/observatory/api/enroll';
+  'https://accessbridge.space/observatory/api/enroll';
 export const OBSERVATORY_RING_ENDPOINT =
-  'http://72.61.227.64:8300/observatory/api/ring';
+  'https://accessbridge.space/observatory/api/ring';
 /** Re-fetch the ring at most weekly. Ring changes are monotonic + rare. */
 export const RING_REFRESH_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
 

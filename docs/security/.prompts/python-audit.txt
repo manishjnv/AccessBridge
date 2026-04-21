@@ -1,0 +1,38 @@
+Run a Python security audit. Scope:
+- tools/prepare-models/*.py (download-indicwhisper.py, download-moondream.py, evaluate-*.py, compute-hashes.sh uses python)
+- tools/pilot/*.py (if any)
+- scripts/vps/main.py (FastAPI app that ships on VPS)
+- Any other *.py files anywhere in the repo
+
+Install bandit + ruff (pip install bandit ruff). Optionally pip-audit for the project's Python dependencies.
+
+Focus on these patterns:
+
+(a) Pickle / joblib / marshal deserialization of untrusted data — especially around ONNX weight prep or XGBoost model loads
+(b) subprocess.{run,call,Popen,check_output} with shell=True, or with unvalidated user-controlled args; os.system
+(c) Path traversal — os.path.join, pathlib operations with attacker-controlled segments; zip-slip in any zipfile extraction
+(d) Downloading untrusted files without integrity check — every requests.get or urllib.request.urlopen. Weights downloads MUST verify SHA-256 against registry before loading (CLAUDE.md R0-* invariants)
+(e) yaml.load without SafeLoader (or yaml.unsafe_load)
+(f) Hardcoded secrets — API tokens, HuggingFace tokens, passwords (grep for patterns: HF_TOKEN=, api_key=, AKIA, sk-*)
+(g) SQL injection in scripts/vps/main.py — sqlite3 parameter style (? vs f-string)
+(h) XML parsing — lxml/xml.etree without defusedxml
+(i) exec() / eval() / compile() on any user-influenced input
+(j) tempfile.mktemp race conditions (use NamedTemporaryFile instead)
+(k) random.* used for security-sensitive values (should be secrets.* or os.urandom)
+(l) TLS verification disabled — requests.get(..., verify=False)
+(m) Logging user input without sanitization — log injection
+(n) FastAPI route handlers — verify every path parameter is typed (not Any), every Form/JSON payload has a Pydantic model with validators, no unchecked user input reaching the SQL layer
+(o) uvicorn config — is it bound to 127.0.0.1 or 0.0.0.0? (should be 127.0.0.1, behind nginx)
+(p) CORS middleware — allow_origins=["*"] with allow_credentials=True is a vuln
+(q) CSV/XLSX generation — any user input fed into a formula cell (CSV injection via =cmd|...)
+
+Output: docs/security/python-audit.md, same format:
+
+### FINDING-PY-NNN [SEVERITY]
+- File: relative/path.py:LINE
+- Rule: bandit rule-id or manual-check-name
+- Description:
+- Remediation:
+- Status: Open
+
+Group by severity. Summary at end. Do NOT modify source files.

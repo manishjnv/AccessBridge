@@ -1,0 +1,31 @@
+Run a Rust security audit against packages/desktop-agent/src-tauri/src/. Try installing semgrep (pip install semgrep) with Rust rulesets if it has them; otherwise do a manual adversarial read using Grep + direct file reads.
+
+Focus on these patterns (many reference RCA BUGs already filed — use them as prior-art to flag regressions):
+
+(a) unsafe{} blocks — list every one, confirm each has a safety justification comment, flag any without
+(b) Raw pointer deref and FFI soundness — check UIA on Windows (uia.rs), NSAccessibility on macOS (platform/macos.rs), AT-SPI on Linux (platform/linux.rs)
+(c) Path traversal — every std::fs::{read,read_to_string,write,create_dir_all,OpenOptions::open,canonicalize} that takes a caller-influenced path
+(d) Command injection — every std::process::Command usage. Particular focus on platform/linux.rs gsettings + kdeglobals paths (Session 22). Check for shell interpolation (there should be none; Command::new().args() is safe).
+(e) Integer overflow in serde_json + ipc_protocol.rs — check for u32/u64 truncation, casts between signed/unsigned
+(f) TOCTOU on file reads — stat-then-open races (check symlink_metadata + open sequences)
+(g) Symlink-follow in file I/O — RCA BUG-018 pattern. Every fs::read_to_string and fs::write on ~/.config/* paths should precede with refuse_if_symlink. Check new Session 24/25 code.
+(h) Umask-chmod race on key files — RCA BUG-017/019. Every OpenOptions that writes secret material (.key, .psk, .token, .db) should set .mode(0o600) at create-time, not after. grep for fs::write on sensitive paths.
+(i) tokio blocking-ops in async contexts — std::fs or std::thread::sleep inside async fn
+(j) zbus/atspi message deserialization on Linux — any unchecked payload size?
+(k) PSK handshake constant-time comparison — should be ring::constant_time::verify_slices_are_equal or subtle::CtOption, NOT == or eq
+(l) AES-GCM nonce reuse — scan for hardcoded nonces, reused Ivs, counter that doesn't monotonically increase
+(m) Keyring fallback — when OS keyring is unavailable and we fall back to file-based key storage (crypto::write_key_to_file), verify it still honors the 0o600-at-create invariant
+(n) SQLCipher PRAGMA leak — the master key must never appear in logs, panics, error messages, or SQL that gets logged
+(o) Tauri IPC command handlers — every #[tauri::command] fn should validate its inputs; check for path traversal, unvalidated enum strings, buffer-length assumptions
+(p) Logging secrets — tracing/log/println! calls that might format a struct containing key material
+
+Output: write docs/security/rust-audit.md with the same format as the TS audit:
+
+### FINDING-RUST-NNN [SEVERITY]
+- File: relative/path.rs:LINE
+- Rule: rule-id or manual-check-name
+- Description:
+- Remediation:
+- Status: Open
+
+Group by severity. At the end: tool + version, files scanned, total per severity, any timeouts/errors. Do NOT modify source files.

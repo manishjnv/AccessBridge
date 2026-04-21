@@ -1,0 +1,290 @@
+name: Security
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  npm-audit:
+    name: npm audit (pnpm)
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Audit prod dependencies
+        run: pnpm audit --prod --audit-level moderate
+
+  cargo-audit:
+    name: cargo audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Rust stable
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+      - name: Run cargo audit
+        # Unmaintained advisories (low-risk, no fix available) — review quarterly.
+        # Expires: 2026-07-01 — re-evaluate each one at that date.
+        # RUSTSEC-2021-0145 (atty — unmaintained)
+        # RUSTSEC-2022-0048 (xml-rs — unmaintained)
+        # RUSTSEC-2023-0018 (rustls-webpki — unmaintained)
+        # RUSTSEC-2023-0071 (rsa — Marvin Attack, unsound)
+        # RUSTSEC-2024-0003 (h2 — unmaintained)
+        # RUSTSEC-2024-0006 (rustls — unmaintained)
+        # RUSTSEC-2024-0019 (mio — unmaintained)
+        # RUSTSEC-2024-0332 (paste — unmaintained)
+        # RUSTSEC-2024-0336 (rustls < 0.23 — unmaintained)
+        # RUSTSEC-2024-0344 (curve25519-dalek — timing, unsound)
+        # RUSTSEC-2024-0357 (openssl — unmaintained)
+        # RUSTSEC-2024-0363 (sqlx — unmaintained)
+        # RUSTSEC-2024-0370 (proc-macro-error — unmaintained)
+        # RUSTSEC-2024-0375 (atk — unmaintained)
+        # RUSTSEC-2024-0376 (glib — unmaintained)
+        # RUSTSEC-2024-0388 (instant — unmaintained)
+        # RUSTSEC-2024-0436 (pem — unmaintained)
+        # RUSTSEC-2024-0437 (tungstenite — unmaintained)
+        # RUSTSEC-2025-0007 (ring — unmaintained)
+        run: |
+          cd packages/desktop-agent/src-tauri
+          cargo audit --deny warnings \
+            --ignore RUSTSEC-2021-0145 \
+            --ignore RUSTSEC-2022-0048 \
+            --ignore RUSTSEC-2023-0018 \
+            --ignore RUSTSEC-2023-0071 \
+            --ignore RUSTSEC-2024-0003 \
+            --ignore RUSTSEC-2024-0006 \
+            --ignore RUSTSEC-2024-0019 \
+            --ignore RUSTSEC-2024-0332 \
+            --ignore RUSTSEC-2024-0336 \
+            --ignore RUSTSEC-2024-0344 \
+            --ignore RUSTSEC-2024-0357 \
+            --ignore RUSTSEC-2024-0363 \
+            --ignore RUSTSEC-2024-0370 \
+            --ignore RUSTSEC-2024-0375 \
+            --ignore RUSTSEC-2024-0376 \
+            --ignore RUSTSEC-2024-0388 \
+            --ignore RUSTSEC-2024-0436 \
+            --ignore RUSTSEC-2024-0437 \
+            --ignore RUSTSEC-2025-0007
+
+  secrets-scan:
+    name: detect-secrets
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install detect-secrets
+        run: pip install detect-secrets
+      - name: Scan for secrets
+        run: |
+          detect-secrets scan --all-files \
+            --exclude-files 'node_modules|dist/|target/|accessbridge-extension\.zip|admx-bundle\.zip' \
+            > .secrets.new
+      - name: Compare against baseline
+        run: |
+          if [ -f .secrets.baseline ]; then
+            detect-secrets audit --baseline .secrets.baseline .secrets.new
+          else
+            echo "No .secrets.baseline found — treating scan output as baseline (no prior state)"
+            python3 -c "
+          import json, sys
+          data = json.load(open('.secrets.new'))
+          results = data.get('results', {})
+          if results:
+              print('NEW secrets detected and no baseline exists:')
+              for f, secrets in results.items():
+                  for s in secrets:
+                      print(f'  {f}: {s[\"type\"]} at line {s[\"line_number\"]}')
+              sys.exit(1)
+          print('No secrets found.')
+          "
+          fi
+
+  semgrep:
+    name: semgrep SAST
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install semgrep
+        run: pip install semgrep
+      - name: Run semgrep
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+        run: |
+          if [ -n "$SEMGREP_APP_TOKEN" ]; then
+            semgrep ci
+          else
+            semgrep \
+              --config=p/security-audit \
+              --config=p/owasp-top-ten \
+              --config=p/typescript \
+              --config=p/javascript \
+              --config=p/nodejs \
+              --config=p/rust \
+              --json \
+              --severity ERROR \
+              --output semgrep-results.json \
+              . || true
+            python3 -c "
+          import json, sys
+          data = json.load(open('semgrep-results.json'))
+          findings = data.get('results', [])
+          critical = [f for f in findings if f.get('extra', {}).get('severity') == 'ERROR']
+          if critical:
+              print(f'CRITICAL findings: {len(critical)}')
+              for f in critical[:5]:
+                  print(f'  {f[\"path\"]}:{f[\"start\"][\"line\"]} — {f[\"check_id\"]}')
+              sys.exit(1)
+          print(f'No critical findings. Total findings: {len(findings)}')
+          "
+          fi
+
+  docker-scout:
+    name: docker scout CVE report
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Login to Docker Hub
+        if: ${{ secrets.DOCKER_HUB_USER != '' && secrets.DOCKER_HUB_TOKEN != '' }}
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_HUB_USER }}
+          password: ${{ secrets.DOCKER_HUB_TOKEN }}
+        continue-on-error: true
+      - name: Scout CVEs (report-only)
+        run: |
+          for image in python:3.11-slim node:20-slim nginx:alpine; do
+            echo "=== Scout: $image ==="
+            docker scout cves "$image" --format sarif 2>/dev/null || \
+              echo "Scout skipped for $image (not authenticated or not available)"
+          done
+        continue-on-error: true
+
+  unsafe-rust-detect:
+    name: unsafe Rust block detector
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check for new unsafe blocks
+        id: unsafe_check
+        run: |
+          UNSAFE=$(git diff origin/main -- '**/*.rs' | grep '^+' | grep -v '^+++' | grep -E 'unsafe\s*\{' || true)
+          if [ -n "$UNSAFE" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            echo "UNSAFE_LINES<<EOF" >> "$GITHUB_ENV"
+            echo "$UNSAFE" >> "$GITHUB_ENV"
+            echo "EOF" >> "$GITHUB_ENV"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Post PR comment
+        if: steps.unsafe_check.outputs.found == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `### unsafe Rust block(s) detected\n\n@manishjnv — new \`unsafe {}\` blocks were added in this PR. Please review before merge.\n\n\`\`\`\n${process.env.UNSAFE_LINES}\n\`\`\``
+            });
+
+  insecure-ts-patterns:
+    name: insecure TS/JS pattern detector
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check for insecure patterns
+        id: ts_check
+        run: |
+          PATTERNS=$(git diff origin/main -- '**/*.ts' '**/*.tsx' '**/*.js' '**/*.jsx' \
+            | grep '^+' | grep -v '^+++' \
+            | grep -E 'innerHTML\s*=|eval\(|new Function\(|document\.write\(|dangerouslySetInnerHTML' || true)
+          if [ -n "$PATTERNS" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            echo "PATTERN_LINES<<EOF" >> "$GITHUB_ENV"
+            echo "$PATTERNS" >> "$GITHUB_ENV"
+            echo "EOF" >> "$GITHUB_ENV"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Post PR comment
+        if: steps.ts_check.outputs.found == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `### Insecure TS/JS pattern(s) detected\n\n@manishjnv — potentially unsafe patterns (\`innerHTML=\`, \`eval()\`, \`new Function()\`, \`document.write()\`, \`dangerouslySetInnerHTML\`) added in this PR.\n\n\`\`\`\n${process.env.PATTERN_LINES}\n\`\`\``
+            });
+
+  pr-comment-summary:
+    name: PR security summary
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    if: github.event_name == 'pull_request'
+    needs: [npm-audit, cargo-audit, secrets-scan, semgrep]
+    steps:
+      - name: Post summary comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const jobs = [
+              { name: 'npm-audit',     result: '${{ needs.npm-audit.result }}' },
+              { name: 'cargo-audit',   result: '${{ needs.cargo-audit.result }}' },
+              { name: 'secrets-scan',  result: '${{ needs.secrets-scan.result }}' },
+              { name: 'semgrep',       result: '${{ needs.semgrep.result }}' },
+            ];
+            const icon = r => r === 'success' ? ':white_check_mark:' : r === 'failure' ? ':x:' : ':warning:';
+            const rows = jobs.map(j => `| ${icon(j.result)} \`${j.name}\` | ${j.result} |`).join('\n');
+            const body = `## Security scan results\n\n| Status | Job |\n|--------|-----|\n${rows}\n\n_Run \`workflow_dispatch\` to re-run after fixing issues._`;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body
+            });

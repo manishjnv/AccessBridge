@@ -1323,7 +1323,7 @@ function SettingsTab({
 
   const handleCopyVerifierUrl = () => {
     const today = todayISO();
-    const url = `http://72.61.227.64:8300/observatory/verifier?date=${today}`;
+    const url = `https://accessbridge.space/observatory/verifier?date=${today}`;
     navigator.clipboard.writeText(url).then(() => {
       setCopiedUrl(true);
       setTimeout(() => setCopiedUrl(false), 2000);
@@ -1545,7 +1545,7 @@ function SettingsTab({
           </>
         )}
         <a
-          href="http://72.61.227.64:8300/observatory/"
+          href="https://accessbridge.space/observatory/"
           target="_blank"
           rel="noopener noreferrer"
           className="block text-center mt-3 text-xs"

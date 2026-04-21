@@ -14,7 +14,7 @@
 
 import type { ModelMetadata, ModelTier } from './types.js';
 
-const VPS_MODEL_BASE = 'http://72.61.227.64:8300/models';
+const VPS_MODEL_BASE = 'https://accessbridge.space/models';
 
 export const STRUGGLE_CLASSIFIER_ID = 'struggle-classifier-v1';
 export const MINILM_EMBEDDINGS_ID = 'minilm-l6-v2';

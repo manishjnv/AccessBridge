@@ -1,0 +1,28 @@
+Install semgrep (pip install semgrep) and run it against packages/extension/src with OWASP Top 10 and Chrome-extension rulesets. If semgrep install fails, do a manual adversarial line-by-line read using Grep. Focus on these specific patterns:
+
+(a) XSS via innerHTML, insertAdjacentHTML, document.write, dangerouslySetInnerHTML, .html() jQuery-style
+(b) eval, Function(), setTimeout/setInterval with string arg (not function)
+(c) contentEditable combined with user-supplied content being rendered
+(d) postMessage handlers without event.origin validation
+(e) chrome.runtime.onMessage handlers that don't validate sender.id or sender.origin — can content scripts from attacker pages call them?
+(f) Unsanitized URL parameter parsing (location.search, URLSearchParams fed directly to DOM)
+(g) Direct href/src assignment without protocol allowlist (javascript:, data: URIs)
+(h) localStorage and chrome.storage reads treated as trusted input fed to DOM without sanitization
+(i) Prototype pollution patterns — RCA BUG-015 flagged "in" operator against plain object literals; grep for: `in BCP47_*`, `in SUPPORTED_*`, `in FEATURE_*`, Object.assign without hasOwnProperty gating, JSON.parse followed by direct structured-merge
+(j) chrome.tabs.executeScript or chrome.scripting.executeScript with dynamic code strings (not files)
+(k) DOMParser or createContextualFragment used on untrusted HTML without DOMPurify
+(l) Sanitizer bypasses — DOMPurify default config is not enough for all contexts; check if any svg/mathml/foreignObject allowed
+(m) aria-label injection — user-curation data flowing to aria-label must not contain HTML-ish chars (the user-curation-store sanitizer was adversarial-pass fixed in Session 23; verify it still holds)
+(n) CSP violations — the extension manifest.json uses wasm-unsafe-eval for ONNX; verify no other unsafe-eval path snuck in
+(o) Content script to background message contracts — are payload shapes validated at the border?
+
+Output: write docs/security/semgrep-extension.md as a markdown report. Format every finding as:
+
+### FINDING-EXT-NNN [SEVERITY]
+- File: relative/path.ts:LINE
+- Rule: rule-id or manual-check-name
+- Description: 1-2 sentence what + why it matters
+- Remediation: concrete fix
+- Status: Open
+
+Group by severity: CRITICAL, HIGH, MEDIUM, LOW, INFO. At the end include a summary section: tool + version used, files scanned, total findings per severity, any checks that timed out or errored. Prefer false positives to missed vulns. Do NOT modify any source files.

@@ -1,0 +1,164 @@
+version: 2
+
+updates:
+  # Root workspace (pnpm uses npm-compat protocol)
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:30"
+      timezone: "Asia/Kolkata"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "security"
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+
+  # packages/core
+  - package-ecosystem: "npm"
+    directory: "/packages/core"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:30"
+      timezone: "Asia/Kolkata"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "security"
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+
+  # packages/extension
+  - package-ecosystem: "npm"
+    directory: "/packages/extension"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:30"
+      timezone: "Asia/Kolkata"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "security"
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+
+  # packages/ai-engine
+  - package-ecosystem: "npm"
+    directory: "/packages/ai-engine"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:30"
+      timezone: "Asia/Kolkata"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "security"
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+
+  # packages/onnx-runtime
+  - package-ecosystem: "npm"
+    directory: "/packages/onnx-runtime"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:30"
+      timezone: "Asia/Kolkata"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "security"
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+
+  # packages/desktop-agent (Node devDeps, if any)
+  - package-ecosystem: "npm"
+    directory: "/packages/desktop-agent"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:30"
+      timezone: "Asia/Kolkata"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "security"
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+
+  # ops/observatory
+  - package-ecosystem: "npm"
+    directory: "/ops/observatory"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:30"
+      timezone: "Asia/Kolkata"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "security"
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+
+  # Rust — desktop-agent Tauri workspace
+  - package-ecosystem: "cargo"
+    directory: "/packages/desktop-agent/src-tauri"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:30"
+      timezone: "Asia/Kolkata"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "security"
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:30"
+      timezone: "Asia/Kolkata"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "security"
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"

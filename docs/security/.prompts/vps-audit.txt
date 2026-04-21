@@ -1,0 +1,39 @@
+Run a security audit against VPS Node.js code:
+- ops/observatory/server.js (the primary target)
+- ops/observatory/*.js (crypto-verify.js, enterprise-endpoint.js, seed-demo-data.js, and any __tests__/*.js)
+- ops/observatory/public/*.js (verifier.js, pilot.js — client-side, but still scan for auth/token leaks)
+- Any other *.js files under ops/
+
+Try installing semgrep (pip install semgrep) with node.js / express rulesets. If not feasible, do a manual adversarial read using Grep + direct file reads.
+
+Focus on these patterns:
+
+(a) SQL injection — every better-sqlite3 prepare/exec/run/all call. Confirm every call uses named/positional parameters, never string concatenation. The enterprise-endpoint and pilot endpoints are newest attack surface (Sessions 20 + 24).
+(b) Prototype pollution — Object.assign({}, userInput), spread from req.body, body-parser mergePatch. The curation-learning-loop aggregator is a possible surface.
+(c) Express body-parser size limits — bodyParser.json() without { limit: '100kb' } permits 100MB POST bombs
+(d) CORS — cors({ origin: true }) with credentials or cors({ origin: '*' }) anywhere. Verify origin allowlist.
+(e) Auth bypass — every enrollment-token, ring signature verify, relay-signature-verify (if relay exists yet). Check timing: is verify constant-time?
+(f) SSRF — ring-download, any fetch()/http.get() call. Is the URL user-influenced? Is there DNS rebind protection?
+(g) Rate-limit bypass — check the 60/60s IP rate limiter. Does it honor X-Forwarded-For? Is that trustable behind Caddy? Can an attacker set a custom X-Forwarded-For to reset their counter?
+(h) Header injection — every res.setHeader with variables; filename= in Content-Disposition on downloads
+(i) XXE — any XML parsing (probably none, but check)
+(j) Path traversal — every fs.readFile or res.sendFile with a caller-influenced path segment. Normalize + enforce-under-root.
+(k) Timing attacks on attestation verify / token compare / HMAC compare — should use crypto.timingSafeEqual
+(l) k-anonymity + DP epsilon — every /api/observatory/* read endpoint that returns aggregates must enforce K_ANON_MIN >= 5 and must not re-noise already-noised data
+(m) Arbitrary file write via logging — logger writing to a user-controllable path
+(n) eval / new Function / vm.runInNewContext on user input
+(o) child_process.{exec,execFile,spawn} — any shell-true? Any user input in args?
+(p) Session / JWT handling (if present) — algorithm confusion (none/HS256/RS256), expiry check, issuer validation
+(q) Stored XSS via the dashboard JSON endpoints — does client-side code render server-returned strings via innerHTML?
+(r) Dashboard static-serve — is pilot.html or verifier.html served with proper CSP/Content-Type? Can an attacker stash HTML in a path that the static server will render?
+
+Output: docs/security/vps-audit.md, same format:
+
+### FINDING-VPS-NNN [SEVERITY]
+- File: relative/path.js:LINE
+- Rule:
+- Description:
+- Remediation:
+- Status: Open
+
+Group by severity. Summary at end. Do NOT modify source files.

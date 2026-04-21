@@ -246,6 +246,37 @@ fn read_key_from_file(path: &Path) -> Option<[u8; 32]> {
     Some(buf)
 }
 
+/// Write arbitrary bytes to a file with 0o600 permissions on Unix.
+///
+/// Mirrors the BUG-017/BUG-019 pattern: the file is created with the
+/// restrictive mode at open time so it is never world-readable even for
+/// a microsecond on a multi-user Linux host.
+fn write_secret_file_at(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    #[cfg(unix)]
+    {
+        use std::io::Write;
+        use std::os::unix::fs::OpenOptionsExt;
+        use std::os::unix::fs::PermissionsExt;
+        let mut f = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .mode(0o600)
+            .open(path)?;
+        f.write_all(bytes)?;
+        // Belt-and-braces: chmod again in case the file pre-existed.
+        let _ = std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600));
+    }
+    #[cfg(not(unix))]
+    {
+        std::fs::write(path, bytes)?;
+    }
+    Ok(())
+}
+
 fn write_key_to_file(path: &Path, key: &[u8; 32]) -> Result<(), CryptoError> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| CryptoError::Io(e.to_string()))?;
@@ -486,11 +517,12 @@ pub fn load_or_create_psk_via_keyring() -> Result<Psk, CryptoError> {
         tracing::warn!("keyring set error for pair-psk ({}), writing to file only", e);
     }
     // Always write the file as well so ipc_server::load_or_create_pair_key stays consistent.
-    if let Some(parent) = file_path.parent() {
-        let _ = std::fs::create_dir_all(parent);
-    }
+    // RUST-001 fix (BUG-017/019 regression): use write_secret_file_at so the file
+    // is created at 0o600 on Unix — never world-readable even for a microsecond.
     if let Ok(json) = file.to_json() {
-        let _ = std::fs::write(&file_path, json);
+        if let Err(err) = write_secret_file_at(&file_path, json.as_bytes()) {
+            tracing::warn!("failed to persist PSK file: {err}");
+        }
     }
     Ok(psk)
 }
@@ -864,6 +896,32 @@ mod tests {
             let key = get_or_create_db_key_with_store(&store, &file_path).unwrap();
             assert_eq!(key.len(), 32);
         }
+    }
+
+    // RUST-001 regression guard: PSK file-fallback write must produce 0o600 on Unix.
+    #[cfg(unix)]
+    #[test]
+    fn load_or_create_psk_via_keyring_file_fallback_has_0o600() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = unique_test_dir("psk_fallback_0o600");
+        let path = dir.join("pair.key");
+
+        // Call write_secret_file_at directly (same helper the fallback path uses)
+        // with realistic PSK JSON bytes so we test the exact code path.
+        let (file, _psk) = PairKeyFile::new_with_random_psk();
+        let json = file.to_json().expect("to_json must succeed");
+        write_secret_file_at(&path, json.as_bytes())
+            .expect("write_secret_file_at must succeed");
+
+        let meta = std::fs::metadata(&path).expect("file must exist after write");
+        let mode = meta.permissions().mode();
+        assert_eq!(
+            mode & 0o777,
+            0o600,
+            "PSK file must be 0600, got {:03o}",
+            mode & 0o777
+        );
     }
 
     #[test]

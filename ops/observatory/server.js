@@ -145,6 +145,11 @@ db.exec(`
 // ---------- Middleware ----------
 app.use(express.json({ limit: '64kb' }));
 
+// Trust the 3-hop proxy chain: Cloudflare → Caddy → nginx → us.
+// This makes req.ip resolve to the real client IP via X-Forwarded-For.
+// Prefer CF-Connecting-IP when present (Cloudflare guarantees this header).
+app.set('trust proxy', 3);
+
 // Open CORS — dashboard is same-origin via nginx; extensions have no Origin
 // guarantee so we serve everywhere. Publish is still gated by schema + rate limit.
 app.use((req, res, next) => {
@@ -167,13 +172,42 @@ app.use((req, res, next) => {
   next();
 });
 
+// ---------- Client IP helper (FINDING-VPS-001) ----------
+// Cloudflare sets CF-Connecting-IP on every proxied request and also sets
+// CF-Ray (a per-request trace ID of shape "<hex>-<datacenter>"). CF overwrites
+// both before forwarding — neither is forgeable FROM INSIDE the CF-proxy path.
+//
+// Threat: if the VPS origin port is directly reachable (CF bypass by an
+// attacker who found the origin IP), a raw request can set CF-Connecting-IP
+// itself. We gate on CF-Ray: only trust CF-Connecting-IP when CF-Ray is also
+// present AND has the expected shape. An attacker who also synthesizes CF-Ray
+// still only buckets requests to whatever IP they supply — which gains them
+// nothing unless they can cycle many such fake pairs, in which case the much
+// stronger defense is firewalling port 8300 to CF IPs only (ops concern).
+//
+// When neither header is present (direct-to-nginx in dev), fall back to
+// req.ip which Express resolves via X-Forwarded-For honoring trust-proxy=3.
+function getClientIp(req) {
+  const cf = req.headers['cf-connecting-ip'];
+  const cfRay = req.headers['cf-ray'];
+  if (
+    typeof cf === 'string' && cf.length > 0 && cf.length < 64 &&
+    /^[0-9a-fA-F:.]+$/.test(cf) &&
+    typeof cfRay === 'string' && cfRay.length >= 10 && cfRay.length < 64 &&
+    /^[0-9a-f]+-[A-Z0-9]{3,5}$/i.test(cfRay)
+  ) {
+    return cf;
+  }
+  return req.ip || 'unknown';
+}
+
 // ---------- Rate limiter (in-memory, per-IP, 60 rps per 60s) ----------
 const rateBuckets = new Map();
 const RATE_LIMIT = 60;
 const RATE_WINDOW_MS = 60_000;
 
 function rateLimit(req, res, next) {
-  const ip = req.ip || req.headers['x-forwarded-for'] || 'unknown';
+  const ip = getClientIp(req);
   const now = Date.now();
   let bucket = rateBuckets.get(ip);
   if (!bucket) {
@@ -202,7 +236,7 @@ setInterval(() => {
 // --- Session 16: enroll rate limiter (separate bucket, tighter window) ---
 const enrollBuckets = new Map();
 function enrollRateLimit(req, res, next) {
-  const ip = req.ip || req.headers['x-forwarded-for'] || 'unknown';
+  const ip = getClientIp(req);
   const now = Date.now();
   let bucket = enrollBuckets.get(ip);
   if (!bucket) {
@@ -256,7 +290,7 @@ const PILOT_ENROLL_LIMIT = 10;
 const pilotEnrollBuckets = new Map();
 
 function pilotEnrollRateLimit(req, res, next) {
-  const ip = req.ip || req.headers['x-forwarded-for'] || 'unknown';
+  const ip = getClientIp(req);
   const now = Date.now();
   // Prune stale entries on write (BUG-013)
   for (const [k, v] of pilotEnrollBuckets.entries()) {
@@ -287,7 +321,7 @@ function pilotFeedbackRateLimit(req, res, next) {
   // Key on device_hash from body; fall back to IP if absent
   const key = (req.body && typeof req.body.device_hash === 'string' && req.body.device_hash)
     ? `dh:${req.body.device_hash}`
-    : `ip:${req.ip || 'unknown'}`;
+    : `ip:${getClientIp(req)}`;
   const now = Date.now();
   // Prune stale entries on write (BUG-013)
   for (const [k, v] of pilotFeedbackBuckets.entries()) {
@@ -1468,7 +1502,7 @@ app.post('/api/pilot/enrollments', requirePilotAdmin, (req, res) => {
 
     res.status(201).json({ pilot_id: result.lastInsertRowid, created_at });
   } catch (e) {
-    console.error('[pilot/create] pilot_id=new ip=' + (req.ip || 'unknown'), e.message);
+    console.error('[pilot/create] pilot_id=new ip=' + getClientIp(req), e.message);
     res.status(500).json({ error: 'internal' });
   }
 });
@@ -1542,7 +1576,7 @@ app.get('/api/pilot/:id/status', rateLimit, (req, res) => {
       feature_adoption,
     });
   } catch (e) {
-    console.error('[pilot/status] pilot_id=' + req.params.id + ' ip=' + (req.ip || 'unknown'), e.message);
+    console.error('[pilot/status] pilot_id=' + req.params.id + ' ip=' + getClientIp(req), e.message);
     res.status(500).json({ error: 'internal' });
   }
 });
@@ -1693,7 +1727,7 @@ app.get('/api/pilot/:id/results', rateLimit, (req, res) => {
       recommendations: [],
     });
   } catch (e) {
-    console.error('[pilot/results] pilot_id=' + req.params.id + ' ip=' + (req.ip || 'unknown'), e.message);
+    console.error('[pilot/results] pilot_id=' + req.params.id + ' ip=' + getClientIp(req), e.message);
     res.status(500).json({ error: 'internal' });
   }
 });
@@ -1742,7 +1776,7 @@ app.get('/api/pilot/:id/export.csv', rateLimit, (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename="pilot-${pilotId}-export.csv"`);
     res.send(lines.join('\r\n'));
   } catch (e) {
-    console.error('[pilot/export.csv] pilot_id=' + req.params.id + ' ip=' + (req.ip || 'unknown'), e.message);
+    console.error('[pilot/export.csv] pilot_id=' + req.params.id + ' ip=' + getClientIp(req), e.message);
     res.status(500).json({ error: 'internal' });
   }
 });
@@ -1798,7 +1832,7 @@ app.post('/api/pilot/:id/enroll-device', pilotEnrollRateLimit, (req, res) => {
 
     res.json({ ok: true });
   } catch (e) {
-    console.error('[pilot/enroll-device] pilot_id=' + req.params.id + ' ip=' + (req.ip || 'unknown'), e.message);
+    console.error('[pilot/enroll-device] pilot_id=' + req.params.id + ' ip=' + getClientIp(req), e.message);
     res.status(500).json({ error: 'internal' });
   }
 });
@@ -1841,7 +1875,7 @@ app.post('/api/pilot/:id/feedback', pilotFeedbackRateLimit, (req, res) => {
 
     res.json({ ok: true, feedback_id: result.lastInsertRowid });
   } catch (e) {
-    console.error('[pilot/feedback] pilot_id=' + req.params.id + ' ip=' + (req.ip || 'unknown'), e.message);
+    console.error('[pilot/feedback] pilot_id=' + req.params.id + ' ip=' + getClientIp(req), e.message);
     res.status(500).json({ error: 'internal' });
   }
 });
@@ -1906,7 +1940,7 @@ app.get('/api/pilot/:id/feedback/aggregate', rateLimit, (req, res) => {
       word_frequency,
     });
   } catch (e) {
-    console.error('[pilot/feedback/aggregate] pilot_id=' + req.params.id + ' ip=' + (req.ip || 'unknown'), e.message);
+    console.error('[pilot/feedback/aggregate] pilot_id=' + req.params.id + ' ip=' + getClientIp(req), e.message);
     res.status(500).json({ error: 'internal' });
   }
 });

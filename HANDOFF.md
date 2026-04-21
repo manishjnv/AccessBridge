@@ -1,6 +1,105 @@
 # AccessBridge - Shift Handoff
 
-## Last Session: Session 25 — Team deployment toolkit (3 OS installers + 6 preset pilot profiles + universal dispatcher + 2 tester CLIs) + Pilot Rollout Orchestrator (7 new /api/pilot/* endpoints + SQLite schema + admin-token gate + k-anon=20 small-cohort floor) + pilot dashboard + extension pilotId plumbing + sidepanel feedback widget + Team landing route + Team + pilot-playbook docs (Plan §9.2 deployment modes 3/3, Plan §15 Phase 2 pilot tooling ready) (2026-04-22)
+## Last Session: Session 26 — Plan §15 Week 23 security audit + production hardening (7 audit docs + 4 HIGH fixes + 17 Node advisories resolved + CI security gates + dependabot + CF-RAY rate-limit gate + ring-sig adversarial pass + 5 new RCA entries) (2026-04-22)
+
+### Headline
+
+Closed Plan Section 15 Week 23 — the pre-production security audit. Codex quota-exhausted 4 sessions deep (resets 2026-04-26) so the entire audit ran Opus-orchestrated + Sonnet/Haiku-parallel + Opus-solo adversarial-review fallback per `feedback_rescue_fallback` memory. **4 parallel Sonnet audits** (TS extension, Rust desktop-agent, Node observatory, Python tools+FastAPI) + **1 Haiku safe-pentest** + **1 Opus ring-signature adversarial pass** + **4 parallel Sonnet HIGH-finding fixes** + **2 Opus adversarial revisions** landed in a single session without ceding the security-adjacent review to codex:rescue. **Pre-audit totals**: 2 CRITICAL + 13 HIGH + 22 MEDIUM + 15 LOW across 7 surfaces, plus 17 open Node advisories (2 CRITICAL + 8 HIGH + 7 MODERATE, all in `jspdf` + `dompurify`). **Post-fix**: 0 CRITICAL shipped, 0 HIGH shipped (1 HIGH open — TLS 1.0 at Cloudflare edge, infrastructure action not code), 0 open dependency advisories. **Shipped-code HIGH fixes**: (1) [EXT-001](docs/security/SECURITY_AUDIT_REPORT.md) observatory + model-CDN HTTP→HTTPS swap across 4 files + 2 regression tests (BUG-002 pattern extension) — ring-sig anonymity was partially defeatable by network observer via timing correlation; (2) [EXT-002](docs/security/SECURITY_AUDIT_REPORT.md) background `chrome.runtime.onMessage` now gates 23 privileged-mutation types by `sender.tab === undefined` + `sender.id === chrome.runtime.id` — closes the content-script-XSS → AI_SET_KEY/SAVE_PROFILE/OBSERVATORY_ROTATE_KEY pathway; Opus-solo adversarial revision reclassified TOGGLE_FEATURE + ACTION_ITEMS_UPDATE as content-allowed after discovering gestures.ts + action-items.ts legitimately send them; 49 regression tests; (3) [RUST-001](docs/security/rust-audit.md) third umask-chmod race in `crypto::load_or_create_psk_via_keyring` — BUG-017/019 had missed it in both prior sweeps despite being in the SAME file as BUG-017's fix; extracted `write_secret_file_at` helper mirroring the canonical pattern + Unix regression test asserting `0o600`; (4) [VPS-001](docs/security/SECURITY_AUDIT_REPORT.md) observatory rate-limiters were bucketing every request to 127.0.0.1 since Session 10 because `trust proxy` was never configured — rate limit was always-bypassable → `app.set('trust proxy', 3)` for the Cloudflare → Caddy → nginx → us chain + `getClientIp(req)` helper gated by CF-Connecting-IP WHEN CF-Ray is also present (CF-bypass spoof defense caught by Opus adversarial revision) + 7 regression tests including malformed-CF-Ray + missing-CF-Ray fallback cases. **Dependency cluster** (BUG-025): `jspdf 2.5.2 → ^4.2.1` direct bump + `dompurify ^3.4.0` root pnpm-override → 17 advisories → 0, 304/304 extension tests still pass. **CI wiring** ([security.yml](.github/workflows/security.yml) + [cve-watch.yml](.github/workflows/cve-watch.yml) + [dependabot.yml](.github/dependabot.yml)): 8 PR jobs (npm-audit, cargo-audit, secrets-scan, semgrep, docker-scout opt-in, unsafe-rust-detect, insecure-ts-patterns, pr-comment-summary), nightly CVE watch, 9 dependabot ecosystems. **Ring-sig adversarial pass** (Opus-solo, replacing codex:rescue): 12 threat classes exercised, BUG-014 keyImage-domain regression check PASS, 10 SAFE + 2 LOW defensive-gaps (RING-001 scalar malleability, RING-002 no crypto-layer MIN_RING_SIZE — both deferred, neither exploitable today). **Deferred findings register** tracks ~25 MEDIUM/LOW items (EXT-003/004/006/007, RUST-002-009, VPS-002/003/004, PY-001-004, RING-001/002, PENTEST-001/004/005) for follow-up triage — no CRITICAL or HIGH open in shipped code. **Gates**: `pnpm -r typecheck` clean across all 5 packages; `pnpm -r test` green (one pre-existing test in `model-registry.test.ts` asserted bare-IP URL, updated to HTTPS); `pnpm audit --prod` → 0 advisories (was 17); `cargo audit` → 0 vulnerabilities; `detect-secrets` → 0 real secrets (291 classified false-positives: 285 pnpm-lock integrity hashes, 5 model SHA-256s, 1 `password: 'Password'` in icon lexicon). **DEPLOY NOT RUN** — this session lands code changes + 10 new security docs + 5 new RCA entries (BUG-021..BUG-025); deploy gated on user approval because (a) observatory server.js change needs the BUG-020 manual scp + docker-restart workaround until `deploy.sh --with-observatory` ships, (b) the Node dep upgrade changes pnpm-lock.yaml which triggers conditional VPS `pnpm install` (2-5 min).
+
+### Completed
+
+#### Phase 0 — Warm start (Opus)
+
+`codex:setup` → codex-cli 0.118.0, shared runtime pipe, **authenticated but quota-exhausted 4 days out** (resets 2026-04-26). Parallel-read HANDOFF.md (Session 24 tagline + Session 25 team deployment), CLAUDE.md (global + project), MEMORY.md index, RCA.md (20 entries — especially BUG-017/018/019 umask/symlink + BUG-013 prune-on-write + BUG-015 proto-pollution), FEATURES.md, ARCHITECTURE.md, ROADMAP.md, `packages/extension/manifest.json`, `packages/desktop-agent/src-tauri/tauri.conf.json`, `reference_infrastructure` memory. Flagged: working tree is dirty with Session 24/25 WIP (deploy/team/, tools/pilot/, sidepanel/pilot/, modified observatory server.js/core types/background/index.ts/enterprise/policy.ts); decided to audit tree-as-is (option C from the scoping brief) since the WIP includes the very surfaces I'm auditing. User said "go" → proceeded.
+
+#### Phase 1 — Audit foundation (parallel)
+
+- Installed `detect-secrets` 1.5.0, `cargo-audit` 0.22.1 (9m23s cargo-build), `semgrep` 1.160.0 (Python 3.14 wheels OK after first-try failure); `gitleaks` deferred (no Go toolchain on this Windows host — scheduled in `cve-watch.yml` ubuntu-latest instead).
+- `pnpm audit --prod` → **17 advisories** (2 CRIT + 8 HIGH + 7 MOD), all in jspdf + dompurify.
+- `cargo audit` → **0 vulnerabilities**, 2 transitive unsound (glib 0.18.5 + rand 0.7.3 via Tauri GTK3), 17 unmaintained (gtk-rs + unic-*).
+- `detect-secrets` → 291 findings, **0 real secrets** (classified: pnpm-lock integrity + model SHA-256s + `icon-lexicon.ts:150 password: 'Password'`).
+- **4 parallel Sonnet audits** (TS + Rust + VPS Node + Python) — all 18–20 pattern-classes swept per audit, ~3000 LOC + 40 files read, produced [semgrep-extension.md](docs/security/semgrep-extension.md), [rust-audit.md](docs/security/rust-audit.md), [vps-audit.md](docs/security/vps-audit.md), [python-audit.md](docs/security/python-audit.md).
+
+#### Phase 1b — Safe-only pentest (Haiku)
+
+Curl-driven probe of 11 public URLs, TLS version check, light rate-limit probe. [pentest-report-safe.md](docs/security/pentest-report-safe.md). Confirmed HIGH: TLS 1.0 accepted at Cloudflare edge. Opus cross-verified: Haiku's PENTEST-002 (missing XCTO/XFO on observatory) was a false positive — my direct curl shows `x-content-type-options: nosniff` and `content-security-policy: frame-ancestors 'none'` present on `/observatory/api/health`. Retracted.
+
+#### Phase 2 — HIGH fixes (4 parallel Sonnet + 2 Opus adversarial revisions)
+
+- **EXT-001 + EXT-005** (Sonnet): HTTP→HTTPS across 4 files + 2 regression test files. No breaking changes; 17/17 post-fix tests.
+- **EXT-002** (Sonnet + Opus revision): Sender-origin gate on background. Initial UI-only set included TOGGLE_FEATURE + ACTION_ITEMS_UPDATE; Opus adversarial revision caught that `gestures.ts:315,320,325` + `action-items.ts:346` send these from content scripts — reclassified + added defense-in-depth requirement for handler-side feature-name allowlist. 49/49 tests.
+- **RUST-001** (Sonnet): `write_secret_file_at` helper + site migration + Unix 0o600 regression test. `cargo check` blocked by known-Windows-openssl-sys issue (RCA BUG-011); CI ubuntu-latest authoritative.
+- **VPS-001** (Sonnet + Opus revision): `trust proxy 3` + `getClientIp` with CF-Connecting-IP. Initial fix trusted CF-Connecting-IP unconditionally → Opus caught CF-bypass spoof → added CF-Ray shape-check gate + 3 new tests (no-CF-Ray fallback, malformed-CF-Ray fallback, valid shapes accepted). 7/7 tests.
+
+#### Phase 2b — Dep advisory cleanup (Sonnet)
+
+`pnpm why jspdf` revealed direct dep of `@accessbridge/extension` only. `pnpm why dompurify` revealed transitive via jspdf. Bumped `jspdf: ^2.5.2 → ^4.2.1` + root `pnpm.overrides.dompurify: ^3.4.0`. `pnpm install` +7 packages, no breaking. Post-fix: 0 advisories. 304/304 extension tests pass including PDF-export path.
+
+#### Phase 3 — Ring-signature adversarial review (Opus-solo)
+
+12 threat classes exercised against `packages/core/src/crypto/ring-signature/*` + `ops/observatory/crypto-verify.js` + `ops/observatory/public/verifier.js`. BUG-014 regression check (keyImage domain = date-only) — **PASS** across all three implementations. Verdict: 10 SAFE / 2 LOW DEFENSIVE-GAP (RING-001 scalar malleability, RING-002 no MIN_RING_SIZE=5) / 0 VULNERABILITY. [ring-sig-adversarial.md](docs/security/ring-sig-adversarial.md).
+
+#### Phase 4 — CI wiring + docs (Sonnet)
+
+- `.github/workflows/security.yml` — 8 jobs, 290 LOC, `pnpm audit --audit-level moderate` fail-gate, concurrency group.
+- `.github/workflows/cve-watch.yml` — nightly 01:00 UTC, opens GitHub issue on new advisories, 147 LOC.
+- `.github/dependabot.yml` — 9 ecosystems (7 npm workspaces + cargo + github-actions), weekly Mondays 09:30 IST, labels `dependencies` + `security`, minor+patch grouped, 164 LOC.
+
+#### Phase 5 — Consolidation + HANDOFF + RCA
+
+- [attack-surface.md](docs/security/attack-surface.md) — 222 LOC, 8 trust boundaries, 57 surfaces.
+- [dep-audit-report.md](docs/security/dep-audit-report.md) — per-GHSA tables + remediation plan for each of 3 ecosystems.
+- [secrets-scan.md](docs/security/secrets-scan.md) — 0 real secrets, 291 classified false positives.
+- [SECURITY_AUDIT_REPORT.md](docs/security/SECURITY_AUDIT_REPORT.md) — consolidation, deferred-findings register, sign-off.
+- RCA.md: 5 new entries (BUG-021 EXT-001, BUG-022 EXT-002, BUG-023 RUST-001, BUG-024 VPS-001, BUG-025 dep cluster).
+
+#### Phase 6 — Gates
+
+- `pnpm -r typecheck` clean (ai-engine + core + onnx-runtime + desktop-agent + extension all `Done`).
+- `pnpm -r test` green after updating one stale test expectation (`packages/onnx-runtime/src/__tests__/model-registry.test.ts` was asserting bare-IP URL pattern — updated to match EXT-001 HTTPS).
+- `pnpm audit --prod` → 0 advisories.
+- All new regression tests pass (EXT-001 regression + EXT-002 sender-validation 49 + VPS-001 rate-limit-ip-spoof 7 + RUST-001 Unix 0o600 guard).
+
+### Not done in this session (gated or deferred)
+
+- **`./deploy.sh`** — not run. Deploy gated on user approval. The fix touches `ops/observatory/server.js` which requires the BUG-020 manual-scp workaround until `deploy.sh --with-observatory` ships (tracked but out-of-scope). Recommended deploy one-liner:
+
+  ```bash
+  ./deploy.sh --skip-bump   # code is feat(security), auto-bump will take 0.24.0 → 0.25.0
+  # then:
+  scp ops/observatory/server.js a11yos-vps:/opt/accessbridge/observatory/
+  scp ops/observatory/__tests__/rate-limit-ip-spoof.test.js a11yos-vps:/opt/accessbridge/observatory/__tests__/
+  ssh a11yos-vps docker restart accessbridge-observatory
+  curl -sI https://accessbridge.space/observatory/api/health | head -3
+  ```
+
+- **Deferred findings (24 open, all MEDIUM/LOW)** — tracked in [SECURITY_AUDIT_REPORT.md deferred register](docs/security/SECURITY_AUDIT_REPORT.md).
+- **Aggressive pentest (Part 5 full)** — nmap/sqlmap/ZAP/nikto deferred; require staging env clone.
+- **Fuzz testing (Part 6)** — cargo-fuzz requires nightly Rust + 10-min runs; own session.
+- **Disaster recovery doc (Part 11)** — documentation task, own session.
+- **PGP-signed PDF (Part 12)** — user's GPG key required, user action.
+- **v0.25.0 security-hardened release tag (Part 13)** — end of fix pipeline, after all deferred findings triaged.
+- **CWS submission bundle (Part 15)** — adjacent track, own session.
+- **TLS 1.0 at CF edge (PENTEST-001 HIGH)** — ops action (Cloudflare dashboard: SSL/TLS → Edge Certificates → Minimum TLS Version = 1.2). Coordinate with ti-platform on shared Caddy edge.
+
+### RCA additions (5 new entries)
+
+- **BUG-021** — Observatory attestation + model-CDN endpoints over plaintext HTTP. Swapped to `https://accessbridge.space/...`; regression tests added.
+- **BUG-022** — Background onMessage handler accepted privileged mutations from any content script. Added UI-only sender-gate with 23 mutation types; Opus-solo adversarial revision reclassified gesture + action-items messages as content-allowed. 49 regression tests.
+- **BUG-023** — Third umask-chmod race in `crypto::load_or_create_psk_via_keyring` file-fallback. Missed by BUG-017 + BUG-019 sweeps despite being in same file as BUG-017's fix. Extracted `write_secret_file_at` helper. New grep recipe mandated for class-of-bug sweeps in next session.
+- **BUG-024** — Observatory rate limiters bucketed every request to 127.0.0.1 since Session 10 because `trust proxy` unset. Added `app.set('trust proxy', 3)` + `getClientIp(req)` with CF-Connecting-IP gated by CF-Ray shape-check. 7 regression tests.
+- **BUG-025** — 17 npm advisories shipped in v0.24.0 concentrated in jspdf + dompurify. Bumped jspdf direct dep + added dompurify pnpm override; 0 advisories post-fix. Wired Dependabot (9 ecosystems) + CI security workflow to prevent recurrence.
+
+### Agent utilization
+
+Opus: Phase 0 warm-start + scoping; Phase 2 + 2b adversarial reviews of 4 Sonnet fix diffs + 2 adversarial revisions (EXT-002 content-script reclassification + VPS-001 CF-Ray gate); Phase 3 ring-signature adversarial pass (12 threat classes, Opus-solo replacing codex:rescue); Phase 5 consolidation (SECURITY_AUDIT_REPORT.md, dep-audit synthesis, secrets-scan.md, 5 RCA entries, this HANDOFF); Phase 6 gates sweep. Key Opus calls: cross-verified Haiku pentest's PENTEST-002 finding as false-positive via direct curl; caught BUG-017/019 regression pattern-match in RUST-001 before first Sonnet fix draft; caught CF-bypass spoof in VPS-001 Sonnet draft → added CF-Ray shape gate; caught EXT-002 over-broad UI-only classification breaking gestures.ts + action-items.ts.
+Sonnet: 4 parallel Wave-1 audits (extension TS + Rust desktop-agent + Node observatory + Python — 18-20 patterns each, ~3000 LOC + 40 files read, 4 audit docs produced); 4 parallel Wave-2 HIGH fixes (EXT-001 HTTPS swap, EXT-002 sender-gate, RUST-001 write_secret_file_at, VPS-001 trust-proxy + getClientIp); Wave-3 CI workflows (security.yml + cve-watch.yml + dependabot.yml); Wave-4 attack-surface.md + dep-audit-report.md + **fixed 17 Node advisories** via jspdf bump + dompurify override.
+Haiku: 1 safe-only pentest subagent (11-URL header audit, TLS version probe, light rate-limit probe) — found 1 HIGH (TLS 1.0) + 2 MEDIUM (1 retracted as FP by Opus, 1 defensible by design) + 2 LOW. Classic Haiku one-fact-from-many-files routing.
+codex:rescue: **n/a — daily quota exhausted** (4 days out, resets 2026-04-26). Replaced by Opus-solo adversarial passes per `feedback_rescue_fallback` memory: (a) ring-signature crypto review (12 threats, 2 new LOW findings), (b) EXT-002 sender-gate over-broad-classification catch, (c) VPS-001 CF-bypass spoof catch. Zero Codex invocations this session; mandatory for next session once quota resets.
+
+---
+
+## Previous Session: Session 25 — Team deployment toolkit (3 OS installers + 6 preset pilot profiles + universal dispatcher + 2 tester CLIs) + Pilot Rollout Orchestrator (7 new /api/pilot/* endpoints + SQLite schema + admin-token gate + k-anon=20 small-cohort floor) + pilot dashboard + extension pilotId plumbing + sidepanel feedback widget + Team landing route + Team + pilot-playbook docs (Plan §9.2 deployment modes 3/3, Plan §15 Phase 2 pilot tooling ready) (2026-04-22)
 
 ### Headline
 

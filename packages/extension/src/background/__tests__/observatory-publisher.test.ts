@@ -9,10 +9,25 @@ import {
   addLaplaceNoise,
   merkleRoot,
   aggregateDailyBundle,
+  OBSERVATORY_ENDPOINT,
+  OBSERVATORY_ENROLL_ENDPOINT,
+  OBSERVATORY_RING_ENDPOINT,
 } from '../observatory-publisher.js';
 
 // Node 20+ exposes globalThis.crypto with SubtleCrypto via the Web Crypto API,
 // and vitest's 'node' environment inherits it — no shim needed.
+
+describe('uses https for all observatory endpoints (EXT-001 regression)', () => {
+  it('OBSERVATORY_ENDPOINT starts with https://accessbridge.space/', () => {
+    expect(OBSERVATORY_ENDPOINT.startsWith('https://accessbridge.space/')).toBe(true);
+  });
+  it('OBSERVATORY_ENROLL_ENDPOINT starts with https://accessbridge.space/', () => {
+    expect(OBSERVATORY_ENROLL_ENDPOINT.startsWith('https://accessbridge.space/')).toBe(true);
+  });
+  it('OBSERVATORY_RING_ENDPOINT starts with https://accessbridge.space/', () => {
+    expect(OBSERVATORY_RING_ENDPOINT.startsWith('https://accessbridge.space/')).toBe(true);
+  });
+});
 
 function variance(xs: number[]): number {
   const mean = xs.reduce((a, b) => a + b, 0) / xs.length;

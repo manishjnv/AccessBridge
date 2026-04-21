@@ -548,12 +548,80 @@ interface Message {
   payload?: unknown;
 }
 
+// ---------- FINDING-EXT-002 fix: sender-origin gate ----------
+//
+// In MV3, a content script running on a page that suffers an XSS can call
+// chrome.runtime.sendMessage and reach our background listener with
+// sender.id === chrome.runtime.id (same extension).  The distinguisher is
+// sender.tab: it is defined for content-script messages and undefined for
+// messages from our own UI (popup / sidepanel).
+//
+// PRIVILEGED MUTATION messages MUST only be accepted from our UI surfaces.
+// Content scripts legitimately send signal/intent/AI/transcription messages
+// (read-heavy, result returned to the tab) — those are allowed with sender.tab.
+//
+// Query-only messages (GET_*) are allowed from both origins because they
+// return data and mutate nothing.
+
+/** Message types that are only allowed from our UI (popup / sidepanel). */
+export const UI_ONLY_MESSAGES = new Set<string>([
+  'SAVE_PROFILE',
+  'AI_SET_KEY',
+  'AI_CLEAR_KEY',
+  'ONNX_LOAD_TIER',
+  'ONNX_UNLOAD_TIER',
+  'ONNX_CLEAR_CACHE',
+  'ONNX_SET_FORCE_FALLBACK',
+  'AGENT_SET_PSK',
+  'AGENT_CLEAR_PSK',
+  'AGENT_PAIR_INITIATE',
+  'AGENT_APPLY_NATIVE',
+  'AGENT_REVERT_NATIVE',
+  'OBSERVATORY_ENROLL',
+  'OBSERVATORY_ROTATE_KEY',
+  'VISION_CURATION_SAVE',
+  'VISION_CURATION_DELETE',
+  'VISION_CURATION_CLEAR',
+  'VISION_CURATION_EXPORT',
+  'CHECK_UPDATE',
+  'APPLY_UPDATE',
+  // ONNX_RUN_BENCHMARK triggers sustained inference — UI-only
+  'ONNX_RUN_BENCHMARK',
+  // REVERT_* mutate activeAdaptations — UI-only. TOGGLE_FEATURE and
+  // ACTION_ITEMS_UPDATE are intentionally content-script-allowed: gestures.ts
+  // fires TOGGLE_FEATURE from touch/trackpad gestures, and action-items.ts
+  // reports extracted items via ACTION_ITEMS_UPDATE. Both rely on the
+  // background handler to validate/sanitize the payload (feature name must be
+  // in a known allowlist; items are size-capped). If that validation is ever
+  // weakened, re-evaluate moving them UI-only.
+  'REVERT_ADAPTATION',
+  'REVERT_ALL',
+]);
+
+/** Return true when the message type must originate from a UI surface. */
+export function isUiOnlyMessage(type: string): boolean {
+  return UI_ONLY_MESSAGES.has(type);
+}
+
 chrome.runtime.onMessage.addListener(
   (
     message: Message,
     sender: chrome.runtime.MessageSender,
     sendResponse: (response: unknown) => void,
   ) => {
+    const type = (message as unknown as Record<string, unknown>)?.type;
+    if (typeof type === 'string' && isUiOnlyMessage(type)) {
+      // sender.tab is defined when the message originates from a content script.
+      if (sender.tab !== undefined) {
+        sendResponse({ error: 'unauthorized', reason: 'content-script-forbidden' });
+        return false;
+      }
+      // Defence-in-depth: reject cross-extension probes.
+      if (sender.id !== chrome.runtime.id) {
+        sendResponse({ error: 'unauthorized', reason: 'cross-extension' });
+        return false;
+      }
+    }
     handleMessage(message, sender)
       .then(sendResponse)
       .catch((err) => {

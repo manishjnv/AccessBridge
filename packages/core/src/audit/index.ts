@@ -10,6 +10,7 @@ export type {
   FrameInfo,
   AuditInput,
   AuditFinding,
+  AuditFindingSource,
   AuditRule,
   AuditReport,
 } from './types.js';
@@ -24,3 +25,19 @@ export {
   buildElementSelector,
   principleForCriterion,
 } from './rules.js';
+
+export type {
+  AxeViolationNode,
+  AxeViolation,
+  AxeResults,
+  MergeResult,
+} from './axe-integration.js';
+
+export {
+  mapAxeViolationsToFindings,
+  mergeAuditFindings,
+  rebuildReportWithMergedFindings,
+  extractWcagCriterion,
+  extractWcagLevel,
+  dedupKey,
+} from './axe-integration.js';

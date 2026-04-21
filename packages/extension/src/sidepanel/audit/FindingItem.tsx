@@ -19,6 +19,21 @@ export function FindingItem({ finding, onHighlight }: FindingItemProps) {
         <span className="ab-finding-sev">{finding.severity}</span>
         <span className="ab-finding-criterion">WCAG {finding.wcagCriterion} · {finding.level}</span>
         <span className="ab-finding-rule" title={finding.rule}>{finding.rule}</span>
+        {finding.source && (
+          <span
+            className="ab-finding-source"
+            data-source={finding.source}
+            title={
+              finding.source === 'both'
+                ? 'Custom rule + axe-core both flagged this element'
+                : finding.source === 'axe'
+                  ? 'Detected by axe-core'
+                  : 'Detected by AccessBridge custom rule'
+            }
+          >
+            {finding.source}
+          </span>
+        )}
       </div>
       <p className="ab-finding-body">{finding.message}</p>
       {finding.htmlSnippet && (

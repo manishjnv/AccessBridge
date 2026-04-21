@@ -207,6 +207,21 @@ Track every bug fix: what broke, why, how it was fixed, and how to prevent recur
 
 ---
 
+## BUG-016: axe-core WCAG criterion regex silently mis-parsed every 2-digit success criterion (1.4.10, 1.4.11, 2.5.5, …)
+
+| Field | Detail |
+| ------- | -------- |
+| **Date** | 2026-04-21 |
+| **Severity** | High (silent user-visible data corruption; caught pre-production by Session 18 Opus-solo adversarial pass) |
+| **Symptom** | `extractWcagCriterion(['wcag1410'])` returned `'1.41.0'` instead of `'1.4.10'`. Same miscoding for every WCAG 2.1 AA criterion with a 2-digit success-criterion number: 1.4.11, 1.4.12, 1.4.13, 2.5.5, 2.5.6, 3.2.3, 3.2.4 — axe-core emits `wcagNMM` where N = principle (1-4), M = guideline (1-4), MM = criterion (1-13). Wrong criterion would appear on every source:`axe` finding for these violations; the per-criterion `wcagCompliance` counters would also miscategorize. |
+| **Root Cause** | The initial regex `/^wcag(\d)(\d+)(\d+)$/i` was greedy-ambiguous. On input `wcag1410`, the first `(\d+)` greedily tried `410`, backtracked to `41` to let the trailing `(\d+)$` match `0`, and reported `1.41.0`. WCAG guarantees principle and guideline are always single digits (4 principles × ≤5 guidelines each), so only the criterion component can be 2 digits. The fix is structural: `(\d)(\d)(\d+)` forces single-digit groups 1+2, variable-digit group 3. |
+| **Fix** | [packages/core/src/audit/axe-integration.ts](packages/core/src/audit/axe-integration.ts) — regex changed to `/^wcag(\d)(\d)(\d+)$/i`. Comment added explaining the WCAG dimensional invariant + the exact greedy-backtrack failure mode. Same commit widened `extractWcagCriterion` / `extractWcagLevel` parameter types `string[] | undefined` → `unknown` with `Array.isArray` + per-element `typeof === 'string'` gates — prevents throws on malformed input (matches BUG-015 defensive style). Five new regression tests in [packages/core/src/audit/__tests__/axe-integration.test.ts](packages/core/src/audit/__tests__/axe-integration.test.ts): `wcag1410→1.4.10`, `wcag1411`, `wcag1413`, `wcag255`, `wcag324`. Four new proto-pollution-guard tests: non-array tags, string tags, null, non-string elements inside an array. |
+| **Files Changed** | `packages/core/src/audit/axe-integration.ts`, `packages/core/src/audit/__tests__/axe-integration.test.ts` |
+| **Commit** | (pending — Session 18 combined commit) |
+| **Prevention** | **Any regex designed to parse fixed-width structured data MUST explicitly encode the width constraint — never rely on greedy/non-greedy quantifiers to guess widths correctly.** Anti-pattern: `(\d+)(\d+)` when both groups are numeric and one has a known width. Correct pattern: `(\d{K})(\d+)` for a K-wide prefix. Adversarial-pass checklist for future string-parsing work: unit-test with the MINIMUM number of digits that could confuse the greedy engine — for this class, always test a 4-digit suffix against any `wcag\d{4}` pattern. Second lesson: **Opus-solo adversarial pass IS non-skippable when codex:rescue is unavailable.** `feedback_rescue_fallback` memory exists for this reason. If Session 18 had skipped this pass (as a "no time, CI will catch it" shortcut), the bug would have shipped — CI tests didn't previously exist for `wcag1410` and happy-path unit tests covered only `wcag111` + `wcag143`. |
+
+---
+
 ## BUG-015: IndicWhisper language gate used `in` operator — inherited keys like `toString` bypass the 22-language allowlist
 
 | Field | Detail |

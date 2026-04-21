@@ -26,6 +26,7 @@ import { DomainConnectorRegistry } from './domains/index.js';
 import { TransliterationController } from './i18n/transliteration.js';
 import { detectPageLanguage, detectedLangToVoiceLocale } from './i18n/language-detect.js';
 import { collectAuditInput } from './audit-collector.js';
+import { runAxeInPage } from './audit/axe-runner.js';
 import {
   EnvironmentSensor,
   EnvironmentIndicator,
@@ -766,6 +767,15 @@ function listenForCommands(adapter: BaseAdapter, sensory: SensoryAdapter): void 
             sendResponse({ error: String(err) });
           }
           break;
+        }
+        case 'AUDIT_RUN_AXE': {
+          // Session 18: axe-core runs in the page's MAIN world via script
+          // injection. The promise can take up to 30 s on slow/large pages —
+          // respond asynchronously by returning `true` from the listener.
+          runAxeInPage()
+            .then((envelope) => sendResponse(envelope))
+            .catch((err) => sendResponse({ error: String(err) }));
+          return true;
         }
         case 'HIGHLIGHT_ELEMENT': {
           const { selector } = message.payload as { selector: string };

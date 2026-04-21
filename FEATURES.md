@@ -163,6 +163,26 @@ Security invariants enforced at multiple layers: (a) opt-in gate on every `recor
 
 ---
 
+## Accessibility Audit (WCAG) — Session 18 upgrade
+
+| ID | Feature | Entry | State | Notes |
+|----|---------|-------|-------|-------|
+| A11Y-01 | Custom WCAG audit (20 hand-rolled rules) | SP | Shipped | [packages/core/src/audit/rules.ts](packages/core/src/audit/rules.ts) — contrast, alt text, heading order, tap targets, etc. |
+| A11Y-02 | **axe-core integration (~90 checks, industry-standard)** | SP | Shipped | Session 18. Injected into page MAIN world via `<script src>` from `web_accessible_resources`; results merged + dedup'd against custom findings via `(wcagCriterion, elementSelector)` key. See [docs/features/accessibility-audit.md](docs/features/accessibility-audit.md). |
+| A11Y-03 | Source badge + filter (custom / axe / both) | SP | Shipped | Session 18. Side panel shows per-finding provenance + per-source tally in header; filter chips toggle sources on/off. |
+| A11Y-04 | Multi-page PDF export | SP | Shipped | `pdf-generator.ts` — valid `%PDF-…%%EOF` file with scored findings + element selectors. |
+
+## Testing stack (Plan Section 8.5 — Session 18)
+
+| Tier | Tool | Count | Scope |
+|------|------|-------|-------|
+| Structural | TypeScript strict | all packages | typecheck via `pnpm typecheck` |
+| Unit | Vitest 2 | 992 tests | pure logic, audit rules, axe mapper, crypto, fusion, i18n |
+| E2E | Playwright + Chromium | ~20 tests in 6 spec files | popup/sidepanel lifecycle, audit + axe + PDF, sensory, reload recovery, cognitive simplifier |
+| Dev tool | Pa11y batch scan | deferred | reserved for future `tools/pa11y/` addition |
+
+See [docs/testing.md](docs/testing.md) for the full test pyramid.
+
 ## Feature-count summary
 
 | Module | Count |

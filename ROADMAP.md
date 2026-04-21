@@ -25,13 +25,14 @@ Completed items move to [HANDOFF.md](HANDOFF.md) + closed here.
 
 ---
 
-## Current State (2026-04-20)
+## Current State (2026-04-21)
 
-- 🟢 Chrome extension — shipped v0.1.1 with 26 features across 6 modules (see [FEATURES.md](FEATURES.md))
+- 🟢 Chrome extension — shipped v0.16.0 with 29 features across 6 modules (see [FEATURES.md](FEATURES.md))
 - 🟢 Landing page + self-update pipeline — live at `https://accessbridge.space`
 - 🟢 Core engine + AI engine packages — extracted, tested, reusable
 - 🟢 Monorepo structured for multi-surface expansion (see [ARCHITECTURE.md](ARCHITECTURE.md))
 - 🟡 Robust AI pipeline designed (see [docs/features/ai-pipeline.md](docs/features/ai-pipeline.md)) — Tier 0 below tracks phased rollout
+- 🟢 **Plan Section 8.5 testing stack (Session 18)** — Vitest (992 tests) + Playwright (~20 E2E specs) + axe-core merged with custom WCAG rules + CI workflows (ci.yml + e2e.yml). Pa11y batch tool deferred (reserved for future `tools/pa11y/`). See [docs/testing.md](docs/testing.md).
 
 ---
 

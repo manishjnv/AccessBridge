@@ -1,12 +1,19 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import type {
   AuditFinding,
+  AuditFindingSource,
   AuditInput,
   AuditReport,
   AuditSeverity,
+  AxeResults,
   WCAGPrinciple,
 } from '@accessbridge/core/audit';
-import { AuditEngine } from '@accessbridge/core/audit';
+import {
+  AuditEngine,
+  mapAxeViolationsToFindings,
+  mergeAuditFindings,
+  rebuildReportWithMergedFindings,
+} from '@accessbridge/core/audit';
 import { ScoreRing } from './ScoreRing.js';
 import { WCAGBadge } from './WCAGBadge.js';
 import { CategoryBar } from './CategoryBar.js';
@@ -15,6 +22,7 @@ import { downloadAuditPDF } from './pdf-generator.js';
 
 const SEVERITY_ORDER: AuditSeverity[] = ['critical', 'serious', 'moderate', 'minor', 'info'];
 const PRINCIPLES: WCAGPrinciple[] = ['perceivable', 'operable', 'understandable', 'robust'];
+const SOURCE_ORDER: AuditFindingSource[] = ['custom', 'axe', 'both'];
 
 const engine = new AuditEngine();
 
@@ -22,33 +30,68 @@ type ScanState =
   | { kind: 'idle' }
   | { kind: 'scanning' }
   | { kind: 'error'; message: string }
-  | { kind: 'done'; report: AuditReport };
+  | { kind: 'done'; report: AuditReport; axeError?: string };
 
 export function AuditPanel() {
   const [state, setState] = useState<ScanState>({ kind: 'idle' });
   const [activeSeverities, setActiveSeverities] = useState<Set<AuditSeverity>>(
     new Set(SEVERITY_ORDER),
   );
+  const [activeSources, setActiveSources] = useState<Set<AuditFindingSource>>(
+    new Set(SOURCE_ORDER),
+  );
 
   const runScan = useCallback(async () => {
     setState({ kind: 'scanning' });
     try {
-      const response = await chrome.runtime.sendMessage({ type: 'AUDIT_SCAN_REQUEST' });
-      if (!response) {
+      // 1. Custom engine: ask content script for serialized AuditInput, run in-panel.
+      const scanResponse = await chrome.runtime.sendMessage({ type: 'AUDIT_SCAN_REQUEST' });
+      if (!scanResponse) {
         setState({ kind: 'error', message: 'No response from background script.' });
         return;
       }
-      if (typeof response === 'object' && 'error' in response) {
-        setState({ kind: 'error', message: String((response as { error: string }).error) });
+      if (typeof scanResponse === 'object' && 'error' in scanResponse) {
+        setState({ kind: 'error', message: String((scanResponse as { error: string }).error) });
         return;
       }
-      const input = (response as { input?: AuditInput }).input;
+      const input = (scanResponse as { input?: AuditInput }).input;
       if (!input) {
         setState({ kind: 'error', message: 'Audit collector returned no data.' });
         return;
       }
-      const report = engine.runAudit(input);
-      setState({ kind: 'done', report });
+      const customReport = engine.runAudit(input);
+      const customFindings = customReport.findings.map((f) => ({ ...f, source: 'custom' as const }));
+
+      // 2. axe-core: run in parallel to the custom engine on the live DOM.
+      //    If axe fails (CSP blocks injection, network hiccup on the web_accessible_resource,
+      //    etc.) we still ship the custom report — axe is additive, never required.
+      let axeFindings: AuditFinding[] = [];
+      let axeError: string | undefined;
+      try {
+        const axeResponse = (await chrome.runtime.sendMessage({ type: 'AUDIT_RUN_AXE' })) as {
+          results?: AxeResults;
+          error?: string;
+        } | null;
+        if (axeResponse?.error) {
+          axeError = axeResponse.error;
+        } else if (axeResponse?.results) {
+          axeFindings = mapAxeViolationsToFindings(axeResponse.results);
+        } else {
+          axeError = 'axe-core returned no data';
+        }
+      } catch (err) {
+        axeError = `axe-core unreachable: ${String(err)}`;
+      }
+
+      // 3. Merge, rebuild the report with deduped scoring.
+      const merge = mergeAuditFindings(customFindings, axeFindings);
+      const report = rebuildReportWithMergedFindings(customReport, merge.merged, {
+        custom: merge.custom,
+        axe: merge.axe,
+        both: merge.both,
+      });
+
+      setState({ kind: 'done', report, axeError });
     } catch (err) {
       setState({ kind: 'error', message: `Scan failed: ${String(err)}` });
     }
@@ -73,10 +116,24 @@ export function AuditPanel() {
     });
   }, []);
 
+  const toggleSource = useCallback((src: AuditFindingSource) => {
+    setActiveSources((prev) => {
+      const next = new Set(prev);
+      if (next.has(src)) next.delete(src);
+      else next.add(src);
+      return next;
+    });
+  }, []);
+
   const filteredFindings = useMemo(() => {
     if (state.kind !== 'done') return [] as AuditFinding[];
-    return state.report.findings.filter((f) => activeSeverities.has(f.severity));
-  }, [state, activeSeverities]);
+    return state.report.findings.filter((f) => {
+      if (!activeSeverities.has(f.severity)) return false;
+      // Legacy findings without `source` default to 'custom' for filter purposes.
+      const src = f.source ?? 'custom';
+      return activeSources.has(src);
+    });
+  }, [state, activeSeverities, activeSources]);
 
   const groupedBySeverity = useMemo(() => {
     const groups: Record<AuditSeverity, AuditFinding[]> = {
@@ -98,8 +155,9 @@ export function AuditPanel() {
         <div className="ab-audit-empty">
           <div className="ab-audit-empty-title">WCAG 2.1 Accessibility Audit</div>
           <p className="ab-audit-empty-desc">
-            Scan the current page against 20 heuristic WCAG checks — get a score, category
-            breakdown, and exportable PDF report for compliance review.
+            Scan the current page with AccessBridge's 20 heuristic WCAG checks plus the
+            industry-standard axe-core engine. Get a merged score, category breakdown,
+            and exportable PDF report.
           </p>
           <button type="button" className="ab-audit-primary-btn" onClick={runScan}>
             Run Audit
@@ -112,7 +170,7 @@ export function AuditPanel() {
   if (state.kind === 'scanning') {
     return (
       <div className="ab-audit-panel">
-        <div className="ab-audit-loading">Scanning page accessibility…</div>
+        <div className="ab-audit-loading">Scanning page accessibility (custom + axe-core)…</div>
       </div>
     );
   }
@@ -128,7 +186,8 @@ export function AuditPanel() {
     );
   }
 
-  const { report } = state;
+  const { report, axeError } = state;
+  const sources = report.sources;
 
   return (
     <div className="ab-audit-panel">
@@ -147,9 +206,21 @@ export function AuditPanel() {
             <span className="ab-audit-header-stat">
               <strong>{report.totalElements}</strong> elements
             </span>
+            {sources && (
+              <span className="ab-audit-header-stat" title="custom + axe + overlap">
+                <strong>{sources.custom}</strong>c · <strong>{sources.axe}</strong>a ·{' '}
+                <strong>{sources.both}</strong>∩
+              </span>
+            )}
           </div>
         </div>
       </div>
+
+      {axeError && (
+        <div className="ab-audit-notice" role="status">
+          axe-core skipped: {axeError}. Custom findings still applied.
+        </div>
+      )}
 
       {/* WCAG compliance badges */}
       <div className="ab-wcag-badges">
@@ -202,11 +273,33 @@ export function AuditPanel() {
         })}
       </div>
 
+      {/* Source filters — only shown when axe produced a verdict */}
+      {sources && (
+        <div className="ab-source-filters" role="group" aria-label="Filter findings by source">
+          {SOURCE_ORDER.map((src) => {
+            const count = sources[src];
+            const active = activeSources.has(src);
+            return (
+              <button
+                key={src}
+                type="button"
+                className={`ab-source-chip${active ? ' active' : ''}`}
+                data-source={src}
+                aria-pressed={active}
+                onClick={() => toggleSource(src)}
+              >
+                {src} ({count})
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* Findings grouped by severity */}
       {filteredFindings.length === 0 ? (
         <div className="ab-audit-empty">
           <div className="ab-audit-empty-desc">
-            No findings match the selected severities.
+            No findings match the selected filters.
           </div>
         </div>
       ) : (

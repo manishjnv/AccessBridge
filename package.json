@@ -9,6 +9,10 @@
     "build:all": "pnpm -r build",
     "lint": "pnpm -r lint",
     "test": "pnpm -r test",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:debug": "cross-env PWDEBUG=1 playwright test",
+    "test:all": "pnpm -r test && pnpm test:e2e",
     "typecheck": "pnpm -r typecheck",
     "prepare": "husky"
   },
@@ -19,6 +23,12 @@
     "pnpm": ">=9.0.0"
   },
   "devDependencies": {
-    "husky": "^9.1.7"
+    "@axe-core/playwright": "^4.10.1",
+    "@playwright/test": "^1.48.2",
+    "@types/node": "^20.12.0",
+    "axe-core": "^4.10.2",
+    "cross-env": "^7.0.3",
+    "husky": "^9.1.7",
+    "playwright": "^1.48.2"
   }
 }

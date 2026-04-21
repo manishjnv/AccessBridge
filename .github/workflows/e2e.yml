@@ -1,0 +1,71 @@
+name: E2E
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  playwright:
+    name: Playwright (Chromium + extension)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build extension
+        run: pnpm build
+
+      - name: Verify axe.min.js copied into dist
+        run: |
+          test -f packages/extension/dist/axe.min.js || (echo "::error::axe.min.js missing from dist/" && exit 1)
+          size=$(stat -c%s packages/extension/dist/axe.min.js)
+          if [ "$size" -lt 100000 ]; then
+            echo "::error::axe.min.js is suspiciously small ($size bytes)"
+            exit 1
+          fi
+          echo "✓ axe.min.js present, $size bytes"
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run Playwright tests (xvfb)
+        # MV3 extensions need a real browser window; xvfb-run gives us one in CI.
+        run: xvfb-run --auto-servernum pnpm test:e2e
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+      - name: Upload test-results (traces + videos) on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-test-results
+          path: test-results/
+          retention-days: 7

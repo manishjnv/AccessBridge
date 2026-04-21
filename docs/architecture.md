@@ -138,3 +138,9 @@ The extension imports core types and classes directly. The AI engine is intentio
 | Voice | Web Speech API |
 | Eye tracking | MediaPipe (planned) |
 | VPS | Docker Compose (API, Observatory, Nginx) |
+| Testing (unit) | Vitest 2 (900+ tests across 5 packages) |
+| Testing (E2E) | Playwright + @playwright/test (Chromium + MV3 extension) |
+| Testing (WCAG) | Custom 20 rules + axe-core ~90 checks (merged/dedup'd) |
+| CI | GitHub Actions — `ci.yml` (typecheck/test/build/IIFE guard) + `e2e.yml` (Playwright over xvfb) |
+
+See [testing.md](testing.md) for the full test pyramid, coverage map, and debugging tips.

@@ -57,7 +57,8 @@
       "resources": [
         "models/*.onnx",
         "ort/*.wasm",
-        "ort/*.mjs"
+        "ort/*.mjs",
+        "axe.min.js"
       ],
       "matches": [
         "<all_urls>"

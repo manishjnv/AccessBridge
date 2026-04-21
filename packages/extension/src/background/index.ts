@@ -464,6 +464,7 @@ type MessageType =
   | 'CHECK_UPDATE'
   | 'APPLY_UPDATE'
   | 'AUDIT_SCAN_REQUEST'
+  | 'AUDIT_RUN_AXE'
   | 'HIGHLIGHT_ELEMENT'
   // --- Priority 1: Captions + Actions ---
   | 'EXTRACT_ACTION_ITEMS'
@@ -702,6 +703,24 @@ async function handleMessage(
       }
       try {
         const response = await chrome.tabs.sendMessage(activeTab.id, { type: 'AUDIT_SCAN_REQUEST' });
+        return response ?? { error: 'No response from content script' };
+      } catch (err) {
+        return { error: `Content script unreachable: ${String(err)}` };
+      }
+    }
+
+    case 'AUDIT_RUN_AXE': {
+      // Session 18: route axe-core execution into the active tab's content
+      // script. The content script injects axe via web_accessible_resources +
+      // script tag, so we preserve the existing AUDIT_SCAN_REQUEST permission
+      // profile — no new manifest permission needed.
+      const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!activeTab?.id) return { error: 'No active tab' };
+      if (activeTab.url?.startsWith('chrome://') || activeTab.url?.startsWith('edge://')) {
+        return { error: 'axe-core unavailable on browser internal pages' };
+      }
+      try {
+        const response = await chrome.tabs.sendMessage(activeTab.id, { type: 'AUDIT_RUN_AXE' });
         return response ?? { error: 'No response from content script' };
       } catch (err) {
         return { error: `Content script unreachable: ${String(err)}` };

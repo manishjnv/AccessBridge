@@ -91,6 +91,11 @@ export interface AuditInput {
   totalElements: number;
 }
 
+/** Finding provenance. `both` means a custom heuristic + axe-core independently
+ *  flagged the same (criterion, selector) — see mergeAuditFindings. Optional for
+ *  back-compat with reports generated before Session 18. */
+export type AuditFindingSource = 'custom' | 'axe' | 'both';
+
 export interface AuditFinding {
   id: string;
   ruleId: string;
@@ -104,6 +109,9 @@ export interface AuditFinding {
   message: string;
   suggestion: string;
   htmlSnippet: string;
+  source?: AuditFindingSource;
+  /** Raw axe-core violation node (JSON-serializable) for power-user debugging. */
+  rawAxe?: unknown;
 }
 
 export interface AuditRule {
@@ -129,4 +137,6 @@ export interface AuditReport {
   summary: {
     critical: number; serious: number; moderate: number; minor: number; info: number;
   };
+  /** Optional per-source counts. Absent on reports that never ran axe-core. */
+  sources?: { custom: number; axe: number; both: number };
 }

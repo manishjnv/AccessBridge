@@ -8,11 +8,13 @@ When triggered from the side panel, the audit:
 
 1. Injects `collectAuditInput()` via the content script to walk the live DOM and capture element metadata, computed styles, bounding boxes, and structural information.
 2. Passes the `AuditInput` payload to `AuditEngine.run()` in the `@accessbridge/core/audit` module, which evaluates 20 built-in WCAG rules.
-3. Returns an `AuditReport` containing scored findings, per-category scores, overall score, and WCAG compliance percentages.
-4. Renders the report in `AuditPanel.tsx` inside the side panel — interactive, with severity badges, WCAG links, and element selectors.
-5. Optionally exports the full report as a multi-page PDF via `pdf-generator.ts`.
+3. **Session 18:** in parallel with (2), the sidepanel asks the content script to inject and run [axe-core](https://github.com/dequelabs/axe-core) against the live MAIN-world DOM. axe contributes ~90 additional WCAG + ARIA findings with canonical help URLs.
+4. `mergeAuditFindings(customFindings, axeFindings)` deduplicates by `(wcagCriterion, elementSelector)` — overlapping flags are promoted to `source: 'both'`, axe-only findings get `source: 'axe'`, custom-only get `source: 'custom'`. The overall score is deducted against the merged (dedup'd) set, not both sources twice.
+5. Returns an `AuditReport` containing scored findings with `source` badges, per-category scores, overall score, WCAG compliance percentages, and a `sources: { custom, axe, both }` tally.
+6. Renders the report in `AuditPanel.tsx` inside the side panel — interactive, with severity badges, source badges, source filters, WCAG links, and element selectors.
+7. Optionally exports the full report as a multi-page PDF via `pdf-generator.ts`.
 
-This feature enables developers to get instant, in-browser accessibility feedback without leaving their workflow, and produces portable compliance artifacts for teams and stakeholders.
+This feature enables developers to get instant, in-browser accessibility feedback without leaving their workflow, and produces portable compliance artifacts for teams and stakeholders. The three-tier test pyramid (20 custom rules + axe-core industry standard + merge/dedup vitest coverage) is documented in [testing.md](../testing.md).
 
 ---
 
@@ -42,6 +44,35 @@ The following 20 rules are evaluated on every audit run.
 | 18 | `focus-order` | Focus order violations | 2.4.3 | A | moderate |
 | 19 | `link-purpose` | Generic link text | 2.4.4 | AA | minor |
 | 20 | `redundant-title` | Redundant title attribute | 2.4.9 | AAA | info |
+
+**Session 18 additions:** on every scan, axe-core contributes an additional ~90 WCAG + ARIA checks with canonical help URLs. These findings carry `source: 'axe'` (or `'both'` when the custom engine independently corroborates them). The `rawAxe` field preserves axe's original violation node for power-user debugging.
+
+---
+
+## axe-core integration
+
+Session 18 added axe-core alongside the custom rules. axe cannot run in the extension's ISOLATED content-script world because it introspects `window.axe`, so the flow is:
+
+1. Sidepanel button → `chrome.runtime.sendMessage({ type: 'AUDIT_RUN_AXE' })`.
+2. Background forwards to the active tab's content script via `chrome.tabs.sendMessage`.
+3. Content script ([content/audit/axe-runner.ts](../../packages/extension/src/content/audit/axe-runner.ts)) injects `axe.min.js` into the page's MAIN world via `<script src="chrome-extension://.../axe.min.js">`. The file lives in `manifest.web_accessible_resources`.
+4. A second inline `<script>` runs `await window.axe.run()` and posts the results back via `window.postMessage({ type: 'AB_AXE_RESULT', nonce, results })`. The nonce is a `crypto.randomUUID()` — a page-level `MutationObserver` attacker cannot guess it ahead of time.
+5. Content script resolves the promise, background returns to sidepanel.
+6. Sidepanel maps `AxeResults → AuditFinding[]` via `mapAxeViolationsToFindings`, merges via `mergeAuditFindings`, and rebuilds the scored report via `rebuildReportWithMergedFindings`.
+
+**axe-core is never imported from `@accessbridge/core` or bundled into the content-script chunk.** It lives only as a file copy (`packages/extension/node_modules/axe-core/axe.min.js` → `dist/axe.min.js`). This keeps the content-script IIFE safe from BUG-008/BUG-012-class regressions and avoids a ~564 KB per-page-load tax.
+
+### Coverage comparison
+
+| Source | Count | Strengths | Weaknesses |
+| --- | --- | --- | --- |
+| Custom rules | 20 | Domain-aware, offline, fast, integrated with our UI copy | Small rule count, heuristic |
+| axe-core | ~90 | Industry standard, canonical WCAG mappings, help URLs | ~564 KB on-demand, depends on page MAIN-world |
+| Merged | de-dup'd | Best of both | — |
+
+### WCAG criterion extraction
+
+axe-core emits tags like `wcag111` (1.1.1), `wcag143` (1.4.3), and `wcag1410` (1.4.10). The extractor's regex is `^wcag(\d)(\d)(\d+)$` — principle and guideline are always single digits (WCAG has 4 principles × ≤5 guidelines), so the criterion is the only component that can exceed one digit. See [packages/core/src/audit/axe-integration.ts](../../packages/core/src/audit/axe-integration.ts) for implementation + regression tests.
 
 ---
 

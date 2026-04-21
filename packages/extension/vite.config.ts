@@ -228,6 +228,22 @@ function copyManifestPlugin() {
         }
       }
 
+      // ---- Copy axe-core bundle ----
+      // Session 18: axe-core is loaded into the active tab's MAIN world via a
+      // <script src="chrome-extension://.../axe.min.js"> tag when the sidepanel
+      // audit runs. The file is listed under manifest web_accessible_resources
+      // so page origins can fetch it. The content-script bundle itself does NOT
+      // import axe-core — keeping that bundle lean + BUG-008/012 safe.
+      const axeSrc = resolve(
+        __dirname,
+        'node_modules',
+        'axe-core',
+        'axe.min.js',
+      );
+      if (existsSync(axeSrc)) {
+        copyFileSync(axeSrc, resolve(distDir, 'axe.min.js'));
+      }
+
       // ---- Strip rollup-auto-emitted ort-wasm copies ----
       // onnxruntime-web contains `new URL('./ort-wasm-simd-threaded.wasm',
       // import.meta.url)` patterns which vite rewrites into asset emissions

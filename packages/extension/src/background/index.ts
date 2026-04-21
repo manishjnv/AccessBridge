@@ -505,6 +505,7 @@ type MessageType =
   | 'VOICE_TIER_RECORD'
   // --- Session 19: Desktop Agent Bridge ---
   | 'AGENT_GET_STATUS'
+  | 'AGENT_GET_INFO'
   | 'AGENT_HAS_PSK'
   | 'AGENT_SET_PSK'
   | 'AGENT_CLEAR_PSK'
@@ -1022,7 +1023,17 @@ async function handleMessage(
 
     // --- Session 19: Desktop Agent Bridge ---
     case 'AGENT_GET_STATUS': {
-      return agentBridge.getStatus();
+      const status = agentBridge.getStatus();
+      // Augment with live agentInfo (may differ from lastStatus if client reconnected)
+      return { ...status, agentInfo: agentBridge.getAgentInfo() };
+    }
+
+    case 'AGENT_GET_INFO': {
+      const info = agentBridge.getAgentInfo();
+      if (info) return { agentInfo: info };
+      // Async fallback: check chrome.storage for last-known persisted value
+      const persisted = await agentBridge.getAgentInfoAsync();
+      return { agentInfo: persisted };
     }
 
     case 'AGENT_HAS_PSK': {

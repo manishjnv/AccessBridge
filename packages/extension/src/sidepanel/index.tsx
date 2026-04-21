@@ -1733,8 +1733,17 @@ interface ActiveNativeAdaptation {
   label: string;
 }
 
+// --- Session 21: platform display helper (mirrors popup formatPlatform) ---
+function formatPlatform(p: string): string {
+  if (p === 'macos') return 'macOS';
+  if (p === 'windows') return 'Windows';
+  if (p === 'linux') return 'Linux';
+  return p.charAt(0).toUpperCase() + p.slice(1);
+}
+
 function NativeAppsPanel() {
   const [agentConnected, setAgentConnected] = React.useState(false);
+  const [agentInfo, setAgentInfo] = React.useState<{ version: string; platform: string; capabilities: string[] } | null>(null);
   const [windows, setWindows] = React.useState<NativeWindow[]>([]);
   const [loading, setLoading] = React.useState(false);
   const [selectedProcess, setSelectedProcess] = React.useState<string | null>(null);
@@ -1746,7 +1755,9 @@ function NativeAppsPanel() {
     const poll = () => {
       chrome.runtime.sendMessage({ type: 'AGENT_GET_STATUS' }, (status) => {
         if (status && typeof status === 'object' && 'connected' in status) {
-          setAgentConnected(!!(status as { connected: boolean }).connected);
+          const s = status as { connected: boolean; agentInfo?: { version: string; platform: string; capabilities: string[] } | null };
+          setAgentConnected(!!s.connected);
+          if (s.agentInfo) setAgentInfo(s.agentInfo);
         }
       });
     };
@@ -1810,7 +1821,7 @@ function NativeAppsPanel() {
           borderRadius: 10,
         }}>
           <div style={{ fontSize: 15, fontWeight: 600, color: '#e2e8f0', marginBottom: 8 }}>Desktop Agent not connected</div>
-          <div>Install the AccessBridge Desktop Agent and pair it via the popup to adapt native Windows apps.</div>
+          <div>Connect the Desktop Agent to see native app adaptations.</div>
         </div>
       </section>
     );
@@ -1822,6 +1833,34 @@ function NativeAppsPanel() {
       aria-label="Native Apps"
       style={{ marginTop: 8 }}
     >
+      {/* --- Session 21: agent platform + capability chips --- */}
+      {agentInfo && (
+        <div style={{ marginBottom: 12, padding: '8px 12px', background: 'rgba(16, 185, 129, 0.07)', border: '1px solid rgba(16, 185, 129, 0.18)', borderRadius: 8 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: '#10b981', marginBottom: 6 }}>
+            {formatPlatform(agentInfo.platform)} · v{agentInfo.version}
+          </div>
+          {agentInfo.capabilities.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+              {agentInfo.capabilities.map((cap) => (
+                <span
+                  key={cap}
+                  style={{
+                    padding: '2px 8px',
+                    fontSize: 10,
+                    fontWeight: 600,
+                    background: 'rgba(123, 104, 238, 0.15)',
+                    color: '#bb86fc',
+                    borderRadius: 4,
+                    border: '1px solid rgba(123, 104, 238, 0.25)',
+                  }}
+                >
+                  {cap}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
         <h2 className="text-xs font-semibold uppercase tracking-widest text-a11y-muted" style={{ margin: 0 }}>Native Apps</h2>
         <button

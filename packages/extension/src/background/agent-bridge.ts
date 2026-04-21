@@ -15,11 +15,14 @@ import type { AccessibilityProfile } from '@accessbridge/core';
 
 const STORAGE_KEY_PSK = 'agentPairKeyB64';
 const STORAGE_KEY_LAST_STATUS = 'agentLastStatus';
+const STORAGE_KEY_LAST_AGENT_INFO = 'agentLastKnownInfo';
 
 export interface AgentStatus {
   connected: boolean;
   state: ConnectionState;
   server: AgentInfo | null;
+  /** Agent-side platform + capabilities info, populated after successful HELLO_ACK. */
+  agentInfo: AgentInfo | null;
   lastError: string | null;
   updatedAt: number;
 }
@@ -33,6 +36,7 @@ export class AgentBridge {
     connected: false,
     state: 'idle',
     server: null,
+    agentInfo: null,
     lastError: null,
     updatedAt: Date.now(),
   };
@@ -76,11 +80,16 @@ export class AgentBridge {
     });
 
     this.client.onState((s) => {
+      const liveInfo = this.client?.getAgentInfo() ?? null;
+      if (s === 'connected' && liveInfo) {
+        chrome.storage.local.set({ [STORAGE_KEY_LAST_AGENT_INFO]: liveInfo }).catch(() => {});
+      }
       this.setStatus({
         ...this.lastStatus,
         state: s,
         connected: s === 'connected',
         server: this.client?.getServerInfo() ?? null,
+        agentInfo: liveInfo,
         lastError: s === 'error' ? this.lastStatus.lastError : null,
       });
     });
@@ -104,12 +113,35 @@ export class AgentBridge {
   stop(): void {
     if (this.client) { this.client.dispose(); this.client = null; }
     this.started = false;
-    this.setStatus({ ...this.lastStatus, state: 'idle', connected: false, server: null });
+    this.setStatus({ ...this.lastStatus, state: 'idle', connected: false, server: null, agentInfo: null });
   }
 
   isConnected(): boolean { return !!this.client && this.client.isConnected(); }
 
   getStatus(): AgentStatus { return { ...this.lastStatus }; }
+
+  /**
+   * Returns live agent info from the connected client, or falls back to the
+   * last value persisted in chrome.storage.local (so the popup can show
+   * something useful even after a SW restart before reconnect completes).
+   * Returns null synchronously only from the live path; callers that need
+   * the persisted fallback should use getAgentInfoAsync().
+   */
+  getAgentInfo(): AgentInfo | null {
+    return this.client?.getAgentInfo() ?? this.lastStatus.agentInfo ?? null;
+  }
+
+  /** Async variant that also checks chrome.storage for the persisted last-known info. */
+  async getAgentInfoAsync(): Promise<AgentInfo | null> {
+    const live = this.getAgentInfo();
+    if (live) return live;
+    try {
+      const result = await chrome.storage.local.get(STORAGE_KEY_LAST_AGENT_INFO);
+      const stored = result[STORAGE_KEY_LAST_AGENT_INFO];
+      if (stored && typeof stored === 'object') return stored as AgentInfo;
+    } catch { /* non-fatal */ }
+    return null;
+  }
 
   onStatusChange(h: AgentStatusHandler): () => void {
     this.statusHandlers.add(h);

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  AccessBridge Desktop Agent — macOS hardened-runtime entitlements.
+  Kept to the minimal surface required for the accessibility + AppleScript
+  adapter introduced in Session 21 Part 3. All potentially-dangerous JIT /
+  unsigned-code keys are explicitly omitted (not just set to false) so the
+  App Sandbox and notarisation process can reject any future accidental
+  addition at build time rather than at review time.
+-->
+<plist version="1.0">
+<dict>
+    <!--
+      com.apple.security.automation.apple-events
+      Allows the process to send Apple Events to other apps (required if the
+      macOS NSAccessibility adapter uses AppleScript to reach Safari or
+      system apps). Declared proactively so the hardened-runtime binary does
+      not crash when the adapter exercises that path; set to false if your
+      build never uses AppleScript to avoid the corresponding TCC prompt.
+    -->
+    <key>com.apple.security.automation.apple-events</key>
+    <true/>
+
+    <!--
+      com.apple.security.cs.allow-jit
+      Permits the W^X exception needed for JIT compilers (e.g. a bundled JS
+      engine). AccessBridge does NOT use a JIT — kept false so the kernel
+      enforces W^X on all agent pages.
+    -->
+    <key>com.apple.security.cs.allow-jit</key>
+    <false/>
+
+    <!--
+      com.apple.security.cs.disable-library-validation
+      Disables Gatekeeper's requirement that all loaded dylibs are signed by
+      the same team. AccessBridge only loads system frameworks and
+      first-party crates compiled into the binary — kept false to retain the
+      hardened-runtime dylib-signature check.
+    -->
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <false/>
+</dict>
+</plist>

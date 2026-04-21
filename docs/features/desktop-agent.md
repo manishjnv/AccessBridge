@@ -1,6 +1,10 @@
-# Desktop Agent (Session 19)
+# Desktop Agent (Sessions 19 + 21)
 
-**Status:** MVP shipped in Session 19 (2026-04-21). Windows only.
+**Status:** Session 19 (2026-04-21) shipped the Windows MVP. **Session 21 (2026-04-21) added cross-platform parity — see [desktop-agent-macos.md](desktop-agent-macos.md) for the macOS adapter + NSAccessibility integration; a Linux AT-SPI stub; a SQLCipher-backed persistent profile store replacing the in-memory Session-19 stub; OS-keyring-backed master-key management; a cross-platform accessibility-permission module; and a GitHub Actions matrix build producing Windows MSI + macOS DMG/PKG artifacts. The original MVP below remains accurate for Session 19 behaviour; Session 21 layered on top without breaking the wire protocol or the PSK handshake.**
+
+---
+
+**Status (original Session 19):** MVP shipped in Session 19 (2026-04-21). Windows only.
 **Code (Rust):** [`packages/desktop-agent/src-tauri/src/`](../../packages/desktop-agent/src-tauri/src/)
 **Code (TS client):** [`packages/core/src/ipc/`](../../packages/core/src/ipc/)
 **Code (extension bridge):** [`packages/extension/src/background/agent-bridge.ts`](../../packages/extension/src/background/agent-bridge.ts)

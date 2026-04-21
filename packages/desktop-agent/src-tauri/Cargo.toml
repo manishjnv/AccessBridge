@@ -32,9 +32,29 @@ tower-http = { version = "0.5", features = ["cors", "trace"] }
 once_cell = "1"
 anyhow = "1"
 
-[target.'cfg(windows)'.dependencies]
+# Session 21 — persistent profile store (SQLCipher) + OS-keyring-backed master key.
+# The `bundled-sqlcipher-vendored-openssl` feature compiles SQLCipher + OpenSSL
+# from source, so the first `cargo build` is slow (~5-10 min) but the resulting
+# binary has no dynamic dependency on a system-installed OpenSSL or SQLCipher.
+rusqlite = { version = "0.31", features = ["bundled-sqlcipher-vendored-openssl"] }
+keyring = "3"
+
+[target.'cfg(target_os = "windows")'.dependencies]
 uiautomation = "0.15"
 windows = { version = "0.58", features = ["Win32_UI_WindowsAndMessaging", "Win32_Foundation", "Win32_Graphics_Gdi", "Win32_UI_HiDpi", "Win32_System_ProcessStatus", "Win32_System_Threading"] }
+
+# Session 21 — macOS NSAccessibility adapter deps. Gated to macOS so Windows
+# and Linux builds never try to compile Apple-only crates.
+[target.'cfg(target_os = "macos")'.dependencies]
+core-foundation = "0.10"
+core-foundation-sys = "0.8"
+core-graphics = "0.24"
+objc2 = "0.5"
+objc2-foundation = { version = "0.2", features = ["NSString", "NSDictionary", "NSURL"] }
+objc2-app-kit = { version = "0.2", features = ["NSWorkspace", "NSRunningApplication"] }
+
+[dev-dependencies]
+tempfile = "3"
 
 [features]
 custom-protocol = ["tauri/custom-protocol"]

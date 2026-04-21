@@ -38,6 +38,7 @@ function makeMockClientInstance() {
 
     isConnected: vi.fn(() => inst.__connected),
     getServerInfo: vi.fn(() => inst.__serverInfo),
+    getAgentInfo: vi.fn(() => inst.__serverInfo),
 
     onState: vi.fn((handler: (s: string) => void) => {
       __stateHandler = handler;
@@ -399,6 +400,52 @@ describe('AgentBridge', () => {
     const snap2 = bridge.getStatus();
     expect(snap2.connected).toBe(false);  // original state unchanged
     expect(snap2.lastError).toBeNull();
+  });
+
+  // ─── Session 21: agentInfo tests ─────────────────────────────────────────
+
+  it('19. getAgentInfo() returns null before any connection is made', async () => {
+    const bridge = await importBridge();
+    await bridge.start(); // no PSK → idle
+    expect(bridge.getAgentInfo()).toBeNull();
+  });
+
+  it('20. getAgentInfo() returns the server info from HELLO_ACK after successful connect', async () => {
+    const bridge = await importBridge();
+    await chrome.storage.local.set({ agentPairKeyB64: VALID_PSK_B64 });
+    await bridge.start();
+
+    const info = bridge.getAgentInfo();
+    expect(info).not.toBeNull();
+    expect(info?.platform).toBe('windows');
+    expect(info?.version).toBe('1.0.0');
+    expect(Array.isArray(info?.capabilities)).toBe(true);
+  });
+
+  it('21. agentInfo is persisted to chrome.storage on successful connect', async () => {
+    const bridge = await importBridge();
+    await chrome.storage.local.set({ agentPairKeyB64: VALID_PSK_B64 });
+    await bridge.start();
+
+    // Give the async storage.set a tick to complete
+    await Promise.resolve();
+
+    const stored = await chrome.storage.local.get('agentLastKnownInfo');
+    const persisted = stored['agentLastKnownInfo'] as { platform: string; version: string } | undefined;
+    expect(persisted).toBeDefined();
+    expect(persisted?.platform).toBe('windows');
+    expect(persisted?.version).toBe('1.0.0');
+  });
+
+  it('22. AGENT_GET_STATUS response shape includes agentInfo field', async () => {
+    const bridge = await importBridge();
+    await chrome.storage.local.set({ agentPairKeyB64: VALID_PSK_B64 });
+    await bridge.start();
+
+    const status = bridge.getStatus();
+    // agentInfo is a required field of AgentStatus — must be present (connected case)
+    expect(Object.prototype.hasOwnProperty.call(status, 'agentInfo')).toBe(true);
+    expect(status.agentInfo?.platform).toBe('windows');
   });
 
   it('18. status handler fires on connect; unsubscribe stops further calls', async () => {

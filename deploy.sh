@@ -14,6 +14,12 @@
 #                 and stage it into deploy/downloads/ before the VPS sync step.
 #                 Requires Rust + MSVC + WiX toolchain; safe to omit when not shipping
 #                 a new agent build — the existing MSI in deploy/downloads/ is synced.
+#   --with-agent-all-platforms  Session 21 Part 4: run tools/build-agent-all-platforms.sh
+#                      before the VPS sync step. Builds the agent for the CURRENT OS only
+#                      (Windows → MSI, macOS → DMG+PKG). Cross-platform builds require
+#                      the CI matrix in .github/workflows/agent-build.yml. Safe to omit
+#                      when no new agent release is being shipped — the existing artifacts
+#                      in deploy/downloads/ are still synced.
 #   --with-enterprise  Session 20: package deploy/enterprise/ into admx-bundle.zip
 #                      alongside the existing ADMX/ADML/mobileconfig/JSON template files.
 #                      The landing page Enterprise section links to the zip for admins
@@ -39,6 +45,7 @@ SKIP_CHECK=false
 SKIP_BUMP=false
 NO_CACHE=false
 WITH_AGENT=0
+WITH_AGENT_ALL_PLATFORMS=0
 WITH_ENTERPRISE=0
 
 for arg in "$@"; do
@@ -49,8 +56,9 @@ for arg in "$@"; do
     --no-check)        SKIP_CHECK=true     ;;
     --skip-bump)       SKIP_BUMP=true      ;;
     --no-cache)        NO_CACHE=true       ;;  # restore the old stateless pipeline
-    --with-agent)      WITH_AGENT=1        ;;
-    --with-enterprise) WITH_ENTERPRISE=1   ;;  # Session 20: zip ADMX bundle + sync enterprise templates
+    --with-agent)               WITH_AGENT=1               ;;
+    --with-agent-all-platforms) WITH_AGENT_ALL_PLATFORMS=1 ;;  # Session 21 Part 4: cross-platform agent build
+    --with-enterprise)          WITH_ENTERPRISE=1          ;;  # Session 20: zip ADMX bundle + sync enterprise templates
     *) echo "Unknown arg: $arg" >&2; exit 2 ;;
   esac
 done
@@ -298,6 +306,27 @@ if [ "${WITH_AGENT}" = "1" ]; then
   fi
 else
   echo "[1.6/6] Skipping desktop-agent MSI build (pass --with-agent to enable)"
+fi
+
+# ─────────────────────────────────────────────────────────
+# [1.6b/6] (optional) Build Desktop Agent for ALL platforms (current OS only)
+#           — only with --with-agent-all-platforms
+# Delegates to tools/build-agent-all-platforms.sh which internally calls
+# build-agent-installer.sh with platform detection. Prints a note that
+# cross-building requires the CI matrix in .github/workflows/agent-build.yml.
+# ─────────────────────────────────────────────────────────
+if [ "${WITH_AGENT_ALL_PLATFORMS}" = "1" ]; then
+  echo "[1.6b/6] Building desktop-agent for current platform (--with-agent-all-platforms)..."
+  _ALL_PLATFORMS_SCRIPT="$(pwd)/tools/build-agent-all-platforms.sh"
+  if [ ! -f "$_ALL_PLATFORMS_SCRIPT" ]; then
+    echo "  ✗ tools/build-agent-all-platforms.sh not found — skipping"
+  elif bash "$_ALL_PLATFORMS_SCRIPT"; then
+    echo "  ✓ agent bundle built and staged into deploy/downloads/"
+  else
+    echo "  ⚠ agent bundle build failed — deploy continues without updated agent artifacts"
+  fi
+else
+  echo "[1.6b/6] Skipping cross-platform agent build (pass --with-agent-all-platforms to enable)"
 fi
 
 # ─────────────────────────────────────────────────────────

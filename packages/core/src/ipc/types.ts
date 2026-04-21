@@ -53,6 +53,33 @@ export type AgentMessage =
 
 export type AgentMessageType = AgentMessage['type'];
 
+// ─── Session 21: typed capability helpers ────────────────────────────────────
+
+export type AgentCapability =
+  | 'font-scale'
+  | 'contrast-filter'
+  | 'cursor-size'
+  | 'announce'
+  | 'screen-reader-bridge'
+  | 'color-invert'
+  | 'uia-inspect'
+  | 'ipc'
+  | 'profile-sync';
+
+export function isKnownCapability(s: string): s is AgentCapability {
+  return (
+    s === 'font-scale' ||
+    s === 'contrast-filter' ||
+    s === 'cursor-size' ||
+    s === 'announce' ||
+    s === 'screen-reader-bridge' ||
+    s === 'color-invert' ||
+    s === 'uia-inspect' ||
+    s === 'ipc' ||
+    s === 'profile-sync'
+  );
+}
+
 // Type guard helper
 export function isAgentMessage(v: unknown): v is AgentMessage {
   if (!v || typeof v !== 'object') return false;

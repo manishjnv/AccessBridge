@@ -300,12 +300,17 @@ Docs: [docs/features/onnx-models.md](docs/features/onnx-models.md). Tests: ~70 (
 
 ---
 
-## 8d. Desktop Agent (Session 19)
+## 8d. Desktop Agent (Sessions 19 + 21)
 
 Tauri 2 Rust binary that pairs with the extension over a loopback WebSocket
-(127.0.0.1:8901) and, on Windows, exposes UIA for inspecting native apps.
-The extension works standalone if the agent is absent; the pairing is
-strictly opt-in via a user-copied PSK.
+(127.0.0.1:8901). Session 19 shipped the Windows-only MVP; **Session 21
+(2026-04-21) adds cross-platform parity via a new `AccessibilityAdapter`
+trait, a macOS NSAccessibility adapter, a Linux AT-SPI stub, a SQLCipher-
+backed persistent profile store, OS-keyring-backed master-key management,
+a macOS accessibility-permission request module, and a GitHub Actions
+matrix build producing signed MSI + macOS DMG/PKG artifacts**. The
+extension still works fully standalone if the agent is absent; the pairing
+is strictly opt-in via a user-copied PSK.
 
 - **Agent process** — [packages/desktop-agent/src-tauri/src/](packages/desktop-agent/src-tauri/src/). Rust 2021, axum WS server + tokio runtime + Tauri 2 UI shell. Windows-only UIA dispatcher via the `uiautomation` crate; macOS/Linux get a no-op stub (Phase 2 target).
 - **Shared wire protocol** — TypeScript discriminated union at [packages/core/src/ipc/types.ts](packages/core/src/ipc/types.ts); Rust serde mirror at [packages/desktop-agent/src-tauri/src/ipc_protocol.rs](packages/desktop-agent/src-tauri/src/ipc_protocol.rs). 15 message variants covering HELLO handshake, profile CRUD, UIA inspect, adaptation apply/revert, ping/pong, and error. camelCase over the wire, SCREAMING_SNAKE_CASE `type` discriminator.

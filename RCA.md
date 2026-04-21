@@ -252,6 +252,21 @@ Track every bug fix: what broke, why, how it was fixed, and how to prevent recur
 
 ---
 
+## BUG-017: `write_key_to_file` chmod-after-write race — 32-byte DB/PSK key briefly world-readable on multi-user Unix
+
+| Field | Detail |
+| ------- | -------- |
+| **Date** | 2026-04-21 |
+| **Severity** | Medium (caught pre-production by Session 21 Opus-solo adversarial pass; codex:rescue quota-exhausted until 2026-04-26) |
+| **Symptom** | When the OS keyring was unavailable and `get_or_create_db_key_with_store` fell back to the file-based key store, `write_key_to_file` called `std::fs::write(path, encoded)` first and THEN ran `std::fs::set_permissions(path, 0o600)` in a `#[cfg(unix)]` block. Between those two syscalls the file existed with the process's umask permissions — typically `0o644` on macOS and most Linux dev boxes. On a multi-user host (shared dev server, macOS account shared by admin + user) a co-resident user could `cat ~/Library/Application\ Support/AccessBridge/db.key` during that microsecond window and read the base64-encoded 32-byte SQLCipher master key. With the key, the user's `profile.db` becomes decryptable. Same class applies to the `pair-psk` file via `load_or_create_psk_via_keyring`. |
+| **Root Cause** | Classic POSIX chmod-after-open race. `std::fs::write` opens with mode-from-umask; `std::fs::set_permissions` subsequently narrows it. No exploit was possible in single-user-account scenarios (only one user can reach the file anyway), but the code shipped without the defense-in-depth mode-on-create step that the Unix standard library supports via `std::os::unix::fs::OpenOptionsExt::mode(0o600)`. |
+| **Fix** | `packages/desktop-agent/src-tauri/src/crypto.rs` `write_key_to_file` — rewritten so that on Unix the file is opened via `OpenOptions::new().write(true).create(true).truncate(true).mode(0o600).open(path)` BEFORE any bytes are written. The file therefore never exists at any other mode. A follow-up `set_permissions(0o600)` still runs to cover the case where the file pre-existed with broader permissions (OpenOptionsExt::mode only applies on file creation, not on truncate-open of an existing file). Windows uses `std::fs::write` unchanged since NTFS inherits the per-user ACL from the parent `%LOCALAPPDATA%\AccessBridge\` directory. |
+| **Files Changed** | `packages/desktop-agent/src-tauri/src/crypto.rs` |
+| **Commit** | (pending — Session 21 combined commit) |
+| **Prevention** | **Any time a sensitive file is written on Unix, the 0o600 perm bit MUST be set at creation time via `OpenOptionsExt::mode`, not after-the-fact via `set_permissions`.** The `std::fs::write` convenience function is NEVER safe for secret material on multi-user hosts. Adversarial-pass checklist for future Rust work: grep for `fs::write\|fs::OpenOptions::.*write\|fs::File::create` where the target path holds a secret (`.key`, `.psk`, `secret.*`, `token.*`); confirm the open uses `.mode(0o600)` at creation. Also: when `codex:rescue` is quota-exhausted (it hit daily usage limit on 2026-04-21, recovers 2026-04-26), the `feedback_rescue_fallback` memory mandates an immediate Opus-solo adversarial pass; skipping it because "codex is unavailable" would have shipped this bug. The pass also re-verified no PRAGMA-key SQL leak, no AppleScript injection on the hardcoded Settings URL, no CFRelease/CFRetain imbalance in the macOS AX revert path, and no unbounded-HashMap DoS beyond the single-PSK-authenticated client. |
+
+---
+
 ## Checklist: Version Bump — AUTOMATED (post-commit `a4bd6a1`)
 
 Version bumping is now driven by `./deploy.sh` → `scripts/bump-version.sh --auto` — do **not** hand-edit versions. The checklist is only included here for manual overrides.

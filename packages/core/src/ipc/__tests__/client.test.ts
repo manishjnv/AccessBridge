@@ -459,6 +459,28 @@ describe('AgentClient — timeouts & reconnect', () => {
   });
 });
 
+describe('AgentClient — getAgentInfo()', () => {
+  it('getAgentInfo() returns null before handshake completes', () => {
+    const { client } = setupClient();
+    expect(client.getAgentInfo()).toBeNull();
+    client.dispose();
+  });
+
+  it('getAgentInfo() returns server AgentInfo after successful handshake, then null after disconnect', async () => {
+    const { client, box } = setupClient();
+    await doHandshake(client, box);
+    const info = client.getAgentInfo();
+    expect(info).not.toBeNull();
+    expect(info?.platform).toBe('windows');
+    expect(info?.version).toBe('0.1.0');
+    expect(info?.capabilities).toEqual(['uia']);
+
+    client.disconnect();
+    expect(client.getAgentInfo()).toBeNull();
+    client.dispose();
+  });
+});
+
 describe('AgentClient — disconnect & dispose', () => {
   it('disconnect() clears reconnect timer and rejects pending requests', async () => {
     const { client, box } = setupClient();

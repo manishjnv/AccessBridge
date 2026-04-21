@@ -40,8 +40,13 @@ export default function App() {
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [updateStep, setUpdateStep] = useState<'idle' | 'downloading' | 'downloaded' | 'reloading'>('idle');
-  // --- Session 19: Desktop Agent ---
-  const [agentStatus, setAgentStatus] = useState<{ connected: boolean; state: string; server: { version: string } | null }>({ connected: false, state: 'idle', server: null });
+  // --- Session 19 / 21: Desktop Agent ---
+  const [agentStatus, setAgentStatus] = useState<{
+    connected: boolean;
+    state: string;
+    server: { version: string; platform?: string; capabilities?: string[] } | null;
+    agentInfo: { version: string; platform: string; capabilities: string[] } | null;
+  }>({ connected: false, state: 'idle', server: null, agentInfo: null });
   const [showPairDialog, setShowPairDialog] = useState(false);
   const [pskInput, setPskInput] = useState('');
   const [pairError, setPairError] = useState<string | null>(null);
@@ -416,10 +421,24 @@ export default function App() {
 
 // ---------- Tab panels ----------
 
+// --- Session 21: platform display helper ---
+function formatPlatform(p: string): string {
+  if (p === 'macos') return 'macOS';
+  if (p === 'windows') return 'Windows';
+  if (p === 'linux') return 'Linux';
+  // Capitalise first letter for unknown platforms
+  return p.charAt(0).toUpperCase() + p.slice(1);
+}
+
 function OverviewTab({ score, activeCount, agentStatus, onPairClick }: {
   score: number;
   activeCount: number;
-  agentStatus: { connected: boolean; state: string; server: { version: string } | null };
+  agentStatus: {
+    connected: boolean;
+    state: string;
+    server: { version: string; platform?: string; capabilities?: string[] } | null;
+    agentInfo: { version: string; platform: string; capabilities: string[] } | null;
+  };
   onPairClick: () => void;
 }) {
   const scoreColor =
@@ -466,11 +485,14 @@ function OverviewTab({ score, activeCount, agentStatus, onPairClick }: {
           <div>
             <div style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0' }}>Desktop Agent</div>
             <div style={{ fontSize: 11, color: '#94a3b8' }}>
-              {agentStatus.connected ? `Connected (v${agentStatus.server?.version ?? '?'})` :
-               agentStatus.state === 'handshaking' ? 'Pairing...' :
-               agentStatus.state === 'connecting' ? 'Connecting...' :
-               agentStatus.state === 'error' ? 'Error' :
-               'Not installed'}
+              {agentStatus.connected
+                ? agentStatus.agentInfo
+                  ? `Connected (${formatPlatform(agentStatus.agentInfo.platform)}, v${agentStatus.agentInfo.version})`
+                  : `Connected (v${agentStatus.server?.version ?? '?'})`
+                : agentStatus.state === 'handshaking' ? 'Pairing...'
+                : agentStatus.state === 'connecting' ? 'Connecting...'
+                : agentStatus.state === 'error' ? 'Error'
+                : 'Not installed'}
             </div>
           </div>
         </div>

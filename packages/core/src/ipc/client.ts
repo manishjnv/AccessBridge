@@ -45,6 +45,8 @@ export class AgentClient {
 
   getState(): ConnectionState { return this.state; }
   getServerInfo(): AgentInfo | null { return this.serverInfo; }
+  /** Alias for getServerInfo() — returns the agent-side AgentInfo from HELLO_ACK, or null. */
+  getAgentInfo(): AgentInfo | null { return this.serverInfo; }
   isConnected(): boolean { return this.state === 'connected'; }
 
   onState(h: StateHandler): () => void {
@@ -76,6 +78,7 @@ export class AgentClient {
     // Reject pending before closing so synchronous close events don't double-reject.
     this.rejectPending(new Error('disconnected'));
     if (this.ws) { try { this.ws.close(); } catch {} this.ws = null; }
+    this.serverInfo = null;
     this.setState('disconnected');
   }
 

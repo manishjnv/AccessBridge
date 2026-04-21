@@ -27,6 +27,7 @@ use crate::ipc_protocol::{
     encode_message, parse_message, AgentInfo, AgentMessage, Adaptation, NativeElementInfo,
     NativeTargetHint,
 };
+use crate::platform::AccessibilityAdapter;
 use crate::profile_store::ProfileStore;
 
 pub const DEFAULT_PORT: u16 = 8901;
@@ -61,6 +62,97 @@ impl std::fmt::Display for UiaError {
             UiaError::NotFound => write!(f, "adaptation not found"),
             UiaError::PermissionDenied => write!(f, "permission denied"),
             UiaError::Platform(msg) => write!(f, "platform error: {msg}"),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// AdapterShim — bridges Arc<dyn AccessibilityAdapter> → UiaDispatch.
+//
+// `dyn AccessibilityAdapter` does not auto-impl `UiaDispatch` (Rust's orphan
+// rules prevent a blanket `impl<T: AccessibilityAdapter> UiaDispatch for T`
+// from being used through a trait object).  Instead, `AdapterShim` is a
+// thin newtype that holds the `Arc` and delegates each `UiaDispatch` method
+// to the corresponding `AccessibilityAdapter` method.
+//
+// Usage: `AdapterShim::new(make_adapter())` — the result implements
+// `UiaDispatch + Send + Sync` and can be wrapped in an `Arc` for
+// `ServerContext::uia`.  The existing `dispatch()` and all its tests are
+// completely unchanged.
+// ---------------------------------------------------------------------------
+
+/// Newtype wrapping `Arc<dyn AccessibilityAdapter>` so it can be stored in
+/// `ServerContext::uia: Arc<dyn UiaDispatch + Send + Sync>`.
+///
+/// Holds a `HashMap<adaptation_id, AdaptationHandle>` so that `revert()` can
+/// find the original handle produced by `apply()`. Without this, revert would
+/// silently no-op — the handle was dropped at the end of `apply()`.
+pub struct AdapterShim {
+    adapter: Arc<dyn AccessibilityAdapter>,
+    state: std::sync::Mutex<std::collections::HashMap<String, crate::platform::AdaptationHandle>>,
+}
+
+impl AdapterShim {
+    pub fn new(inner: Arc<dyn AccessibilityAdapter>) -> Self {
+        AdapterShim {
+            adapter: inner,
+            state: std::sync::Mutex::new(std::collections::HashMap::new()),
+        }
+    }
+}
+
+fn map_adapter_err(e: crate::platform::AdapterError) -> UiaError {
+    match e {
+        crate::platform::AdapterError::Unsupported(msg) => UiaError::Platform(msg),
+        crate::platform::AdapterError::PermissionDenied(msg) => UiaError::Platform(msg),
+        crate::platform::AdapterError::ElementNotFound => UiaError::UnsupportedTarget,
+        crate::platform::AdapterError::PlatformError(msg) => UiaError::Platform(msg),
+    }
+}
+
+impl UiaDispatch for AdapterShim {
+    fn inspect(&self, target: Option<NativeTargetHint>) -> Vec<NativeElementInfo> {
+        match target {
+            None => self.adapter.list_top_level_windows().unwrap_or_default(),
+            Some(hint) => match self.adapter.find_element(&hint) {
+                Ok(Some(el)) => vec![el.info().clone()],
+                _ => Vec::new(),
+            },
+        }
+    }
+
+    fn apply(
+        &self,
+        target: NativeTargetHint,
+        adaptation: Adaptation,
+    ) -> Result<String, UiaError> {
+        let id = adaptation.id.clone();
+        match self.adapter.apply_adaptation(&target, &adaptation) {
+            Ok(handle) => {
+                if let Ok(mut s) = self.state.lock() {
+                    s.insert(id.clone(), handle);
+                }
+                Ok(id)
+            }
+            Err(e) => Err(map_adapter_err(e)),
+        }
+    }
+
+    fn revert(&self, adaptation_id: &str) -> Result<(), UiaError> {
+        // Session 21 fix: AdapterShim holds a HashMap<id, AdaptationHandle>
+        // populated in apply().  revert() looks up the handle, removes it,
+        // and delegates to the adapter.  If the id is unknown return NotFound
+        // so the extension can surface a clear error.
+        let handle = {
+            let mut s = self
+                .state
+                .lock()
+                .map_err(|_| UiaError::Platform("adapter state lock poisoned".into()))?;
+            s.remove(adaptation_id)
+        };
+        match handle {
+            Some(h) => self.adapter.revert_adaptation(h).map_err(map_adapter_err),
+            None => Err(UiaError::NotFound),
         }
     }
 }

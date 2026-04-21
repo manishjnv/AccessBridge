@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  AccessBridge Desktop Agent — supplementary macOS Info.plist keys.
+  Tauri merges these into the final .app bundle's Info.plist at build time
+  when this file is present. Keys here supply the usage-description strings
+  that macOS requires before showing the TCC permission prompt to the user.
+  Without these, macOS shows a generic (and alarming) fallback string.
+-->
+<plist version="1.0">
+<dict>
+    <!--
+      NSAppleEventsUsageDescription
+      Shown in the System Settings → Privacy & Security → Automation panel
+      when the agent first sends an Apple Event to another app (e.g. Safari
+      or system UI server via the AppleScript bridge). Keep this string
+      honest and specific — App Store review rejects vague descriptions.
+    -->
+    <key>NSAppleEventsUsageDescription</key>
+    <string>AccessBridge uses AppleScript to adapt native app content for users with accessibility needs. No data leaves your machine.</string>
+
+    <!--
+      NSAccessibilityUsageDescription
+      Shown in System Settings → Privacy & Security → Accessibility when the
+      agent requests the AXUIElement API. Required for the NSAccessibility
+      adapter (Session 21 Part 3) to query and mutate on-screen UI elements
+      for font scaling, contrast, and focus management.
+    -->
+    <key>NSAccessibilityUsageDescription</key>
+    <string>AccessBridge needs accessibility access to adapt native Mac apps (font scaling, contrast) for your profile. No keystrokes or content are logged.</string>
+</dict>
+</plist>

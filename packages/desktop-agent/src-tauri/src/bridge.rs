@@ -1,5 +1,6 @@
 //! Tauri commands exposed to the React settings window.
 
+use crate::permissions;
 use crate::profile_store::ProfileStore;
 use serde_json::Value;
 use tauri::State;
@@ -43,4 +44,21 @@ pub fn bridge_read_pair_key_b64() -> Result<String, String> {
     let (_file, psk) =
         crate::crypto::PairKeyFile::from_json(&raw).map_err(|e| format!("parse: {e}"))?;
     Ok(psk.to_base64())
+}
+
+/// Return the current accessibility permission status for this process.
+///
+/// Always `"granted"` on Windows and Linux. On macOS reflects real TCC state.
+#[tauri::command]
+pub fn bridge_check_accessibility_permission() -> permissions::PermissionStatus {
+    permissions::check_accessibility_permission()
+}
+
+/// Prompt the user to grant accessibility access (macOS only; no-op elsewhere).
+///
+/// Returns `Ok(())` on success or an error string if the helper process fails
+/// to spawn (macOS only).
+#[tauri::command]
+pub fn bridge_request_accessibility_permission() -> Result<(), String> {
+    permissions::request_accessibility_permission().map_err(|e| e.to_string())
 }

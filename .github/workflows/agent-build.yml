@@ -1,0 +1,97 @@
+name: Agent Build
+
+on:
+  push:
+    tags: ['v*']
+    paths:
+      - 'packages/desktop-agent/**'
+      - '.github/workflows/agent-build.yml'
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: pnpm
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.os == 'macos-latest' && 'x86_64-apple-darwin,aarch64-apple-darwin' || 'x86_64-pc-windows-msvc' }}
+
+      # Cache Cargo registry + compiled deps so subsequent runs skip
+      # recompiling unchanged crates (~5-10 min saved on the first cache hit).
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            packages/desktop-agent/src-tauri/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('packages/desktop-agent/src-tauri/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Install pnpm dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build agent installer (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: bash
+        run: bash tools/build-agent-installer.sh
+
+      - name: Build agent installer (macOS universal)
+        if: matrix.os == 'macos-latest'
+        run: bash tools/build-agent-installer.sh
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-${{ matrix.os }}
+          path: deploy/downloads/accessbridge-desktop-agent_*
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    # Only run on version tags, not on branch pushes that happen to touch the
+    # desktop-agent paths. The tag push is the release signal.
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    permissions:
+      contents: write  # required by softprops/action-gh-release to create releases
+
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+
+      - name: List staged files (diagnostic)
+        run: find . -name 'accessbridge-desktop-agent_*' | sort
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          # Glob must span both artifact directories downloaded by the
+          # download-artifact action (agent-windows-latest/, agent-macos-latest/)
+          files: 'agent-*/accessbridge-desktop-agent_*'
+          generate_release_notes: true

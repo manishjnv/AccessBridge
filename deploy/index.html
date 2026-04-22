@@ -2048,6 +2048,12 @@
       font-size: 12px;
       color: var(--muted);
     }
+    .btn.is-disabled {
+      pointer-events: none;
+      opacity: 0.55;
+      cursor: not-allowed;
+      filter: grayscale(0.3);
+    }
     .muted { color: var(--muted); }
 
     /* ---------- Session 24: Team Deployment ---------- */
@@ -3086,8 +3092,8 @@
         </div>
       </div>
       <div class="agent-cta">
-        <a href="/downloads/accessbridge-desktop-agent.msi" class="btn btn-primary" id="agent-download">Download Desktop Agent (MSI)</a>
-        <span class="agent-version muted" id="agent-version">v0.1.0 · <span id="agent-hash">sha256 pending</span></span>
+        <a href="#" class="btn btn-primary is-disabled" id="agent-download" aria-disabled="true">Desktop Agent (MSI) — checking availability…</a>
+        <span class="agent-version muted" id="agent-version"><span id="agent-hash"></span></span>
       </div>
     </div>
   </section>
@@ -3715,15 +3721,58 @@
   <script>
     (async () => {
       try {
-        const resp = await fetch('/downloads/accessbridge-desktop-agent.msi.sha256');
-        if (resp.ok) {
-          const text = (await resp.text()).trim();
-          const hash = text.split(/\s+/)[0];
-          if (hash && hash.length === 64) {
-            document.getElementById('agent-hash').textContent = 'sha256 ' + hash.slice(0, 16) + '\u2026';
-          }
+        // Resolve Desktop Agent download URL + version + sha256 from
+        // /downloads/agent-manifest.json (written by tools/build-agent-installer.sh).
+        // If the manifest is absent (CI failing / builds pending), degrade the CTA
+        // gracefully instead of leaving it pointed at a 404.
+        // Follows BUG-004 prevention: version + URL are never hardcoded in HTML.
+        const btn  = document.getElementById('agent-download');
+        const ver  = document.getElementById('agent-version');
+        const hashEl = document.getElementById('agent-hash');
+        if (!btn || !ver || !hashEl) return;
+
+        const setUnavailable = (reason) => {
+          btn.textContent = 'Desktop Agent — build pending';
+          btn.setAttribute('aria-disabled', 'true');
+          btn.classList.add('is-disabled');
+          btn.removeAttribute('href');
+          ver.textContent = reason;
+        };
+
+        const resp = await fetch('/downloads/agent-manifest.json', { cache: 'no-store' });
+        if (!resp.ok) { setUnavailable('Installer not yet published — check back soon'); return; }
+
+        const manifest = await resp.json();
+        const winArt = manifest && manifest.artifacts && manifest.artifacts['windows-x86_64'];
+        const file   = winArt && typeof winArt.file === 'string' ? winArt.file : null;
+        const sha    = winArt && typeof winArt.sha256 === 'string' ? winArt.sha256 : null;
+        const version = typeof manifest.version === 'string' ? manifest.version : '';
+
+        if (!file) { setUnavailable('Installer not yet published — check back soon'); return; }
+
+        // Cache-bust with the version (BUG-010 prevention — CDN edge caches by URL).
+        const href = '/downloads/' + encodeURIComponent(file) + (version ? ('?v=' + encodeURIComponent(version)) : '');
+        btn.setAttribute('href', href);
+        btn.textContent = 'Download Desktop Agent (MSI)';
+        btn.removeAttribute('aria-disabled');
+        btn.classList.remove('is-disabled');
+
+        const versionLabel = version ? ('v' + version) : '';
+        const hashLabelSuffix = '…';
+        const hashLabel    = (sha && sha.length === 64) ? ('sha256 ' + sha.slice(0, 16) + hashLabelSuffix) : '';
+        if (versionLabel && hashLabel) {
+          ver.textContent = versionLabel + ' · ';
+          hashEl.textContent = hashLabel;
+          ver.appendChild(hashEl);
+        } else {
+          ver.textContent = versionLabel || hashLabel;
         }
-      } catch {}
+      } catch (e) {
+        const btn2 = document.getElementById('agent-download');
+        const ver2 = document.getElementById('agent-version');
+        if (btn2) { btn2.textContent = 'Desktop Agent — build pending'; btn2.setAttribute('aria-disabled', 'true'); btn2.classList.add('is-disabled'); btn2.removeAttribute('href'); }
+        if (ver2) { ver2.textContent = 'Installer not yet published — check back soon'; }
+      }
     })();
   </script>
   <script>

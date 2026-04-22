@@ -1,6 +1,34 @@
 # AccessBridge - Shift Handoff
 
-## Last Session: Session 27 — Desktop Agent MSI v0.21.0 published (first one-click Windows install) + v0.25.3 Session-26 deploy shipped + 2 new RCA entries (BUG-026 installer-path / BUG-027 Strawberry-Perl prereq) (2026-04-22)
+## Last Session: Session 28 — FINDING-PENTEST-001 CLOSED in prod (Cloudflare TLS 1.2 enforced on accessbridge.space) + enforce-min-tls.sh tooling + probe_tls10 "0000" bug fix + BUG-028 exposed-token process RCA (2026-04-22)
+
+### Headline
+
+Closed the last HIGH finding from Session 26. Cloudflare `accessbridge.space` zone `min_tls_version: 1.0 → 1.2` PATCHed via scoped `Zone.Zone Settings: Edit` token (1-day TTL). Post-PATCH: `curl --tlsv1.0 --tls-max 1.0 https://accessbridge.space/` exits 35 with `SEC_E_UNSUPPORTED_FUNCTION` (handshake cryptographically refused); TLS 1.2 continues 200. Three artefacts shipped: [tools/ops/enforce-min-tls.sh](tools/ops/enforce-min-tls.sh) idempotent zone-settings PATCH tool with `--token-file` (mode ≤ 0o600 on Unix, symlink-refused, ≥ 20-char content gate, Windows NTFS-ACL-bypass notice); [docs/operations/cloudflare-hardening.md](docs/operations/cloudflare-hardening.md) runbook; [.github/workflows/cve-watch.yml](.github/workflows/cve-watch.yml) `tls-min-version` nightly regression probe (labeled issue on any drift). **Probe-logic bug surfaced during production run**: `probe_tls10()` concatenated curl's `%{http_code}` (`000` on refusal) with a `|| echo "0"` fallback, producing `"0000"` that the caller's `== "0"` check missed — false-positive "still open" reports after a successful rejection. Fixed by separating curl exit status from stdout and returning a sentinel string (`REJECTED` / `ACCEPTED-<code>`). Re-run exits 0. **Exposed-token process incident (BUG-028)**: user pasted a CF API token into chat as the prompt argument of my `read -rs` one-liner — token ended up in the transcript. Detected via `/user/tokens/verify` that the exposed token was still `active` (expires 2026-04-23 23:59:59Z, ~46h window); alerted user with dashboard revoke path + token id `0c3b1715a0437b9dc509c2702eb84e03`. Contributing factors: (a) I didn't lead with a big `🚨 DO NOT PASTE THIS IN CHAT` warning above the template; (b) I defaulted to bash syntax while the user was in PowerShell, so the one-liner errored line-by-line which re-exposed the intended-to-be-secret token in the error echoes; (c) `Read-Host -AsSecureString` blocks the secret but requires the user to *type at the prompt*, which breaks down when the user is copy-pasting a multi-line block. Corrected flow (final successful run): Notepad-write the token to `~/.cf-min-tls-token`, `shred -u` after use. New feedback memory `feedback_secrets_never_in_chat` codifies the anti-pattern. PowerShell persistent history (`$env:APPDATA\Microsoft\Windows\PowerShell\PSReadLine\ConsoleHost_history.txt`) scrubbed of 5 lines matching `cf-min-tls|CF_API_TOKEN|Read-Host -AsSecureString|cfut_`. **Session 26 post-fix tally is now 0 CRITICAL / 0 HIGH / 0 CVE / TLS 1.2 minimum enforced.** Four commits on `origin/main` this cycle: `0fbd14e fix(security):` enforcement tooling + nightly verify, `75b1db2 feat(ops):` `--token-file` + mode/symlink guards, `08dd40b docs(cloudflare-hardening):` MD036 lint fix, `b2adf57 fix(security):` close PENTEST-001 + fix `probe_tls10`.
+
+### Shipped
+
+- **`tools/ops/enforce-min-tls.sh`** — idempotent Cloudflare min-TLS-version enforcer. Resolves zone id → reads current → PATCHes if different → 10-second propagation wait → verifies via curl TLS 1.0 probe. Supports `--zone`, `--min-version {1.0,1.1,1.2,1.3}`, `--token-file <path>`, `--dry-run`, `--verify-only`. Exit codes 0/1/2/3/4/5 (5 = token-file rejected). Token never on argv.
+- **`docs/operations/cloudflare-hardening.md`** — full runbook: API-token creation steps with zone-scoped permissions, two token-input options (`--token-file` preferred vs `CF_API_TOKEN` env), rollback procedure, Windows-vs-Unix mode-check bypass notes, nightly-verify automation recipe.
+- **`.github/workflows/cve-watch.yml` `tls-min-version` job** — runs `enforce-min-tls.sh --verify-only` on the daily CVE-watch schedule; opens a labeled security issue on any regression (rogue Page Rule override, dashboard config drift, CF default rollback).
+- **Production PATCH** — CF zone `f95f0b6f8d96d387b68d774df844606b` `min_tls_version: 1.0 → 1.2`. Verified via three independent channels: (1) CF API re-read returns `"value": "1.2"`; (2) `curl --tlsv1.2 --tls-max 1.2 https://accessbridge.space/ → 200`; (3) `curl --tlsv1.0 --tls-max 1.0 https://accessbridge.space/ → curl: (35) SEC_E_UNSUPPORTED_FUNCTION`.
+- **RCA entry BUG-028** — process bug: chat-leaked API token with measurable impact (46-hour exploit window). Prevention rules added to `feedback_secrets_never_in_chat` memory.
+- **PowerShell history scrub** — 5 lines matching `cf-min-tls|CF_API_TOKEN|Read-Host -AsSecureString|cfut_` removed from `ConsoleHost_history.txt`; current-session in-memory history left to user (runs `Clear-History` if desired).
+
+### Open action on user side
+
+- **Revoke the exposed token** at <https://dash.cloudflare.com/profile/api-tokens> — token id `0c3b1715a0437b9dc509c2702eb84e03`, auto-expires 2026-04-23 23:59:59Z but should be killed manually immediately. Scope is bounded (Zone.Zone Settings: Edit on accessbridge.space only), worst-case an attacker could revert the TLS 1.2 setting or tamper with other zone settings (WAF, cache, page rules) — but not DNS, not other tokens, not account-level.
+
+### Agent utilization
+
+Opus: Phase 0 re-scoped the "HIGH open" item by re-reading the audit report; wrote `enforce-min-tls.sh` + runbook + `cve-watch.yml` job; ran production PATCH + verification; caught + fixed `probe_tls10` "0000" bug surfaced by the run; detected exposed-token incident via `/user/tokens/verify`; PowerShell history scrubbed; wrote BUG-028 RCA + `feedback_secrets_never_in_chat` memory; authored this HANDOFF entry.
+Sonnet: n/a — single-file tooling + focused doc edits didn't warrant a subagent dispatch.
+Haiku: n/a — no bulk greps or post-deploy sweeps; the `--verify-only` curl probe was the one fact-check and it ran Opus-direct.
+codex:rescue: n/a — Session 26 already cleared the adversarial floor; no new security-adjacent code landed this session beyond the enforcement tooling itself (which is admin-ops, not shipped client code, and the Opus-solo pass in Session 26 covers its threat model).
+
+---
+
+## Previous Session: Session 27 — Desktop Agent MSI v0.21.0 published (first one-click Windows install) + v0.25.3 Session-26 deploy shipped + 2 new RCA entries (BUG-026 installer-path / BUG-027 Strawberry-Perl prereq) (2026-04-22)
 
 ### Headline
 

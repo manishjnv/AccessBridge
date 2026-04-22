@@ -90,6 +90,23 @@
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
+      line-height: 1.05;
+    }
+    .navbar-brand .brand-lockup {
+      display: inline-flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+    .navbar-brand .brand-tagline {
+      font-size: 10px;
+      font-weight: 500;
+      color: var(--muted);
+      letter-spacing: 0.3px;
+      white-space: nowrap;
+      text-transform: none;
+    }
+    @media (max-width: 640px) {
+      .navbar-brand .brand-tagline { display: none; }
     }
     .navbar-links { display: flex; gap: 20px; align-items: center; }
     .navbar-links a {
@@ -2248,7 +2265,10 @@
               <path d="M24 36 L40 36" stroke-width="5.5"/>
             </svg>
           </span>
-          <span class="brand-text">AccessBridge</span>
+          <span class="brand-lockup">
+            <span class="brand-text">AccessBridge</span>
+            <span class="brand-tagline">Accessibility that notices.</span>
+          </span>
         </a>
         <div class="navbar-stats" aria-label="Coverage quick stats">
           <a href="#/reach" class="nav-stat nav-stat-highlight" title="28 languages supported — 10 Indian + English + 17 global"><span class="nav-stat-value">28</span>Languages</a>

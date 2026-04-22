@@ -1,6 +1,6 @@
 # Cloudflare Edge Hardening Runbook
 
-**Session 26 follow-up — closes FINDING-PENTEST-001 (HIGH)**
+> Session 26 follow-up — closes FINDING-PENTEST-001 (HIGH)
 
 The Session 26 safe-pentest confirmed the Cloudflare edge at `accessbridge.space` accepts TLS 1.0 handshakes. Modern baseline is TLS 1.2 minimum. This is the only HIGH finding still open from the Session 26 audit; it is an infrastructure/dashboard action, not a code change — hence this runbook.
 

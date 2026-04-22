@@ -1,6 +1,6 @@
 {
   "name": "accessbridge",
-  "version": "0.26.1",
+  "version": "0.26.2",
   "private": true,
   "description": "A11yOS - The Ambient Accessibility Operating Layer",
   "scripts": {

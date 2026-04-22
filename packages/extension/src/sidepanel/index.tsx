@@ -13,6 +13,8 @@ import VisionPanel from './vision/VisionPanel.js';
 import VisionLabPanel from './vision/VisionLabPanel.js';
 // --- Session 11: Multi-Modal Fusion ---
 import IntelligencePanel from './intelligence/IntelligencePanel.js';
+// --- Session 24: Team Pilot Feedback ---
+import PilotFeedbackPanel from './pilot/PilotFeedbackPanel.js';
 
 type SidePanelTab = 'dashboard' | 'audit' | 'actions' | 'vision' | 'vision-lab' | 'intelligence' | 'compliance' | 'native-apps';
 
@@ -723,6 +725,11 @@ function SidePanel() {
           <AuditPanel />
         ) : (
         <>
+        {/* Session 24: Pilot feedback — renders only when profile.pilotId is set */}
+        {profile?.pilotId && (
+          <PilotFeedbackPanel pilotId={profile.pilotId} />
+        )}
+
         {/* Disabled banner */}
         {!enabled && (
           <div

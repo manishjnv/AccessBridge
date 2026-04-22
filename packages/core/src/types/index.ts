@@ -10,6 +10,8 @@ export {
   DEFAULT_COGNITIVE_PROFILE,
   DEFAULT_MOTOR_PROFILE,
   DEFAULT_PROFILE,
+  PILOT_ID_PATTERN,
+  isValidPilotId,
 } from './profile.js';
 
 export { SignalType, EnvironmentSignalType } from './signals.js';

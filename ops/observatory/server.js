@@ -102,7 +102,45 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_attestations_date ON attestations(date);
   CREATE INDEX IF NOT EXISTS idx_attestations_ring ON attestations(ring_version);
+
+  -- Session 24: Pilot Rollout Orchestrator schema
+  CREATE TABLE IF NOT EXISTS pilots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    preset TEXT NOT NULL,
+    target_size INTEGER NOT NULL,
+    start_date TEXT NOT NULL,
+    end_date TEXT NOT NULL,
+    contact_email TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS pilot_enrollments (
+    pilot_id INTEGER NOT NULL,
+    device_pub_key TEXT NOT NULL,
+    enrolled_at INTEGER NOT NULL,
+    PRIMARY KEY (pilot_id, device_pub_key)
+  );
+  CREATE INDEX IF NOT EXISTS idx_pilot_enrollments_pilot_id ON pilot_enrollments(pilot_id);
+  CREATE TABLE IF NOT EXISTS pilot_feedback (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    pilot_id INTEGER NOT NULL,
+    rating INTEGER NOT NULL CHECK(rating BETWEEN 1 AND 5),
+    comment_hash TEXT,
+    comment_text TEXT,
+    device_hash TEXT NOT NULL,
+    submitted_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_pilot_feedback_pilot_id ON pilot_feedback(pilot_id);
 `);
+
+// Safe ALTER: add pilot_id column to attestations if missing (idempotent)
+{
+  const attestationsCols = db.prepare('PRAGMA table_info(attestations)').all();
+  const hasPilotId = attestationsCols.some((c) => c.name === 'pilot_id');
+  if (!hasPilotId) {
+    db.exec('ALTER TABLE attestations ADD COLUMN pilot_id INTEGER');
+  }
+}
 
 // ---------- Middleware ----------
 app.use(express.json({ limit: '64kb' }));
@@ -187,6 +225,89 @@ setInterval(() => {
     if (now - v.windowStart > ENROLL_RATE_WINDOW_MS * 3) enrollBuckets.delete(k);
   }
 }, ENROLL_RATE_WINDOW_MS).unref();
+
+// ---------- Session 24: Admin token gate ----------
+const PILOT_ADMIN_TOKEN = process.env.PILOT_ADMIN_TOKEN || null;
+
+function requirePilotAdmin(req, res, next) {
+  if (!PILOT_ADMIN_TOKEN) {
+    return res.status(503).json({ error: 'pilot admin disabled; PILOT_ADMIN_TOKEN env var not set' });
+  }
+  const auth = req.headers.authorization || '';
+  const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+  // Constant-time compare to avoid timing oracles on token.
+  // Pad both to the same length before comparison; then also check lengths match.
+  const maxLen = Math.max(token.length, PILOT_ADMIN_TOKEN.length);
+  const a = Buffer.from(token.padEnd(maxLen, '\0'));
+  const b = Buffer.from(PILOT_ADMIN_TOKEN.padEnd(maxLen, '\0'));
+  const timingSafe = crypto.timingSafeEqual(a, b);
+  if (!timingSafe || token.length !== PILOT_ADMIN_TOKEN.length) {
+    return res.status(401).json({ error: 'invalid admin token' });
+  }
+  next();
+}
+
+// ---------- Session 24: Pilot-specific rate limiters ----------
+// BUG-013 pattern: prune expired entries on INSERT, not on READ.
+
+// 10 req/hour per IP for device enrollment
+const PILOT_ENROLL_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+const PILOT_ENROLL_LIMIT = 10;
+const pilotEnrollBuckets = new Map();
+
+function pilotEnrollRateLimit(req, res, next) {
+  const ip = req.ip || req.headers['x-forwarded-for'] || 'unknown';
+  const now = Date.now();
+  // Prune stale entries on write (BUG-013)
+  for (const [k, v] of pilotEnrollBuckets.entries()) {
+    if (now - v.windowStart > PILOT_ENROLL_WINDOW_MS * 2) pilotEnrollBuckets.delete(k);
+  }
+  let bucket = pilotEnrollBuckets.get(ip);
+  if (!bucket) {
+    bucket = { count: 0, windowStart: now };
+    pilotEnrollBuckets.set(ip, bucket);
+  }
+  if (now - bucket.windowStart > PILOT_ENROLL_WINDOW_MS) {
+    bucket.count = 0;
+    bucket.windowStart = now;
+  }
+  bucket.count += 1;
+  if (bucket.count > PILOT_ENROLL_LIMIT) {
+    return res.status(429).json({ error: 'rate limited' });
+  }
+  next();
+}
+
+// 5 req/hour per device_hash for feedback
+const PILOT_FEEDBACK_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+const PILOT_FEEDBACK_LIMIT = 5;
+const pilotFeedbackBuckets = new Map();
+
+function pilotFeedbackRateLimit(req, res, next) {
+  // Key on device_hash from body; fall back to IP if absent
+  const key = (req.body && typeof req.body.device_hash === 'string' && req.body.device_hash)
+    ? `dh:${req.body.device_hash}`
+    : `ip:${req.ip || 'unknown'}`;
+  const now = Date.now();
+  // Prune stale entries on write (BUG-013)
+  for (const [k, v] of pilotFeedbackBuckets.entries()) {
+    if (now - v.windowStart > PILOT_FEEDBACK_WINDOW_MS * 2) pilotFeedbackBuckets.delete(k);
+  }
+  let bucket = pilotFeedbackBuckets.get(key);
+  if (!bucket) {
+    bucket = { count: 0, windowStart: now };
+    pilotFeedbackBuckets.set(key, bucket);
+  }
+  if (now - bucket.windowStart > PILOT_FEEDBACK_WINDOW_MS) {
+    bucket.count = 0;
+    bucket.windowStart = now;
+  }
+  bucket.count += 1;
+  if (bucket.count > PILOT_FEEDBACK_LIMIT) {
+    return res.status(429).json({ error: 'rate limited' });
+  }
+  next();
+}
 
 // ---------- Validation ----------
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -1188,6 +1309,604 @@ app.get('/api/observatory/compliance/eaa', rateLimit, (req, res) => {
     res.json(buildComplianceReport(days, 'European Accessibility Act 2025 — Article 4'));
   } catch (e) {
     console.error('[observatory/compliance/eaa]', e);
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
+// ==========================================================================
+// Session 24 — Pilot Rollout Orchestrator endpoints (/api/pilot/*)
+//
+// Security invariants:
+//   - Parameterized SQL only (no template-string user input)
+//   - k-anonymity floor = 20 for pilot metrics (higher than global K_ANON_MIN=5)
+//   - BUG-013: rate-limit maps prune on INSERT, not on READ
+//   - BUG-015: never use `key in object` for lookups; use Set/Map
+//   - CSV injection: OWASP prefix-escape every field
+//   - Constant-time admin token compare via crypto.timingSafeEqual
+//   - No PII in logs (pilot_id + IP only)
+// ==========================================================================
+
+const PILOT_K_ANON = 20; // higher floor than global K_ANON_MIN due to small-cohort de-anon risk
+
+// Validation helpers for pilot endpoints
+const PILOT_NAME_RE = /^[a-zA-Z0-9 _-]+$/;
+const PILOT_PRESET_RE = /^[a-z0-9-]+$/;
+// Simple RFC 5322-ish email check (no executable code, just structural validation)
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Validate a YYYY-MM-DD string as an actual calendar date. */
+function isValidISODate(s) {
+  if (typeof s !== 'string' || !DATE_RE.test(s)) return false;
+  const d = new Date(`${s}T00:00:00Z`);
+  return !isNaN(d.getTime()) && d.toISOString().startsWith(s);
+}
+
+/**
+ * CSV injection guard (OWASP):
+ * Prefix any field whose first character is =, +, -, @, \t, or \r with a single quote.
+ * Also stringify and quote fields containing commas or newlines.
+ */
+function csvEscape(value) {
+  const s = value == null ? '' : String(value);
+  // Strip any embedded newlines to keep one-row-per-line invariant
+  const safe = s.replace(/[\r\n]/g, ' ');
+  const INJECTION_CHARS = new Set(['=', '+', '-', '@', '\t', '\r']);
+  const first = safe.charAt(0);
+  const prefix = INJECTION_CHARS.has(first) ? "'" : '';
+  // Quote fields with commas
+  if (safe.includes(',')) return `"${prefix}${safe.replace(/"/g, '""')}"`;
+  return prefix + safe;
+}
+
+/**
+ * Sanitize a free-text comment:
+ * - Truncate at 500 chars
+ * - Strip ASCII control chars (0x00–0x1F except \t and \n) + Unicode Bidi overrides (U+202A..U+202E, U+2066..U+2069)
+ * - HTML-entity encode < > & " ' to prevent XSS on render
+ */
+function sanitizeComment(s) {
+  if (typeof s !== 'string') return null;
+  const truncated = s.slice(0, 500);
+  return truncated
+    // Strip ASCII control chars except tab+newline
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+    // Strip Unicode Bidi override chars (BUG-015 / Session-23 pattern)
+    .replace(/[‪-‮⁦-⁩]/g, '')
+    // HTML-entity encode
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// Stopwords for word-frequency endpoint (English + common Hindi transliteration)
+// Using a Set to avoid BUG-015 proto-pollution via key-in-object lookups.
+const STOPWORDS = new Set([
+  // English
+  'a','an','the','and','or','but','in','on','at','to','for','of','with',
+  'is','are','was','were','be','been','being','have','has','had','do','does',
+  'did','will','would','could','should','may','might','shall','not','no',
+  'it','its','this','that','these','those','i','we','you','he','she','they',
+  'my','our','your','his','her','their','me','us','him','them','what','which',
+  'who','how','when','where','why','all','any','some','very','just','so',
+  // Hindi common transliterations
+  'hai','hain','ka','ki','ke','ko','se','mein','par','aur','yeh','jo','kya',
+  'nahi','nahin','tha','thi','the','hoga','hogi','honge','bhi','hi','toh',
+]);
+
+// Prepared statements for pilot endpoints (compiled once, reused)
+const insertPilot = db.prepare(
+  'INSERT INTO pilots (name, preset, target_size, start_date, end_date, contact_email, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+);
+const findPilotById = db.prepare('SELECT * FROM pilots WHERE id = ?');
+const upsertPilotEnrollment = db.prepare(
+  'INSERT OR IGNORE INTO pilot_enrollments (pilot_id, device_pub_key, enrolled_at) VALUES (?, ?, ?)',
+);
+const countPilotEnrollments = db.prepare(
+  'SELECT COUNT(*) AS n FROM pilot_enrollments WHERE pilot_id = ?',
+);
+const insertPilotFeedback = db.prepare(
+  'INSERT INTO pilot_feedback (pilot_id, rating, comment_hash, comment_text, device_hash, submitted_at) VALUES (?, ?, ?, ?, ?, ?)',
+);
+const countPilotFeedback = db.prepare(
+  'SELECT COUNT(*) AS n FROM pilot_feedback WHERE pilot_id = ?',
+);
+const feedbackAggByDay = db.prepare(
+  `SELECT strftime('%Y-%m-%d', submitted_at / 1000, 'unixepoch') AS date,
+          ROUND(AVG(rating), 2) AS avg_rating,
+          COUNT(*) AS count
+   FROM pilot_feedback
+   WHERE pilot_id = ?
+   GROUP BY date
+   ORDER BY date ASC
+   LIMIT 365`,
+);
+const feedbackAllComments = db.prepare(
+  'SELECT comment_text FROM pilot_feedback WHERE pilot_id = ? AND comment_text IS NOT NULL LIMIT 5000',
+);
+
+// ---------- POST /api/pilot/enrollments — create a new pilot (admin only) ----------
+app.post('/api/pilot/enrollments', requirePilotAdmin, (req, res) => {
+  try {
+    const { name, preset, target_size, start_date, end_date, contact_email } = req.body || {};
+
+    // Validate name
+    if (typeof name !== 'string' || name.length === 0 || name.length > 80 || !PILOT_NAME_RE.test(name)) {
+      return res.status(400).json({ error: 'name must be 1–80 chars, alphanumeric/space/_/-' });
+    }
+    // Validate preset
+    if (typeof preset !== 'string' || !PILOT_PRESET_RE.test(preset)) {
+      return res.status(400).json({ error: 'preset must match /^[a-z0-9-]+$/' });
+    }
+    // Validate target_size
+    if (!Number.isInteger(target_size) || target_size < 10 || target_size > 10000) {
+      return res.status(400).json({ error: 'target_size must be integer 10–10000' });
+    }
+    // Validate dates
+    if (!isValidISODate(start_date) || !isValidISODate(end_date)) {
+      return res.status(400).json({ error: 'start_date and end_date must be valid YYYY-MM-DD' });
+    }
+    if (start_date >= end_date) {
+      return res.status(400).json({ error: 'start_date must be before end_date' });
+    }
+    // Validate email
+    if (typeof contact_email !== 'string' || !EMAIL_RE.test(contact_email)) {
+      return res.status(400).json({ error: 'invalid contact_email' });
+    }
+
+    const created_at = Date.now();
+    let result;
+    try {
+      result = insertPilot.run(name, preset, target_size, start_date, end_date, contact_email, created_at);
+    } catch (e) {
+      if (e && e.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+        return res.status(409).json({ error: 'pilot name exists' });
+      }
+      throw e;
+    }
+
+    res.status(201).json({ pilot_id: result.lastInsertRowid, created_at });
+  } catch (e) {
+    console.error('[pilot/create] pilot_id=new ip=' + (req.ip || 'unknown'), e.message);
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
+// ---------- GET /api/pilot/:id/status — pilot health metrics (public, rate-limited) ----------
+app.get('/api/pilot/:id/status', rateLimit, (req, res) => {
+  try {
+    const pilotId = Number(req.params.id);
+    if (!Number.isInteger(pilotId) || pilotId <= 0) {
+      return res.status(400).json({ error: 'invalid pilot id' });
+    }
+
+    const pilot = findPilotById.get(pilotId);
+    if (!pilot) return res.status(404).json({ error: 'pilot not found' });
+
+    const { n: enrolled_count } = countPilotEnrollments.get(pilotId);
+
+    // Small-cohort gate: k-anon = 20 for pilots
+    if (enrolled_count < PILOT_K_ANON) {
+      return res.json({
+        pilot_id: pilotId,
+        name: pilot.name,
+        enrolled_count,
+        status: 'gated',
+        reason: `pilot cohort below N=${PILOT_K_ANON} disclosure floor`,
+      });
+    }
+
+    // Active in last 24h: devices that published in aggregated_daily within 24h window
+    // We proxy this from pilot_enrollments joined with aggregated_daily via date = today.
+    // struggle_rate and effectiveness_rate are NOT directly derivable from the current
+    // aggregated_daily schema (which stores totals per metric, not per pilot).
+    // They are returned as null with an explanatory note field.
+    const today = todayISO();
+    const activeRow = db.prepare(
+      `SELECT COUNT(DISTINCT pe.device_pub_key) AS n
+       FROM pilot_enrollments pe
+       JOIN aggregated_daily ad ON ad.date = ?
+       WHERE pe.pilot_id = ?
+       LIMIT 1`
+    ).get(today, pilotId);
+    const active_count_24h = activeRow ? activeRow.n : 0;
+
+    // Feature adoption: sum features_enabled metrics across all pilot dates
+    const featureRows = db.prepare(
+      `SELECT REPLACE(metric,'features_enabled:','') AS feature,
+              SUM(total) AS cnt
+       FROM aggregated_daily
+       WHERE metric LIKE 'features_enabled:%'
+         AND date BETWEEN ? AND ?
+       GROUP BY metric
+       ORDER BY cnt DESC
+       LIMIT 20`
+    ).all(pilot.start_date, pilot.end_date);
+
+    const feature_adoption = {};
+    for (const row of featureRows) {
+      feature_adoption[row.feature] = Math.round(row.cnt);
+    }
+
+    res.json({
+      pilot_id: pilotId,
+      name: pilot.name,
+      preset: pilot.preset,
+      target_size: pilot.target_size,
+      enrolled_count,
+      active_count_24h,
+      struggle_rate: null,
+      effectiveness_rate: null,
+      _notes: 'struggle_rate and effectiveness_rate are null: aggregated_daily stores global totals not per-pilot; per-pilot metric attribution requires pilot_id tag on submissions (future work)',
+      feature_adoption,
+    });
+  } catch (e) {
+    console.error('[pilot/status] pilot_id=' + req.params.id + ' ip=' + (req.ip || 'unknown'), e.message);
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
+// ---------- GET /api/pilot/:id/results — end-of-pilot rollup (public, gated) ----------
+app.get('/api/pilot/:id/results', rateLimit, (req, res) => {
+  try {
+    const pilotId = Number(req.params.id);
+    if (!Number.isInteger(pilotId) || pilotId <= 0) {
+      return res.status(400).json({ error: 'invalid pilot id' });
+    }
+
+    const pilot = findPilotById.get(pilotId);
+    if (!pilot) return res.status(404).json({ error: 'pilot not found' });
+
+    const { n: enrolled_count } = countPilotEnrollments.get(pilotId);
+
+    if (enrolled_count < PILOT_K_ANON) {
+      return res.json({
+        pilot_id: pilotId,
+        name: pilot.name,
+        enrolled_count,
+        status: 'gated',
+        reason: `pilot cohort below N=${PILOT_K_ANON} disclosure floor`,
+      });
+    }
+
+    // Duration
+    const durationDays = daysBetween(pilot.start_date, pilot.end_date);
+
+    // Aggregate metrics from aggregated_daily over the pilot date range
+    const metricRows = db.prepare(
+      `SELECT metric, SUM(total) AS total, SUM(device_count) AS device_count
+       FROM aggregated_daily
+       WHERE date BETWEEN ? AND ?
+       GROUP BY metric
+       LIMIT 1000`
+    ).all(pilot.start_date, pilot.end_date);
+
+    // Build metric map using Map (BUG-015: no `key in object`)
+    const metricMap = new Map(metricRows.map((r) => [r.metric, r]));
+
+    const getTotal = (key) => {
+      const row = metricMap.get(key);
+      return row ? row.total : 0;
+    };
+    const getDeviceCount = (key) => {
+      const row = metricMap.get(key);
+      return row ? row.device_count : 0;
+    };
+
+    // Compute proxy metrics from available data
+    const totalDevicesEverActive = Math.max(...metricRows.map((r) => r.device_count), 0);
+    const installRate = pilot.target_size > 0
+      ? Math.round((enrolled_count / pilot.target_size) * 1000) / 1000
+      : null;
+
+    // daily_active proxy: average (device_count per day / enrolled)
+    const dailyRows = db.prepare(
+      `SELECT date, MAX(device_count) AS dc
+       FROM aggregated_daily
+       WHERE date BETWEEN ? AND ? AND metric LIKE 'features_enabled:%'
+       GROUP BY date
+       LIMIT 1000`
+    ).all(pilot.start_date, pilot.end_date);
+    const avgDailyActive = dailyRows.length > 0 && enrolled_count > 0
+      ? Math.round((dailyRows.reduce((s, r) => s + r.dc, 0) / dailyRows.length / enrolled_count) * 1000) / 1000
+      : null;
+
+    // adaptations per user per day proxy
+    let totalAdaptations = 0;
+    for (const [key, row] of metricMap.entries()) {
+      if (key.startsWith('adaptations_applied:')) totalAdaptations += row.total;
+    }
+    const adaptPerUserPerDay = (enrolled_count > 0 && durationDays > 0)
+      ? Math.round((totalAdaptations / enrolled_count / durationDays) * 100) / 100
+      : null;
+
+    // Voice commands per day proxy
+    const voiceTotal = getTotal('adaptations_applied:VOICE_NAV');
+    const voicePerDay = durationDays > 0
+      ? Math.round((voiceTotal / durationDays) * 100) / 100
+      : null;
+
+    // Indian language usage: fraction of device-days using Indian scripts
+    const indianLangs = new Set(['hi', 'bn', 'ur', 'pa', 'mr', 'te', 'ta', 'gu', 'kn', 'ml']);
+    let indDeviceCount = 0;
+    let totalLangDeviceCount = 0;
+    for (const [key, row] of metricMap.entries()) {
+      if (key.startsWith('language_used:')) {
+        const lang = key.slice('language_used:'.length);
+        totalLangDeviceCount += row.device_count;
+        if (indianLangs.has(lang)) indDeviceCount += row.device_count;
+      }
+    }
+    const indianLangUsage = totalLangDeviceCount > 0
+      ? Math.round((indDeviceCount / totalLangDeviceCount) * 1000) / 1000
+      : null;
+
+    const status = (val, target, isMin) => {
+      if (val == null || target == null) return 'unknown';
+      return isMin ? (val >= target ? 'green' : 'red') : (val <= target ? 'green' : 'red');
+    };
+
+    res.json({
+      pilot_id: pilotId,
+      name: pilot.name,
+      preset: pilot.preset,
+      duration_days: durationDays,
+      cohort: {
+        target_size: pilot.target_size,
+        enrolled: enrolled_count,
+        active_during_pilot: totalDevicesEverActive,
+      },
+      metrics: {
+        install_rate: {
+          value: installRate,
+          target: 0.80,
+          status: status(installRate, 0.80, true),
+        },
+        daily_active: {
+          value: avgDailyActive,
+          target: 0.70,
+          status: status(avgDailyActive, 0.70, true),
+        },
+        adaptations_per_user_per_day: {
+          value: adaptPerUserPerDay,
+          target_min: 5,
+          target_max: 15,
+          status: adaptPerUserPerDay != null
+            ? (adaptPerUserPerDay >= 5 && adaptPerUserPerDay <= 15 ? 'green' : 'red')
+            : 'unknown',
+        },
+        voice_commands_per_day: {
+          value: voicePerDay,
+          target_min: 10,
+          status: status(voicePerDay, 10, true),
+        },
+        indian_language_usage: {
+          value: indianLangUsage,
+          target_min: 0.50,
+          status: status(indianLangUsage, 0.50, true),
+        },
+      },
+      _notes: 'override_rate is null: adaptations_reverted metric not yet collected. struggle_rate and effectiveness_rate not per-pilot attributed.',
+      satisfaction_score: null,
+      top_issues: [],
+      recommendations: [],
+    });
+  } catch (e) {
+    console.error('[pilot/results] pilot_id=' + req.params.id + ' ip=' + (req.ip || 'unknown'), e.message);
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
+// ---------- GET /api/pilot/:id/export.csv — DP-noised daily CSV (public, gated) ----------
+app.get('/api/pilot/:id/export.csv', rateLimit, (req, res) => {
+  try {
+    const pilotId = Number(req.params.id);
+    if (!Number.isInteger(pilotId) || pilotId <= 0) {
+      return res.status(400).json({ error: 'invalid pilot id' });
+    }
+
+    const pilot = findPilotById.get(pilotId);
+    if (!pilot) return res.status(404).json({ error: 'pilot not found' });
+
+    const { n: enrolled_count } = countPilotEnrollments.get(pilotId);
+    if (enrolled_count < PILOT_K_ANON) {
+      return res.status(403).json({
+        error: 'gated',
+        reason: `pilot cohort below N=${PILOT_K_ANON} disclosure floor`,
+      });
+    }
+
+    const rows = db.prepare(
+      `SELECT date, metric, total AS total_noised, device_count
+       FROM aggregated_daily
+       WHERE date BETWEEN ? AND ?
+       ORDER BY date ASC, metric ASC
+       LIMIT 5000`
+    ).all(pilot.start_date, pilot.end_date);
+
+    // Build CSV with OWASP injection guard on every field
+    const lines = ['date,metric,total_noised,device_count'];
+    for (const row of rows) {
+      lines.push(
+        [
+          csvEscape(row.date),
+          csvEscape(row.metric),
+          csvEscape(String(Math.round(row.total_noised * 100) / 100)),
+          csvEscape(String(row.device_count)),
+        ].join(','),
+      );
+    }
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="pilot-${pilotId}-export.csv"`);
+    res.send(lines.join('\r\n'));
+  } catch (e) {
+    console.error('[pilot/export.csv] pilot_id=' + req.params.id + ' ip=' + (req.ip || 'unknown'), e.message);
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
+// ---------- POST /api/pilot/:id/enroll-device — device self-enrollment (public, rate-limited) ----------
+//
+// Session 24 adversarial-pass fixes (Opus-solo, 2026-04-22):
+//
+// (1) Ring-membership gate — BEFORE Session 24 this endpoint accepted any
+//     64-hex string as device_pub_key. Attackers could flood pilot_enrollments
+//     with random pubkeys to inflate enrolled_count past N=20 and un-gate
+//     aggregate stats. Now requires the pubkey to already exist in
+//     enrolled_devices (i.e. the device has gone through POST /api/enroll).
+//
+// (2) Backfill UPDATE removed — the previous revision did
+//     `UPDATE attestations SET pilot_id=? WHERE ... key_image=? LIMIT 100`,
+//     which (a) uses LIMIT on UPDATE — unsupported without the
+//     SQLITE_ENABLE_UPDATE_DELETE_LIMIT compile flag, and better-sqlite3's
+//     default build does not include it; (b) matched on
+//     `key_image = device_pub_key`, but key_image is
+//     `H_p(date, ringHash, sign(...))` per Session 16 ZK crypto — it is
+//     NEVER equal to the pub_key, so the WHERE clause would match 0 rows
+//     even if LIMIT were accepted. The field is instead populated by the
+//     client on its next daily attestation via the Session-24 pilot_id
+//     bundle field (observatory-publisher.ts setActivePilotId).
+app.post('/api/pilot/:id/enroll-device', pilotEnrollRateLimit, (req, res) => {
+  try {
+    const pilotId = Number(req.params.id);
+    if (!Number.isInteger(pilotId) || pilotId <= 0) {
+      return res.status(400).json({ error: 'invalid pilot id' });
+    }
+
+    const { device_pub_key } = req.body || {};
+    if (typeof device_pub_key !== 'string' || !PUBKEY_HEX_RE.test(device_pub_key)) {
+      return res.status(400).json({ error: 'device_pub_key must be 64-char hex string' });
+    }
+
+    const pilot = findPilotById.get(pilotId);
+    if (!pilot) return res.status(404).json({ error: 'pilot not found' });
+
+    // (1) Require ring membership — device must have previously called /api/enroll.
+    // Otherwise the enrollment-count gate can be trivially bypassed by POSTing
+    // 20 random pubkeys.
+    const ringRow = findDeviceByPubKey.get(device_pub_key);
+    if (!ringRow) {
+      return res.status(403).json({
+        error: 'device not enrolled in observatory ring; POST /api/enroll first',
+      });
+    }
+
+    // Idempotent upsert (INSERT OR IGNORE) — safe to retry on network blips.
+    upsertPilotEnrollment.run(pilotId, device_pub_key, Date.now());
+
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('[pilot/enroll-device] pilot_id=' + req.params.id + ' ip=' + (req.ip || 'unknown'), e.message);
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
+// ---------- POST /api/pilot/:id/feedback — submit feedback (public, rate-limited) ----------
+app.post('/api/pilot/:id/feedback', pilotFeedbackRateLimit, (req, res) => {
+  try {
+    const pilotId = Number(req.params.id);
+    if (!Number.isInteger(pilotId) || pilotId <= 0) {
+      return res.status(400).json({ error: 'invalid pilot id' });
+    }
+
+    const { rating, comment, device_hash } = req.body || {};
+
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+      return res.status(400).json({ error: 'rating must be integer 1–5' });
+    }
+    if (typeof device_hash !== 'string' || !HEX64_RE.test(device_hash)) {
+      return res.status(400).json({ error: 'device_hash must be 64-char hex string' });
+    }
+
+    const pilot = findPilotById.get(pilotId);
+    if (!pilot) return res.status(404).json({ error: 'pilot not found' });
+
+    // Sanitize comment
+    const sanitizedComment = comment != null ? sanitizeComment(comment) : null;
+    // Compute dedup hash of original (pre-sanitize) comment
+    const commentHash = (typeof comment === 'string' && comment.length > 0)
+      ? crypto.createHash('sha256').update(comment.slice(0, 500), 'utf8').digest('hex')
+      : null;
+
+    const result = insertPilotFeedback.run(
+      pilotId,
+      rating,
+      commentHash,
+      sanitizedComment,
+      device_hash,
+      Date.now(),
+    );
+
+    res.json({ ok: true, feedback_id: result.lastInsertRowid });
+  } catch (e) {
+    console.error('[pilot/feedback] pilot_id=' + req.params.id + ' ip=' + (req.ip || 'unknown'), e.message);
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
+// ---------- GET /api/pilot/:id/feedback/aggregate — aggregated feedback (public, k-anon gated) ----------
+app.get('/api/pilot/:id/feedback/aggregate', rateLimit, (req, res) => {
+  try {
+    const pilotId = Number(req.params.id);
+    if (!Number.isInteger(pilotId) || pilotId <= 0) {
+      return res.status(400).json({ error: 'invalid pilot id' });
+    }
+
+    const pilot = findPilotById.get(pilotId);
+    if (!pilot) return res.status(404).json({ error: 'pilot not found' });
+
+    const { n: feedbackCount } = countPilotFeedback.get(pilotId);
+
+    // Session-24 adversarial pass: use the PILOT_K_ANON (20) floor here, not
+    // the generic K_ANON_MIN (5). Feedback aggregates expose free-text word
+    // frequencies + per-day ratings. A cohort of ≤19 respondents can often
+    // be re-identified when cross-referenced with enrollment metadata
+    // (timezone, language preset, device type known to admins). The brief
+    // explicitly requires "Orchestrator refuses to expose stats when pilot
+    // N<20 until it grows (prevents de-anon)" — feedback aggregates share
+    // the same de-anon surface as metric aggregates.
+    if (feedbackCount < PILOT_K_ANON) {
+      return res.json({
+        pilot_id: pilotId,
+        status: 'gated',
+        reason: `feedback below pilot disclosure floor (N=${PILOT_K_ANON})`,
+      });
+    }
+
+    const ratingByDay = feedbackAggByDay.all(pilotId);
+
+    // Word frequency from sanitized comment_text
+    const commentRows = feedbackAllComments.all(pilotId);
+    const wordCounts = new Map(); // BUG-015: Map not plain object
+    for (const row of commentRows) {
+      if (!row.comment_text) continue;
+      const words = row.comment_text.toLowerCase().split(/\s+/);
+      for (const word of words) {
+        // Strip punctuation
+        const clean = word.replace(/[^\p{L}\p{N}]/gu, '');
+        if (!clean || clean.length < 2) continue;
+        // BUG-015: use Set.has() for stopword check, not `word in object`
+        if (STOPWORDS.has(clean)) continue;
+        wordCounts.set(clean, (wordCounts.get(clean) || 0) + 1);
+      }
+    }
+
+    const word_frequency = [...wordCounts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 50)
+      .map(([word, count]) => ({ word, count }));
+
+    res.json({
+      pilot_id: pilotId,
+      name: pilot.name,
+      feedback_count: feedbackCount,
+      rating_by_day: ratingByDay,
+      word_frequency,
+    });
+  } catch (e) {
+    console.error('[pilot/feedback/aggregate] pilot_id=' + req.params.id + ' ip=' + (req.ip || 'unknown'), e.message);
     res.status(500).json({ error: 'internal' });
   }
 });

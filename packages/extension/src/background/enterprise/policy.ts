@@ -9,6 +9,7 @@
  */
 
 import type { AccessibilityProfile } from '@accessbridge/core';
+import { PILOT_ID_PATTERN } from '@accessbridge/core';
 
 // ---------- Public types ----------
 
@@ -44,6 +45,13 @@ export interface ManagedPolicy {
   observatoryAnalyticsLevel?: 'Minimal' | 'Standard' | 'Full';
   /** Session 23 — Daily cap on on-device VLM inferences. 0 disables; omitted = default. */
   maxVisionInferencesPerDay?: number;
+  /**
+   * Session 24 — Pilot cohort identifier set by Team-tier install script or
+   * Group Policy. Format: `^[a-z0-9][a-z0-9-]{0,63}$`. Included in daily
+   * observatory bundles so the orchestrator can aggregate pilot-level metrics.
+   * Omitted when undefined — non-pilot installs are unchanged.
+   */
+  pilotId?: string;
 }
 
 export interface LockdownResult {
@@ -254,6 +262,16 @@ function parseManagedPolicyRaw(raw: Record<string, unknown>): ManagedPolicy {
   const maxInf = coerceBoundedInt(raw['MaxVisionInferencesPerDay'], 0, 10000);
   if (maxInf !== undefined) policy.maxVisionInferencesPerDay = maxInf;
 
+  // Session 24 — pilot cohort id. Validated against PILOT_ID_PATTERN before
+  // accepting — same defence as customAPIEndpoint / minimumAgentVersion: the
+  // value flows into observatory bundles and a future CSV export, so reject
+  // anything containing shell metacharacters, path separators, or control
+  // characters up front.
+  const pilotRaw = raw['PilotId'] ?? raw['pilotId'];
+  if (typeof pilotRaw === 'string' && PILOT_ID_PATTERN.test(pilotRaw)) {
+    policy.pilotId = pilotRaw;
+  }
+
   return policy;
 }
 
@@ -380,6 +398,15 @@ export function mergeWithProfile(
   }
   if (policy.maxVisionInferencesPerDay !== undefined) {
     lockedKeys.add('maxVisionInferencesPerDay');
+  }
+
+  // Session 24 — managed pilotId writes directly to profile.pilotId AND locks
+  // the key so the user cannot unenroll mid-pilot via the popup. If the admin
+  // later clears the policy, mergeWithProfile on next load simply doesn't
+  // touch the field and the user-writable state path takes over.
+  if (policy.pilotId !== undefined) {
+    merged = { ...merged, pilotId: policy.pilotId };
+    lockedKeys.add('pilotId');
   }
 
   return { profile: merged, lockedKeys };

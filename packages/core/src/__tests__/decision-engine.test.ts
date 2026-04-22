@@ -56,6 +56,8 @@ function makeProfile(
     observatoryRingVersion: 0,
     observatoryKeyImage: null,
     observatoryKeyImageDate: null,
+    // --- Session 24: Team pilot id ---
+    pilotId: null,
     ...overrides,
   };
 }

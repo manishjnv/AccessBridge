@@ -53,6 +53,7 @@ import {
   rotateDeviceKeypair,
   getOrRefreshRing,
   setManagedOrgHash,
+  setActivePilotId,
 } from './observatory-publisher.js';
 // --- Session 19: Desktop Agent Bridge ---
 import { agentBridge } from './agent-bridge.js';
@@ -449,6 +450,10 @@ chrome.runtime.onInstalled.addListener((details) => {
     currentProfile = p;
     if (p) {
       decisionEngine = new DecisionEngine(p);
+      // Session 24: push any persisted pilotId into the publisher at startup
+      // so the first attestation of the day carries the tag even if no SAVE
+      // or policy-load fires first.
+      setActivePilotId(p.pilotId);
     }
   });
   scheduleTier0OpportunisticLoad();
@@ -459,6 +464,10 @@ chrome.runtime.onStartup.addListener(() => {
     currentProfile = p;
     if (p) {
       decisionEngine = new DecisionEngine(p);
+      // Session 24: push any persisted pilotId into the publisher at startup
+      // so the first attestation of the day carries the tag even if no SAVE
+      // or policy-load fires first.
+      setActivePilotId(p.pilotId);
     }
   });
   scheduleTier0OpportunisticLoad();
@@ -574,6 +583,11 @@ async function handleMessage(
       currentLockdown = mergeResult;
       const profileToSave = mergeResult.profile;
       await saveProfile(profileToSave);
+      currentProfile = profileToSave;
+      // Session 24: keep the observatory publisher's active pilot_id in lockstep
+      // with the saved profile. Invalid / cleared values silently reset inside
+      // setActivePilotId (PILOT_ID_PATTERN gate).
+      setActivePilotId(profileToSave.pilotId);
       const tabs = await chrome.tabs.query({});
       for (const tab of tabs) {
         if (tab.id) {
@@ -1377,6 +1391,10 @@ loadManagedPolicy().then(async (policy) => {
   setManagedOrgHash(policy.orgHash);
   if (currentProfile) {
     currentLockdown = mergeWithProfile(currentProfile, policy);
+    // Session 24: publish the effective pilot_id (policy wins over profile via
+    // mergeWithProfile's precedence, so reading from the merged profile gives
+    // us the right answer on both code paths).
+    setActivePilotId(currentLockdown.profile.pilotId);
     // Broadcast any policy-forced profile updates to content scripts
     if (currentLockdown.lockedKeys.size > 0) {
       currentProfile = currentLockdown.profile;
@@ -1387,6 +1405,10 @@ loadManagedPolicy().then(async (policy) => {
         }
       }
     }
+  } else {
+    // No profile yet — still honour managed policy.pilotId if present so the
+    // orchestrator can associate the very first attestation with the pilot.
+    setActivePilotId(policy.pilotId ?? null);
   }
 }).catch(() => {});
 
@@ -1397,6 +1419,9 @@ subscribeToPolicyChanges((newPolicy) => {
   if (currentProfile) {
     currentLockdown = mergeWithProfile(currentProfile, newPolicy);
     currentProfile = currentLockdown.profile;
+    // Session 24: re-publish pilot_id after merge so an admin clearing the
+    // policy mid-session disables pilot tagging on the next attestation.
+    setActivePilotId(currentLockdown.profile.pilotId);
     chrome.tabs.query({}, (tabs) => {
       for (const tab of tabs) {
         if (tab.id !== undefined) {
@@ -1404,5 +1429,7 @@ subscribeToPolicyChanges((newPolicy) => {
         }
       }
     });
+  } else {
+    setActivePilotId(newPolicy.pilotId ?? null);
   }
 });

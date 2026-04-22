@@ -45,6 +45,12 @@ export interface RawCounters {
   voice_tier_counts?: Record<string, number>;
   /** Session 20: orgHash — opaque Merkle hash of org device ring, set by Group Policy. Never transmitted when absent. */
   org_hash?: string;
+  /**
+   * Session 24: pilot cohort identifier. Set by `setPilotId()` when a Team
+   * installer or managed-policy pilot tag is present. Orchestrator aggregates
+   * pilot-level metrics keyed by this value. Absent for non-pilot devices.
+   */
+  pilot_id?: string;
 }
 
 export interface NoisyBundle {
@@ -63,6 +69,8 @@ export interface NoisyBundle {
   schema_version: 1;
   /** Session 20: orgHash — opaque Merkle hash of org device ring, set by Group Policy. Never transmitted when absent. */
   org_hash?: string;
+  /** Session 24: pilot cohort identifier. Absent for non-pilot devices. */
+  pilot_id?: string;
 }
 
 export interface PublishResult {
@@ -232,6 +240,41 @@ export function setManagedOrgHash(hash: string | undefined): void {
   _managedOrgHash = hash;
 }
 
+// ---------- Session 24: pilot_id wiring ----------
+
+/**
+ * Module-level pilot_id set by background/index.ts from profile.pilotId OR
+ * managed policy.pilotId (policy wins via mergeWithProfile). Included in
+ * published bundles when present; omitted via undefined otherwise. Validated
+ * against PILOT_ID_PATTERN before being accepted — an attacker-controlled
+ * value propagating from a corrupted profile would simply be rejected, not
+ * passed through to the VPS. This tier's setter is symmetrical with
+ * setManagedOrgHash so wiring follows a single pattern.
+ */
+let _activePilotId: string | undefined;
+
+const _PILOT_ID_RE = /^[a-z0-9][a-z0-9-]{0,63}$/;
+
+/**
+ * Set the active pilot id, or clear it with undefined/null. Invalid values
+ * (wrong shape, uppercase, path separators, control chars) are silently
+ * rejected — the pilot remains whatever it was before the call. Callers that
+ * care about the result should validate first.
+ */
+export function setActivePilotId(pilotId: string | null | undefined): void {
+  if (pilotId === undefined || pilotId === null || pilotId === '') {
+    _activePilotId = undefined;
+    return;
+  }
+  if (typeof pilotId !== 'string') return;
+  if (!_PILOT_ID_RE.test(pilotId)) return;
+  _activePilotId = pilotId;
+}
+
+export function getActivePilotId(): string | undefined {
+  return _activePilotId;
+}
+
 /**
  * Apply Laplace noise (ε=1, sensitivity=1) to every numeric counter and
  * compute a Merkle commitment over the canonicalized noised bundle.
@@ -304,11 +347,23 @@ export async function aggregateDailyBundle(
   // compromised counter-producer from overriding the enterprise device-ring.
   const org_hash = _managedOrgHash ?? raw.org_hash;
 
+  // Session 24: same pattern for pilot_id — module-level value set by
+  // background from profile+policy takes precedence over any raw.pilot_id a
+  // caller supplied (policy is authoritative). Included only when present;
+  // attestations from non-pilot devices are byte-identical to pre-Session-24.
+  // The value is NOT folded into canonicalLines() / merkle_root because the
+  // observatory server would need a coordinated schema bump to accept the
+  // new canonical line — deferred until the pilot orchestrator is proven in
+  // production. pilot_id is carried at the bundle level where it's still
+  // cryptographically bound via the ring signature over the whole payload.
+  const pilot_id = _activePilotId ?? raw.pilot_id;
+
   return {
     ...partial,
     merkle_root,
     schema_version: 1,
     ...(org_hash !== undefined ? { org_hash } : {}),
+    ...(pilot_id !== undefined ? { pilot_id } : {}),
   };
 }
 

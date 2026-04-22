@@ -224,6 +224,27 @@ Tests: 46 (30 in [`enterprise-policy.test.ts`](packages/extension/src/background
 
 ---
 
+## Team Deployment (Session 24)
+
+Scripted install tier for departments of 10–1,000 users. No MDM or Active Directory required. Completes Plan Section 9.2 deployment modes → **3/3 complete** (Self-install ✓, Team ✓, Enterprise ✓). Tooling also ships the Plan Section 15 Phase 2 pilot infrastructure: 100-user cohort launch, observatory pilot analytics, and the decision-report generator.
+
+| ID | Component | Path | Role |
+|----|-----------|------|------|
+| TEAM-01 | Windows installer | [`deploy/team/install-windows.ps1`](deploy/team/install-windows.ps1) | Downloads extension zip (SHA-256 verified, `?v=` cache-busted per BUG-010), writes Chrome `ExtensionInstallForcelist` to HKLM/HKCU, applies preset profile. Writes policy files with `umask 077` before creation (BUG-017/019); refuses symlinked targets (BUG-018). |
+| TEAM-02 | macOS installer | [`deploy/team/install-macos.sh`](deploy/team/install-macos.sh) | Same integrity checks; writes to `/Library/Managed Preferences/`; registers the desktop agent launchd plist if `--install-agent` is passed. |
+| TEAM-03 | Linux installer | [`deploy/team/install-linux.sh`](deploy/team/install-linux.sh) | Same integrity checks; writes to `/etc/opt/chrome/policies/managed/accessbridge.json` (`chmod 644`, root-owned); registers systemd user service for the desktop agent. Auto-detects `.deb` / `.rpm` / AppImage format. |
+| TEAM-04 | Universal dispatcher | [`deploy/team/install.sh`](deploy/team/install.sh) · [`deploy/team/install.ps1`](deploy/team/install.ps1) | Detects OS and delegates to the OS-specific script. Entry point for all one-liner install commands. |
+| TEAM-05 | Preset profiles (6) | [`deploy/team/profiles/`](deploy/team/profiles/) | `pilot-default.json`, `pilot-tamil.json`, `pilot-banking.json`, `pilot-dyslexia.json`, `pilot-fatigue-study.json`, `pilot-motor.json`. Each is a partial `AccessibilityProfile` applied at install time; users can customize afterwards. |
+| TEAM-06 | Observatory pilot endpoints | [`ops/observatory/server.js`](ops/observatory/server.js) | Four new `/api/pilot/*` routes: `POST /register`, `GET /metrics`, `POST /feedback`, `GET /report`. Per-cohort metrics with the same k-anonymity (floor 5) and Laplace DP noise as the general observatory. |
+| TEAM-07 | Pilot dashboard | [`ops/observatory/public/pilot.html`](ops/observatory/public/pilot.html) | Browser UI at `/observatory/pilot.html?pilot_id=<id>`. Tabs: Overview (enrollment curve, feature-usage heatmap, struggle score trend), Feedback (Likert averages + word cloud), per-wave breakdown. |
+| TEAM-08 | Feedback channel | Popup Settings → Feedback button | In-extension five-question Likert widget. POSTs to `/api/pilot/feedback` tagged with `pilot_id`. Responses visible in TEAM-07 dashboard. |
+| TEAM-09 | Batch enroll CLI | [`tools/pilot/enroll-batch.ts`](tools/pilot/enroll-batch.ts) | Tester CLI — bulk-registers a list of pilot IDs with the observatory server and verifies receipt of at least one submission per ID. |
+| TEAM-10 | Report generator CLI | [`tools/pilot/generate-report.ts`](tools/pilot/generate-report.ts) | Tester CLI — queries `/api/pilot/report`, formats a PDF or JSON pilot report (enrollment curve, feature heatmap, struggle trend, feedback summary, scale/extend/abort decision matrix). |
+
+Docs: [docs/deployment/team.md](docs/deployment/team.md) · [docs/operations/pilot-playbook.md](docs/operations/pilot-playbook.md).
+
+---
+
 ## Feature-count summary
 
 | Module | Count |
@@ -235,9 +256,10 @@ Tests: 46 (30 in [`enterprise-policy.test.ts`](packages/extension/src/background
 | AI engine features | 1 (+ engine layer) |
 | Core engine components | 5 |
 | Observatory + ZK Attestation | 12 (OBS-01..07 + ZK-01..05) |
-| Desktop Agent | 5 (DA-01..DA-05) |
+| Desktop Agent | 6 (DA-01..DA-06) |
 | Enterprise Deployment | 9 (ENT-01..ENT-09) |
-| **Total user-facing features** | **43** |
+| **Team Deployment + Pilot Tooling** | **10 (TEAM-01..TEAM-10)** |
+| **Total user-facing features** | **53** |
 
 ---
 

@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pilot Dashboard · AccessBridge</title>
+  <meta name="description" content="AccessBridge Pilot Dashboard — enrolment progress, KPIs, and feedback for active pilot cohorts." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./styles.css" />
+  <link rel="stylesheet" href="./pilot.css" />
+</head>
+<body>
+
+  <!-- ── Navigation ────────────────────────────────────────────────── -->
+  <nav class="nav" aria-label="Observatory navigation">
+    <a href="/observatory/" class="nav-brand" aria-label="AccessBridge Observatory — home">
+      <svg width="32" height="32" viewBox="0 0 64 64" aria-hidden="true">
+        <defs>
+          <linearGradient id="ab-grad-pilot" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#7b68ee"/>
+            <stop offset="1" stop-color="#bb86fc"/>
+          </linearGradient>
+        </defs>
+        <rect width="64" height="64" rx="14" fill="url(#ab-grad-pilot)"/>
+        <path d="M20 46 L32 18 L44 46" stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M24 36 L40 36" stroke="#fff" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+        <path d="M14 53 Q32 47 50 53" stroke="#fff" stroke-width="2.8" fill="none" stroke-linecap="round" opacity="0.85"/>
+      </svg>
+      <span class="brand-text">AccessBridge</span>
+    </a>
+    <div class="nav-tabs" role="navigation" aria-label="Observatory sections">
+      <a href="/observatory/" class="nav-tab">Observatory</a>
+      <a href="/observatory/verifier.html" class="nav-tab">Verifier</a>
+      <a href="/observatory/pilot.html" class="nav-tab active" aria-current="page">
+        Pilot
+        <span class="nav-tab-pill">Session 24</span>
+      </a>
+    </div>
+  </nav>
+
+  <!-- ARIA live region for status poll updates (screen readers) -->
+  <div id="pilot-live-region" aria-live="polite" aria-atomic="true" class="sr-only"
+       style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden;"></div>
+
+  <!-- ── Main content ───────────────────────────────────────────────── -->
+  <main id="pilot-root" aria-label="Pilot dashboard">
+
+    <!-- LIST VIEW -->
+    <div id="view-list">
+      <div style="padding: 32px 0 16px;">
+        <h1 class="page-heading">Pilot Dashboard</h1>
+        <p class="page-sub">Active cohort enrolments, health scores, and KPI progress. Select a pilot for the full detail view.</p>
+      </div>
+
+      <!-- Loading -->
+      <div class="loading-spinner" role="status" aria-live="polite">
+        <div class="spinner" aria-hidden="true"></div>
+        <span>Loading pilots…</span>
+      </div>
+
+      <!-- Error state (hidden by default) -->
+      <div class="pilot-list-error error-state" hidden role="alert">
+        Unable to reach the pilot API. Showing stub data for preview.
+      </div>
+
+      <!-- Pilot cards grid -->
+      <div class="pilot-grid" aria-label="Pilot cohort list" role="list"></div>
+    </div>
+
+    <!-- DETAIL VIEW (populated by pilot.js) -->
+    <div id="view-detail" hidden aria-label="Pilot detail view"></div>
+
+  </main>
+
+  <!-- ── Footer ─────────────────────────────────────────────────────── -->
+  <footer class="footer no-print">
+    <div>
+      <strong>Manish Kumar</strong> — AccessBridge Pilot Dashboard
+    </div>
+    <div style="margin-top:6px; font-size:11px;">
+      Metrics include differential-privacy noise (ε = 1.0). Individual users cannot be identified.
+    </div>
+  </footer>
+
+  <script src="./pilot.js"></script>
+</body>
+</html>

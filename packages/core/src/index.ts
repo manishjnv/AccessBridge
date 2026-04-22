@@ -16,6 +16,8 @@ export {
   DEFAULT_COGNITIVE_PROFILE,
   DEFAULT_MOTOR_PROFILE,
   DEFAULT_PROFILE,
+  PILOT_ID_PATTERN,
+  isValidPilotId,
   SignalType,
   AdaptationType,
 } from './types/index.js';

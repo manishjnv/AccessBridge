@@ -144,6 +144,18 @@ export interface AccessibilityProfile {
   observatoryKeyImage: string | null;
   /** Date (YYYY-MM-DD) the cached keyImage belongs to; null when unset. */
   observatoryKeyImageDate: string | null;
+  // --- Session 24: Team deployment pilot tagging ---
+  /**
+   * Optional pilot cohort identifier set by a Team install script or by
+   * managed policy. When set, included in daily observatory attestations so
+   * the orchestrator can aggregate pilot-level metrics. Null when the device
+   * is not part of any pilot. This is a group identifier — never personal.
+   *
+   * Format: `^[a-z0-9][a-z0-9-]{0,63}$` — lowercase alphanumeric + hyphens,
+   * 1-64 chars, must start with alphanumeric. Rejects path traversal,
+   * shell metacharacters, Unicode bidi overrides, control chars.
+   */
+  pilotId: string | null;
 }
 
 export const DEFAULT_SENSORY_PROFILE: SensoryProfile = {
@@ -238,4 +250,23 @@ export const DEFAULT_PROFILE: AccessibilityProfile = {
   observatoryRingVersion: 0,
   observatoryKeyImage: null,
   observatoryKeyImageDate: null,
+  // --- Session 24: Team deployment pilot tagging ---
+  pilotId: null,
 };
+
+/**
+ * Session 24: pilot_id format gate.
+ * Lowercase alphanumeric + hyphens, 1-64 chars, must start with alphanumeric.
+ * Rejects: uppercase (collision risk with enum keys), whitespace, control
+ * chars, Unicode bidi overrides (RCA BUG-015/Session-23 sanitizeLabel pattern),
+ * shell metacharacters, path traversal (`.`, `..`, `/`, `\`).
+ *
+ * Used by enterprise/policy.ts when parsing `pilotId` from managed storage,
+ * and by observatory-publisher.ts before including pilot_id in bundles.
+ */
+export const PILOT_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/;
+
+/** Returns true if `v` is a string that matches PILOT_ID_PATTERN. */
+export function isValidPilotId(v: unknown): v is string {
+  return typeof v === 'string' && PILOT_ID_PATTERN.test(v);
+}

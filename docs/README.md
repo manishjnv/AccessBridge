@@ -22,6 +22,23 @@
 | [Motor Assistor](./features/motor-assistor.md) | Planned | Voice navigation, eye tracking, dwell click |
 | [Accessibility Audit](./features/accessibility-audit.md) | In Progress | Automated WCAG 2.1 scanning, 20 rules, scored report, PDF export |
 
+### Deployment
+
+| Mode | Status | Guide |
+|------|--------|-------|
+| Self-install | ✓ | Chrome Web Store / sideload |
+| Team (10–1,000 users) | ✓ | [docs/deployment/team.md](./deployment/team.md) |
+| Enterprise (MDM / GPO) | ✓ | [docs/deployment/group-policy.md](./deployment/group-policy.md) · [docs/deployment/enterprise-chrome.md](./deployment/enterprise-chrome.md) |
+
+All three Plan Section 9.2 deployment modes are complete as of Session 24.
+
+### Operations
+
+| Document | Description |
+|----------|-------------|
+| [Pilot Playbook](./operations/pilot-playbook.md) | 100-user 45–60 day pilot coordinator guide (Plan Section 15 Phase 2) |
+| [Signing Strategy](./operations/signing.md) | CRX, MSI, and mobileconfig signing procedures |
+
 ### Project Management
 - [Shift Handoff](../HANDOFF.md) -- current sprint status, blockers, and next steps
 

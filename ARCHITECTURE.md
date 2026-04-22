@@ -345,6 +345,48 @@ Docs: [docs/features/desktop-agent.md](docs/features/desktop-agent.md).
 
 ---
 
+## 9b. Session 24 — Team Deployment + Pilot Tooling
+
+Session 24 completes **Plan Section 9.2 — Deployment Modes**: all three deployment modes (Self-install ✓, Team ✓, Enterprise ✓) are now available. The Team mode targets departments of 10–1,000 users and requires no MDM infrastructure.
+
+### New artifacts
+
+| Path | Role |
+|---|---|
+| [`deploy/team/install.sh`](deploy/team/install.sh) + [`install.ps1`](deploy/team/install.ps1) | Universal dispatcher — detects OS, delegates to OS-specific installer |
+| [`deploy/team/install-windows.ps1`](deploy/team/install-windows.ps1) | Windows installer — writes Chrome ExtensionInstallForcelist to HKLM/HKCU, verifies SHA-256, applies preset |
+| [`deploy/team/install-macos.sh`](deploy/team/install-macos.sh) | macOS installer — writes `/Library/Managed Preferences/` policy JSON, applies preset |
+| [`deploy/team/install-linux.sh`](deploy/team/install-linux.sh) | Linux installer — writes `/etc/opt/chrome/policies/managed/accessbridge.json`, registers systemd user service for the desktop agent |
+| [`deploy/team/profiles/pilot-*.json`](deploy/team/profiles/) | 6 preset profiles: `default`, `tamil`, `banking`, `dyslexia`, `fatigue-study`, `motor` |
+| [`ops/observatory/server.js`](ops/observatory/server.js) | Extended with `/api/pilot/*` endpoints — enrollment, per-cohort metrics, feedback ingestion |
+| [`ops/observatory/public/pilot.html`](ops/observatory/public/pilot.html) | Pilot dashboard — enrollment curve, feature-usage heatmap, struggle score trend, feedback Likert, per-wave breakdown |
+| [`tools/pilot/enroll-batch.ts`](tools/pilot/enroll-batch.ts) | Tester CLI — bulk-enrolls a list of pilot IDs and verifies observatory receipt |
+| [`tools/pilot/generate-report.ts`](tools/pilot/generate-report.ts) | Tester CLI — queries observatory API and generates a PDF / JSON pilot report |
+
+### Architecture changes
+
+- **Install scripts write profiles with `umask 077` before file creation** (BUG-017/019 mode-on-creation rule). No `chmod` after write — the file is created with the correct permissions from the first `open()` call.
+- **Install scripts refuse to write to symlinked targets** (BUG-018 symlink refusal). The canonical path is resolved before writing; if it differs by a symlink hop, the script exits with an error.
+- **All download URLs include `?v=<version>`** (BUG-010 cache-bust rule). Cloudflare's CDN caches by URL; the version query string forces a cache miss on every new release.
+- **Pilot ID tagging is additive.** The `--pilot-id` flag appends a `pilot_id` key to the local managed-policy JSON. The observatory publisher at [`packages/extension/src/background/observatory-publisher.ts`](packages/extension/src/background/observatory-publisher.ts) reads this key and includes it in every daily submission. Removing the tag is a one-command re-install; it does not affect historical data already submitted.
+
+### Layer 9 Observability extension
+
+The observatory server (`ops/observatory/server.js`) gains four new `/api/pilot/*` endpoints:
+
+| Endpoint | Method | Purpose |
+|---|---|---|
+| `/api/pilot/register` | POST | Register a new pilot ID — creates the cohort row in SQLite |
+| `/api/pilot/metrics` | GET | Per-cohort aggregate metrics — enrollment curve, feature usage, struggle scores |
+| `/api/pilot/feedback` | POST | Receive Likert feedback from the in-extension feedback widget |
+| `/api/pilot/report` | GET | Generate a JSON summary suitable for `generate-report.ts` |
+
+The k-anonymity floor (5 devices per categorical value) and Laplace differential-privacy noise remain unchanged — pilot cohorts are subject to the same privacy protections as the general observatory.
+
+Docs: [docs/deployment/team.md](docs/deployment/team.md) · [docs/operations/pilot-playbook.md](docs/operations/pilot-playbook.md).
+
+---
+
 ## 10. See also
 
 - [FEATURES.md](FEATURES.md) — current feature catalog

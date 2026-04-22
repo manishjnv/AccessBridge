@@ -100,12 +100,14 @@ See [dep-audit-report.md](./dep-audit-report.md) for per-GHSA detail.
 
 Target: `https://accessbridge.space`. Tooling: curl. Scope: 11 URLs, GET/HEAD/OPTIONS only, 3 req/s ceiling, 10-second timeouts.
 
-### FINDING-PENTEST-001 [HIGH] — TLS 1.0 accepted at Cloudflare edge → **infrastructure action**
+### FINDING-PENTEST-001 [HIGH] — TLS 1.0 accepted at Cloudflare edge → **tooling shipped, awaiting token provision**
 
 Curl-verified: `curl --tlsv1.0 --tls-max 1.0 https://accessbridge.space/` returns HTTP 200. Cloudflare edge allows TLS 1.0 handshakes. Modern baseline is TLS 1.2 minimum.
 
-- **Remediation:** Cloudflare dashboard → SSL/TLS → Edge Certificates → **Minimum TLS Version: 1.2**. No code change required. **Shared Caddy/CF edge is NOT owned by AccessBridge** (per `reference_infrastructure` memory — `ti-platform-caddy-1` is shared); coordinate with infrastructure team.
-- **Status:** Open — infrastructure action item.
+- **Remediation:** [tools/ops/enforce-min-tls.sh](../../tools/ops/enforce-min-tls.sh) + [docs/operations/cloudflare-hardening.md](../operations/cloudflare-hardening.md). Idempotent bash script: resolves the `accessbridge.space` Cloudflare zone id, reads current `min_tls_version`, PATCHes to `1.2` (or `--min-version 1.3`) if different, waits 10 s for CF edge propagation, verifies via `curl --tlsv1.0 --tls-max 1.0` probe. Exits non-zero if post-PATCH verification fails. Runbook explains how to create a scoped API token (Zone.Zone Settings: Edit scoped to the single zone — no account-level rights, no DNS write, 30-day TTL, IP-restricted).
+- **Blast-radius re-check:** `accessbridge.space` is its own Cloudflare zone; `min_tls_version` is a zone-level setting. It affects ONLY this domain. The shared-Caddy comment in the audit scoping applied to the *Caddy origin* (`ti-platform-caddy-1`); Cloudflare is the CDN layer in front and is per-domain. No coordination with other shared-origin project owners is required for this change — the earlier "coordinate with infrastructure team" caveat was overcautious.
+- **Nightly regression probe:** [.github/workflows/cve-watch.yml](../../.github/workflows/cve-watch.yml) `tls-min-version` job runs `enforce-min-tls.sh --verify-only` daily and opens a security issue if TLS 1.0 ever becomes accepted again (rogue Page Rule override, dashboard config drift, CF default rollback).
+- **Status:** Open — awaiting CF API token provision. Zero code changes required to CLOSE; one curl call once the token exists. Run `CF_API_TOKEN=... tools/ops/enforce-min-tls.sh` from any workstation.
 
 ### FINDING-PENTEST-002 [MEDIUM] — False positive (retracted)
 

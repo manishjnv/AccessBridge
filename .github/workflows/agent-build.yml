@@ -40,7 +40,7 @@ jobs:
       # Cache Cargo registry + compiled deps so subsequent runs skip
       # recompiling unchanged crates (~5-10 min saved on the first cache hit).
       - name: Cache Cargo
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cargo/registry

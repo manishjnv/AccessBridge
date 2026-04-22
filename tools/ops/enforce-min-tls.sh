@@ -217,13 +217,29 @@ _json_get() {
 # TLS 1.0 probe
 # ---------------------------------------------------------------------------
 probe_tls10() {
-  local host="$1"
-  # --max-time caps the attempt; if TLS 1.0 is refused curl exits non-zero
-  # without ever returning an HTTP code — that is the success state.
-  local code
-  code=$(curl -fsS --tlsv1.0 --tls-max 1.0 --max-time 10 \
-    -o /dev/null -w "%{http_code}" "https://${host}/" 2>/dev/null || echo "0")
-  printf '%s' "$code"
+  local host="$1" code curl_status
+  # Capture curl's exit status separately from its stdout.
+  # When TLS 1.0 is refused:
+  #   * curl exits non-zero (SSL connect error; schannel/openssl/libssl vary
+  #     but all return non-zero)
+  #   * curl's -w "%{http_code}" still writes something to stdout — often
+  #     "000" (three zeros) because no HTTP response was received.
+  # We must NOT append an `|| echo "0"` after curl's stdout: that concatenates
+  # "000" + "0" = "0000", which is neither the string "0" nor recognisable
+  # as "rejected" without a pattern match. The Session-26 follow-up caught
+  # this bug in prod: the real CF edge was rejecting TLS 1.0 but probe_tls10
+  # returned "0000" which the caller then mis-reported as still-accepted.
+  code=$(curl -sS --tlsv1.0 --tls-max 1.0 --max-time 10 \
+    -o /dev/null -w "%{http_code}" "https://${host}/" 2>/dev/null)
+  curl_status=$?
+  # Treat these all as "handshake refused — TLS 1.0 is rejected":
+  #   - curl exited non-zero
+  #   - or %{http_code} is empty / all zeros
+  if [[ $curl_status -ne 0 || -z "$code" || "$code" =~ ^0+$ ]]; then
+    printf 'REJECTED'
+    return
+  fi
+  printf 'ACCEPTED-%s' "$code"
 }
 
 # ---------------------------------------------------------------------------
@@ -231,12 +247,12 @@ probe_tls10() {
 # ---------------------------------------------------------------------------
 if [[ "$VERIFY_ONLY" -eq 1 ]]; then
   info "Verify-only: probing TLS 1.0 at ${ZONE}"
-  code=$(probe_tls10 "$ZONE")
-  if [[ "$code" == "0" ]]; then
+  result=$(probe_tls10 "$ZONE")
+  if [[ "$result" == "REJECTED" ]]; then
     ok "TLS 1.0 handshake REJECTED at ${ZONE} (expected — FINDING-PENTEST-001 closed)"
     exit 0
   fi
-  _red "TLS 1.0 handshake ACCEPTED (HTTP ${code}) at ${ZONE} — FINDING-PENTEST-001 still open"
+  _red "TLS 1.0 handshake ${result} at ${ZONE} — FINDING-PENTEST-001 still open"
   exit 4
 fi
 
@@ -304,13 +320,13 @@ info "Waiting 10s for Cloudflare edge propagation..."
 sleep 10
 
 info "Probing TLS 1.0 at ${ZONE}..."
-code=$(probe_tls10 "$ZONE")
-if [[ "$code" == "0" ]]; then
+result=$(probe_tls10 "$ZONE")
+if [[ "$result" == "REJECTED" ]]; then
   ok "TLS 1.0 handshake REJECTED at ${ZONE} — FINDING-PENTEST-001 closed."
   exit 0
 fi
 
-_red "TLS 1.0 probe unexpectedly returned HTTP ${code}."
+_red "TLS 1.0 probe unexpectedly returned ${result}."
 _red "This can happen if:"
 _red "  - Cloudflare edge is still propagating (retry --verify-only in ~60s)"
 _red "  - The PATCH was applied at a different zone scope than expected"

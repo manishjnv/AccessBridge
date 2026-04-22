@@ -59,7 +59,7 @@ objc2-app-kit = { version = "0.2", features = ["NSWorkspace", "NSRunningApplicat
 # `atspi` defaults to `async-std`; override to tokio to match the agent runtime.
 # `zbus` is re-exported by atspi but listed explicitly for `zbus::fdo::DBusProxy`.
 [target.'cfg(target_os = "linux")'.dependencies]
-atspi = { version = "0.22", default-features = false, features = ["tokio"] }
+atspi = { version = "0.29", default-features = false, features = ["tokio"] }
 zbus = { version = "4.4", default-features = false, features = ["tokio"] }
 
 [dev-dependencies]

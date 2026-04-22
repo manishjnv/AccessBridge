@@ -1,6 +1,6 @@
 {
   "name": "accessbridge",
-  "version": "0.25.1",
+  "version": "0.25.2",
   "private": true,
   "description": "A11yOS - The Ambient Accessibility Operating Layer",
   "scripts": {
@@ -21,6 +21,11 @@
   "engines": {
     "node": ">=20.0.0",
     "pnpm": ">=9.0.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "dompurify": "^3.4.0"
+    }
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.10.1",

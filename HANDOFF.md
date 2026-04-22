@@ -1,6 +1,42 @@
 # AccessBridge - Shift Handoff
 
-## Last Session: Session 26 — Plan §15 Week 23 security audit + production hardening (7 audit docs + 4 HIGH fixes + 17 Node advisories resolved + CI security gates + dependabot + CF-RAY rate-limit gate + ring-sig adversarial pass + 5 new RCA entries) (2026-04-22)
+## Last Session: Session 27 — Desktop Agent MSI v0.21.0 published (first one-click Windows install) + v0.25.3 Session-26 deploy shipped + 2 new RCA entries (BUG-026 installer-path / BUG-027 Strawberry-Perl prereq) (2026-04-22)
+
+### Headline
+
+The landing page's Desktop Agent CTA is live for the first time. `https://accessbridge.space/downloads/accessbridge-desktop-agent_0.21.0_x86_64.msi` (6.6 MB, sha256 `0172cc0d…`) is publicly reachable; `/downloads/agent-manifest.json` is served; the landing-page JS flips the button from "Desktop Agent — build pending" to "Download Desktop Agent (MSI)" automatically on next page load. Session 26's pending `./deploy.sh` (flagged "DEPLOY NOT RUN" at exit) also shipped in the same run — v0.25.3 extension + API + CHANGELOG + main.py restart all went out cleanly; `/api/version` reports v0.25.3; served zip's `manifest.version` matches. The MSI itself is the Session-19 → Session-22 desktop-agent binary (Tauri 2 + Windows UIA + SQLCipher profile store + keyring-backed master key + NSAccessibility macOS + AT-SPI2 Linux compiled out via cfg gates on Windows). **Two Windows-build-environment bugs** surfaced and are in RCA: (a) the installer script's MSI path lookup missed the target triple (worked on macOS branch, broken on Windows branch since Session 21 Part 4); (b) MSYS/Git-Bash perl lacks `IPC::Cmd` / `Params::Check` so `openssl-sys` vendored build fails — Strawberry Perl 5.42 is the canonical Windows fix and was installed via `winget`. The MSI is self-signed (SmartScreen prompts "Unrecognised app" → user clicks "More info → Run anyway"); code signing is Phase 2 and already flagged in ROADMAP + `docs/features/desktop-agent.md` §11.
+
+### Shipped
+
+- **Extension v0.25.3** (via first `./deploy.sh --skip-bump --with-agent` run): pushed to origin/main with tags, rsync'd to VPS, `accessbridge-api` restarted, `/api/version` returns v0.25.3, Cloudflare-edge zip matches `manifest.version=0.25.3`. Closes Session 26's "DEPLOY NOT RUN" item. This run also pushed the Session-26 BUG-021..BUG-025 code fixes + security-CI workflows + dependabot config.
+- **Desktop Agent MSI v0.21.0** staged as `deploy/downloads/accessbridge-desktop-agent_0.21.0_x86_64.msi` after [tools/build-agent-installer.sh:116](tools/build-agent-installer.sh#L116) path fix; scp'd to `a11yos-vps:/opt/accessbridge/docs/downloads/`. End-to-end verification: `sha256sum local == sha256sum served == manifest.sha256`.
+- **`agent-manifest.json` v0.21.0** served at `https://accessbridge.space/downloads/agent-manifest.json` (HTTP 200, content-type JSON, 519 bytes). Landing page [deploy/index.html:3722-3776](deploy/index.html#L3722-L3776) reads this to enable the CTA.
+- **[tools/build-agent-installer.sh](tools/build-agent-installer.sh) one-line fix** — Windows `MSI_SRC_DIR` now correctly nests under the `x86_64-pc-windows-msvc` target triple, matching the macOS branch's `universal-apple-darwin` convention. Prevents "No MSI produced" false-negative on any future Windows build.
+- **2 new RCA entries**: BUG-026 (installer-path missing triple) + BUG-027 (MSYS perl lacks `IPC::Cmd` / `Params::Check`, Strawberry Perl is the canonical Windows fix for `openssl-sys` vendored builds).
+
+### Not done in this session (deferred)
+
+- **macOS DMG/PKG publish** — needs a macOS host or the `.github/workflows/agent-build.yml` CI matrix (tag push or `workflow_dispatch`). The manifest already holds `macos-universal` / `macos-universal-pkg` slots with `null` values; a CI run that lands artifacts into `deploy/downloads/` + regenerates the manifest completes this without landing-page code changes.
+- **Linux .deb/.rpm/AppImage publish** — needs a Linux host. `deploy.sh --with-agent-linux` path exists; hard-guarded to `uname -s = Linux`.
+- **Code signing** — ROADMAP Phase 2 item; requires EV cert procurement ($200-400/yr). Eliminates the SmartScreen "Unrecognised app" warning.
+- **`deploy.sh --with-agent` hard-fail guard** — today the Windows branch's agent-build failure is logged as a warning and the rest of the deploy continues. A `[ -f deploy/downloads/agent-manifest.json ] || exit 1` guard after step [1.6/6] would turn silent mis-stages into loud deploy failures. Tracked in BUG-026 Prevention.
+- **`packages/desktop-agent/README.md` + `tools/build-agent-installer.sh` header** should document Strawberry Perl as a Windows prereq (with the `winget` one-liner) + the `OPENSSL_SRC_PERL` env-var override. Tracked in BUG-027 Prevention. Not done in this commit to keep the change surface tight; doc-only follow-up PR.
+
+### RCA additions (2 new entries)
+
+- **BUG-026** — `tools/build-agent-installer.sh` Windows branch looked for the MSI at `target/release/bundle/msi` but cargo nests `--target x86_64-pc-windows-msvc` builds under `target/x86_64-pc-windows-msvc/release/...`. The macOS branch already had the triple baked in — Windows was missed when the script was generalised in Session 21 Part 4. One-line fix, comment added. Also flagged a deploy.sh hardening follow-up.
+- **BUG-027** — MSYS/Git-Bash bundled perl 5.38 lacks `IPC::Cmd` + `Params::Check`, which OpenSSL's `Configure` script requires. This wasn't a blocker pre-Session-21 (Tauri 1.x didn't pull in SQLCipher-vendored-OpenSSL); Session 21's `bundled-sqlcipher-vendored-openssl` feature made it the first crate on the chain, and the prereq regression surfaced on the first non-CI Windows build attempt. Strawberry Perl 5.42 via `winget` is the one-line fix; `OPENSSL_SRC_PERL` env var is the authoritative override.
+
+### Agent utilization
+
+Opus: Phase 0 warm-start (parallel-read CLAUDE.md + HANDOFF.md header + RCA.md header + ROADMAP.md + `docs/features/desktop-agent.md` + MEMORY index), deploy-path audit (build-agent-installer.sh + deploy.sh + agent-build.yml + landing-page JS), executed the two deploy attempts, diagnosed the perl/openssl-sys failure class from the cargo log, diagnosed the MSI-path mismatch from the tauri-build success line vs script-search line, one-line fix + re-run + scp + end-to-end sha256 verification, 2 RCA entries, this HANDOFF.
+Sonnet: n/a — single-seat ops work; no parallelizable mechanical tasks (1 build-script edit + 2 doc appends stayed in Opus's hot read cache).
+Haiku: n/a — no multi-file grep sweeps or bulk read/verify needed (single artifact, single manifest, single sha256 comparison).
+codex:rescue: n/a — no security-adjacent source changes in this session; MSI packaging publishes Session-19/21/22 code that was already Codex-reviewed at write time. Codex quota remains exhausted per Session 26 footer (resets 2026-04-26).
+
+---
+
+## Previous Session: Session 26 — Plan §15 Week 23 security audit + production hardening (7 audit docs + 4 HIGH fixes + 17 Node advisories resolved + CI security gates + dependabot + CF-RAY rate-limit gate + ring-sig adversarial pass + 5 new RCA entries) (2026-04-22)
 
 ### Headline
 

@@ -113,7 +113,8 @@ if [ "$PLATFORM" = "windows" ]; then
   )
 
   bold "[4] Locating MSI output"
-  MSI_SRC_DIR="$AGENT_DIR/src-tauri/target/release/bundle/msi"
+  # --target x86_64-pc-windows-msvc nests the output under the triple dir.
+  MSI_SRC_DIR="$AGENT_DIR/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi"
   msi_raw=$(ls -t "$MSI_SRC_DIR"/*.msi 2>/dev/null | head -n 1 || true)
   if [ -z "${msi_raw:-}" ]; then
     err "No MSI produced — review Tauri build output above"

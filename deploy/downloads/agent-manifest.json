@@ -1,0 +1,23 @@
+{
+  "version": "0.21.0",
+  "artifacts": {
+    "windows-x86_64": {
+      "file": "accessbridge-desktop-agent_0.21.0_x86_64.msi",
+      "sha256": "0172cc0dffe18a2c563e7dc126681e1f07f3c2acb843bca4d9e58d1aa58abfa7"
+    },
+    "macos-universal": {
+      "file": null,
+      "sha256": null
+    },
+    "macos-universal-pkg": {
+      "file": null,
+      "sha256": null
+    },
+    "linux-x86_64": {
+      "file": null,
+      "sha256": null,
+      "status": "not-yet-supported"
+    }
+  },
+  "updatedAt": "2026-04-22T16:06:42Z"
+}

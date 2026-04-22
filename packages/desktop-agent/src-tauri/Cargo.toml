@@ -51,7 +51,7 @@ core-foundation = "0.10"
 core-foundation-sys = "0.8"
 core-graphics = "0.24"
 objc2 = "0.5"
-objc2-foundation = { version = "0.2", features = ["NSString", "NSDictionary", "NSURL"] }
+objc2-foundation = { version = "0.3", features = ["NSString", "NSDictionary", "NSURL"] }
 objc2-app-kit = { version = "0.2", features = ["NSWorkspace", "NSRunningApplication"] }
 
 # Session 22 — Linux AT-SPI adapter deps. Gated to Linux so Windows and

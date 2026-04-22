@@ -38,12 +38,27 @@ Scope rationale: this token can ONLY change zone settings for `accessbridge.spac
 
 ## Run the enforcement
 
-From the repo root, on any workstation with bash + curl:
+From the repo root, on any workstation with bash + curl. **Two token sources are supported; `--token-file` is preferred** — it avoids leaking the token to `/proc/<pid>/environ` on shared Linux hosts and to shell history:
 
 ```bash
+# Option A (recommended) — token in a 0600 file, never on the command line
+umask 077
+install -m 600 /dev/stdin ~/.cf-min-tls-token <<< 'PASTE_TOKEN_HERE'
+tools/ops/enforce-min-tls.sh --token-file ~/.cf-min-tls-token
+
+# Option B — env var (fine for one-shot / throw-away shells)
 CF_API_TOKEN="<paste-your-token-here>" \
   tools/ops/enforce-min-tls.sh
 ```
+
+Token-file guards (all exit code 5):
+
+- File must exist and not be a symlink (BUG-018 symlink-refusal pattern)
+- On Unix: file mode must be `<= 0o600` (owner-only read/write)
+- On Windows Git Bash / MSYS / Cygwin: mode check is skipped (NTFS ACLs, not Unix bits, govern access there) with a one-line notice — secure via `icacls` or file-properties dialog
+- Content stripped of whitespace, must be ≥ 20 chars (CF tokens are typically 40+)
+
+If both `--token-file` and `CF_API_TOKEN` are supplied, `--token-file` wins.
 
 Expected output on first run:
 
@@ -81,6 +96,7 @@ Exit 0 when TLS 1.0 is rejected, exit 4 when still accepted. Useful for a nightl
 | --- | --- | --- |
 | `--zone <fqdn>` | `accessbridge.space` | Target a different zone — e.g. a staging domain |
 | `--min-version <v>` | `1.2` | Accepts `1.2` or `1.3`. `1.3` is the modern recommendation; `1.2` is the minimum that closes PENTEST-001 |
+| `--token-file <path>` | — | Read CF API token from file (mode ≤ 0o600, no symlinks). Precedence over `CF_API_TOKEN` env var |
 | `--dry-run` | off | Probe + print plan; do not PATCH |
 | `--verify-only` | off | Skip PATCH; only run the TLS 1.0 curl probe (no token required) |
 
@@ -93,6 +109,7 @@ Exit 0 when TLS 1.0 is rejected, exit 4 when still accepted. Useful for a nightl
 | 2 | Zone not found under the token's permissions |
 | 3 | Cloudflare API call failed |
 | 4 | Post-PATCH verification failed (TLS 1.0 still accepted) |
+| 5 | Token-file rejected (not found, symlink, mode > 0o600 on Unix, empty, or content < 20 chars) |
 
 ## Rollback
 

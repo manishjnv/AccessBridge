@@ -13,19 +13,28 @@
 #
 # USAGE
 #   CF_API_TOKEN=xxx tools/ops/enforce-min-tls.sh
+#   tools/ops/enforce-min-tls.sh --token-file ~/.cf-min-tls-token
 #   CF_API_TOKEN=xxx tools/ops/enforce-min-tls.sh --zone accessbridge.space
 #   CF_API_TOKEN=xxx tools/ops/enforce-min-tls.sh --min-version 1.3
 #   CF_API_TOKEN=xxx tools/ops/enforce-min-tls.sh --dry-run
 #
-# REQUIRED ENVIRONMENT
-#   CF_API_TOKEN    Cloudflare API token with Zone.Zone Settings:Edit scope
-#                   for the target zone. Create under Cloudflare Dashboard →
-#                   My Profile → API Tokens → Create Token → Custom. Scope
-#                   to a single zone to limit blast radius.
+# TOKEN SOURCE (exactly one required; --token-file preferred)
+#   CF_API_TOKEN env var     — simplest, but visible to other users on some
+#                              Linux configs via /proc/<pid>/environ
+#   --token-file <path>      — reads token from file; rejects world- or
+#                              group-readable files (mode must be <= 0o600)
+#                              and refuses symlinks (BUG-018 pattern).
+#                              Precedence: --token-file > CF_API_TOKEN when both
+#                              are supplied.
+#
+#   Create the token: Cloudflare Dashboard → My Profile → API Tokens →
+#   Create Token → Custom. Scope to a single zone to limit blast radius.
 #
 # OPTIONS
 #   --zone <fqdn>         Target zone (default: accessbridge.space)
 #   --min-version <ver>   1.0 | 1.1 | 1.2 | 1.3 (default: 1.2)
+#   --token-file <path>   Read CF API token from file (mode <= 0o600, no
+#                         symlinks; overrides CF_API_TOKEN env if both set)
 #   --dry-run             Probe + print plan; do not PATCH
 #   --verify-only         Skip PATCH; only run the TLS 1.0 curl probe
 #   --help
@@ -36,11 +45,13 @@
 #   2  Zone not found under the provided token's permissions
 #   3  Cloudflare API call failed
 #   4  Post-PATCH verification failed (curl TLS 1.0 still returned 200)
+#   5  Token-file rejected (not found, symlink, wrong permissions, empty)
 #
 # SECURITY
-#   Token is read from CF_API_TOKEN env var and passed via curl -H only —
-#   never written to disk, never logged, never printed. Do not pass it via
-#   --argument or shell history will retain it.
+#   Token is passed via curl -H Authorization only — never written to disk,
+#   never logged, never printed. Do not pass it via --token=... positional
+#   arg; use --token-file or CF_API_TOKEN env. --token-file is the preferred
+#   path for shared hosts and for avoiding shell-history / ps-aux leakage.
 # =============================================================================
 
 set -euo pipefail
@@ -52,6 +63,8 @@ ZONE="accessbridge.space"
 MIN_VERSION="1.2"
 DRY_RUN=0
 VERIFY_ONLY=0
+TOKEN_FILE=""
+TOKEN_FILE_SET=0
 API_BASE="https://api.cloudflare.com/client/v4"
 
 # ---------------------------------------------------------------------------
@@ -76,12 +89,13 @@ ok() { _green "OK: $*"; }
 # ---------------------------------------------------------------------------
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --zone)        ZONE="$2"; shift 2 ;;
-    --min-version) MIN_VERSION="$2"; shift 2 ;;
-    --dry-run)     DRY_RUN=1; shift ;;
-    --verify-only) VERIFY_ONLY=1; shift ;;
-    --help|-h)     sed -n '2,50p' "$0"; exit 0 ;;
-    *)             die "Unknown arg: $1" ;;
+    --zone)         ZONE="$2"; shift 2 ;;
+    --min-version)  MIN_VERSION="$2"; shift 2 ;;
+    --token-file)   TOKEN_FILE="$2"; TOKEN_FILE_SET=1; shift 2 ;;
+    --dry-run)      DRY_RUN=1; shift ;;
+    --verify-only)  VERIFY_ONLY=1; shift ;;
+    --help|-h)      sed -n '2,60p' "$0"; exit 0 ;;
+    *)              die "Unknown arg: $1" ;;
   esac
 done
 
@@ -106,9 +120,65 @@ command -v curl >/dev/null 2>&1 || die "curl not found on PATH"
 HAVE_JQ=0
 if command -v jq >/dev/null 2>&1; then HAVE_JQ=1; fi
 
+load_token_from_file() {
+  local path="$1"
+  [[ -n "$path" ]] || die "--token-file requires a path" 5
+  [[ -e "$path" ]] || die "--token-file not found: $path" 5
+  # BUG-018 pattern — refuse symlinks. symlink_metadata equivalent in bash.
+  [[ -L "$path" ]] && die "--token-file refuses symlinks: $path" 5
+  [[ -f "$path" ]] || die "--token-file not a regular file: $path" 5
+  # Require Unix mode <= 0o600 on real Unix hosts. On Windows Git Bash /
+  # MSYS / Cygwin the kernel doesn't expose Unix mode bits meaningfully
+  # (stat always reports 0o644 for user-owned files regardless of chmod);
+  # NTFS ACLs handle this layer separately, so skip the check there.
+  local kernel=""
+  if command -v uname >/dev/null 2>&1; then
+    kernel=$(uname -s 2>/dev/null || echo "")
+  fi
+  case "$kernel" in
+    MINGW*|MSYS*|CYGWIN*)
+      info "(Windows host detected — skipping Unix mode check; ensure NTFS ACLs restrict the file to your user only)"
+      ;;
+    *)
+      if command -v stat >/dev/null 2>&1; then
+        local mode
+        # GNU stat first, BSD stat second
+        mode=$(stat -c '%a' "$path" 2>/dev/null || stat -f '%Lp' "$path" 2>/dev/null || echo "")
+        if [[ -n "$mode" ]]; then
+          # Allow 0600, 0400, 0200 (owner-read/write only). Reject anything
+          # with group or other bits set.
+          case "$mode" in
+            600|400|200) ;;
+            *) die "--token-file mode must be <= 0o600, got 0o${mode}: $path" 5 ;;
+          esac
+        fi
+      fi
+      ;;
+  esac
+  # Read the file; strip whitespace + newlines. Never echo the content.
+  local raw
+  raw=$(cat "$path")
+  # shellcheck disable=SC2001 # sed is clearer than ${var//re/} here
+  raw=$(printf '%s' "$raw" | sed 's/[[:space:]]//g')
+  [[ -n "$raw" ]] || die "--token-file is empty or whitespace-only: $path" 5
+  # Loose sanity check — CF tokens are typically 40+ chars of [A-Za-z0-9_-].
+  if [[ ${#raw} -lt 20 ]]; then
+    die "--token-file content too short to be a valid CF API token (${#raw} chars)" 5
+  fi
+  CF_API_TOKEN="$raw"
+  export CF_API_TOKEN
+}
+
 if [[ "$VERIFY_ONLY" -eq 0 ]]; then
-  # Only need the token when we are going to PATCH
-  [[ -n "${CF_API_TOKEN:-}" ]] || die "CF_API_TOKEN env var not set. See script header for token scope."
+  # --token-file takes precedence over the env var when both are supplied.
+  # Track "was the flag passed?" separately from "is the value non-empty?"
+  # so `--token-file ""` gives a precise error instead of falling through
+  # to the generic "no token source" message.
+  if [[ "$TOKEN_FILE_SET" -eq 1 ]]; then
+    load_token_from_file "$TOKEN_FILE"
+    info "Token loaded from file (length ${#CF_API_TOKEN} chars)"
+  fi
+  [[ -n "${CF_API_TOKEN:-}" ]] || die "No token source: pass --token-file <path> or set CF_API_TOKEN env var."
 fi
 
 # ---------------------------------------------------------------------------

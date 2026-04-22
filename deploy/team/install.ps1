@@ -8,7 +8,7 @@
     SHA-256 integrity verification and automatic download if needed.
 
     Author  : Manish Kumar
-    Project : AccessBridge v0.22.0
+    Project : AccessBridge v0.25.0
     Session : 24 — Team-tier installer
     Updated : 2026-04-21
 
@@ -74,7 +74,7 @@ $EXPECTED_SHA256 = [ordered]@{
     'install-windows.ps1' = 'PLACEHOLDER_WINDOWS_SHA256'
 }
 
-$ACCESSBRIDGE_VERSION = '0.22.0'
+$ACCESSBRIDGE_VERSION = '0.25.0'
 $BASE_URL             = 'https://accessbridge.space/team'
 
 # ---------------------------------------------------------------------------

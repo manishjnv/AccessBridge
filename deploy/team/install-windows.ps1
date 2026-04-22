@@ -9,7 +9,7 @@
     (10-1000 users) without full MDM/ADMX infrastructure.
 
     Author  : Manish Kumar
-    Project : AccessBridge v0.22.0
+    Project : AccessBridge v0.25.0
     Session : 24 — Team-tier installer
     Updated : 2026-04-21
 
@@ -72,7 +72,7 @@ $ErrorActionPreference = 'Stop'
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-$script:VERSION              = '0.22.0'
+$script:VERSION              = '0.25.0'
 $script:EXTENSION_ID         = 'REPLACE_WITH_REAL_EXTENSION_ID'
 $script:UPDATE_URL           = 'https://accessbridge.space/chrome/updates.xml'
 $script:FORCE_INSTALL_ENTRY  = "$($script:EXTENSION_ID);$($script:UPDATE_URL)"

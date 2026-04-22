@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# AccessBridge v0.22.0 — macOS Team Installer
+# AccessBridge v0.25.0 — macOS Team Installer
 # Author : Manish Kumar
 # Project: AccessBridge — Ambient Accessibility Middleware (A11yOS)
 # Session: 24 (Team tier — scripted install for 10-1000 users)
@@ -33,7 +33,7 @@ set -euo pipefail
 # Constants — edit these before production deployment
 # ---------------------------------------------------------------------------
 
-readonly VERSION="0.22.0"
+readonly VERSION="0.25.0"
 readonly BUNDLE_ID="com.accessbridge.desktop"
 readonly APP_NAME="AccessBridge Desktop Agent"
 

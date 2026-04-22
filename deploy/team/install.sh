@@ -3,7 +3,7 @@
 # AccessBridge Team-tier Universal Installer — macOS + Linux dispatcher
 #
 # Author  : Manish Kumar
-# Project : AccessBridge v0.22.0
+# Project : AccessBridge v0.25.0
 # Session : 24 — Team-tier installer
 # Updated : 2026-04-21
 #
@@ -32,7 +32,7 @@ declare -A EXPECTED_SHA256=(
   [install-linux.sh]="PLACEHOLDER_LINUX_SHA256"
 )
 
-ACCESSBRIDGE_VERSION="0.22.0"
+ACCESSBRIDGE_VERSION="0.25.0"
 BASE_URL="https://accessbridge.space/team"
 
 # ---------------------------------------------------------------------------
@@ -46,7 +46,7 @@ die() { _red "ERROR: $*" >&2; exit 1; }
 
 print_help() {
   cat <<'HELP'
-AccessBridge Team Installer — Universal Bash Dispatcher v0.22.0
+AccessBridge Team Installer — Universal Bash Dispatcher v0.25.0
 Author: Manish Kumar
 
 USAGE

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# AccessBridge v0.22.0 — Linux Team Installer
+# AccessBridge v0.25.0 — Linux Team Installer
 # Author : Manish Kumar
 # Purpose: Install the AccessBridge Chrome extension (and optional desktop
 #          agent) on Linux workstations managed by IT/team leads.
@@ -30,7 +30,7 @@ set -euo pipefail
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-readonly VERSION="0.22.0"
+readonly VERSION="0.25.0"
 readonly EXTENSION_ID="abcdefghijklmnopqrstuvwxyzabcdef"  # REPLACE BEFORE PRODUCTION DEPLOY
 readonly UPDATE_URL="https://accessbridge.space/chrome/updates.xml"
 

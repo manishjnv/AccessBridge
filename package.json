@@ -28,12 +28,12 @@
     }
   },
   "devDependencies": {
-    "@axe-core/playwright": "^4.10.1",
-    "@playwright/test": "^1.48.2",
+    "@axe-core/playwright": "^4.11.3",
+    "@playwright/test": "^1.60.0",
     "@types/node": "^20.12.0",
-    "axe-core": "^4.10.2",
+    "axe-core": "^4.11.4",
     "cross-env": "^7.0.3",
     "husky": "^9.1.7",
-    "playwright": "^1.48.2"
+    "playwright": "^1.60.0"
   }
 }
